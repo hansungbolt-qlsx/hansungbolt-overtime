@@ -52,6 +52,7 @@ export async function GET(
   if (reg.department !== 'HD' && reg.department !== 'RL') {
     return NextResponse.json({ error: 'Department không hợp lệ' }, { status: 500 });
   }
+  const department: 'HD' | 'RL' = reg.department;
 
   const { data: items, error: itemErr } = await supabaseAdmin
     .from('overtime_items')
@@ -113,15 +114,15 @@ export async function GET(
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buf as unknown as ArrayBuffer);
 
-  const sheet = wb.getWorksheet(reg.department);
+  const sheet = wb.getWorksheet(department);
   if (!sheet) {
     return NextResponse.json(
-      { error: `Template thiếu sheet ${reg.department}` },
+      { error: `Template thiếu sheet ${department}` },
       { status: 500 },
     );
   }
 
-  for (const r of DATA_MERGES[reg.department]) {
+  for (const r of DATA_MERGES[department]) {
     try {
       sheet.unMergeCells(r);
     } catch {}
@@ -133,7 +134,7 @@ export async function GET(
     }
   }
 
-  sheet.getCell('H5').value = `Bộ phận:  ${reg.department}\r\nDepartment:`;
+  sheet.getCell('H5').value = `Bộ phận:  ${department}\r\nDepartment:`;
 
   const timeLabel = `${formatTime(reg.time_from)}-${formatTime(reg.time_to)}`;
   const hours = Number(reg.duration_hours);
@@ -179,7 +180,7 @@ export async function GET(
   noteCell.font = { italic: true, size: 10 };
 
   const outBuf = await wb.xlsx.writeBuffer();
-  const filename = `Phieu_TangCa_${reg.department}_${reg.overtime_date}.xlsx`;
+  const filename = `Phieu_TangCa_${department}_${reg.overtime_date}.xlsx`;
 
   return new Response(outBuf as BodyInit, {
     headers: {
