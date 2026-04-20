@@ -264,66 +264,74 @@ export default function OvertimeForm({ department }: { department: string }) {
 
                 {/* Machine checkboxes */}
                 <div>
-                  <label className="block text-xs font-semibold text-brand-navy mb-2">
-                    Chọn máy{' '}
-                    {row.checkedMachineIds.length > 0 && (
-                      <span className="text-brand-teal font-semibold">
-                        ({row.checkedMachineIds.length} máy)
-                      </span>
-                    )}
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {visibleMachines.map((machine) => {
-                      const checked = row.checkedMachineIds.includes(machine.id);
-                      const itemCode = machine.items[0]?.item_code ?? '—';
-                      const qty = plannedQty(machine.rpm);
-                      return (
-                        <button
-                          key={machine.id}
-                          type="button"
-                          onClick={() => toggleMachine(idx, machine.id)}
-                          className={`text-left p-2.5 rounded-lg border-2 transition ${
-                            checked
-                              ? 'bg-brand-teal/10 border-brand-teal'
-                              : 'bg-gray-50 border-gray-200 hover:border-brand-teal/40'
-                          }`}
-                        >
-                          <div className="flex items-start gap-2">
-                            {/* Custom checkbox */}
-                            <div
-                              className={`mt-0.5 w-4 h-4 rounded flex-shrink-0 flex items-center justify-center border-2 transition ${
-                                checked
-                                  ? 'bg-brand-teal border-brand-teal'
-                                  : 'border-gray-300 bg-white'
-                              }`}
-                            >
-                              {checked && (
-                                <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 10 8">
-                                  <path
-                                    d="M1 4l3 3 5-6"
-                                    stroke="currentColor"
-                                    strokeWidth="1.8"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                  />
-                                </svg>
-                              )}
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-semibold text-brand-navy">
+                      Chọn máy{' '}
+                      {row.checkedMachineIds.length > 0 && (
+                        <span className="text-brand-teal font-semibold">
+                          ({row.checkedMachineIds.length} máy)
+                        </span>
+                      )}
+                    </label>
+                    <span className="text-[10px] text-brand-navy-soft">
+                      {visibleMachines.length} máy khả dụng
+                    </span>
+                  </div>
+                  <div className="max-h-[360px] overflow-y-auto border border-brand-surface-alt rounded-lg p-1.5 bg-brand-surface/40">
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {visibleMachines.map((machine) => {
+                        const checked = row.checkedMachineIds.includes(machine.id);
+                        const itemCode = machine.items[0]?.item_code ?? '—';
+                        const qty = plannedQty(machine.rpm);
+                        return (
+                          <button
+                            key={machine.id}
+                            type="button"
+                            onClick={() => toggleMachine(idx, machine.id)}
+                            className={`text-left px-2 py-1.5 rounded-md border transition ${
+                              checked
+                                ? 'bg-brand-teal/10 border-brand-teal'
+                                : 'bg-white border-gray-200 hover:border-brand-teal/40'
+                            }`}
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <div
+                                className={`w-3.5 h-3.5 rounded flex-shrink-0 flex items-center justify-center border transition ${
+                                  checked
+                                    ? 'bg-brand-teal border-brand-teal'
+                                    : 'border-gray-300 bg-white'
+                                }`}
+                              >
+                                {checked && (
+                                  <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 10 8">
+                                    <path
+                                      d="M1 4l3 3 5-6"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    />
+                                  </svg>
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-baseline justify-between gap-1">
+                                  <span className="text-xs font-bold text-brand-navy leading-tight">
+                                    {machine.code}
+                                  </span>
+                                  <span className="text-[10px] text-brand-navy-soft leading-tight">
+                                    {qty.toLocaleString('vi-VN')}
+                                  </span>
+                                </div>
+                                <div className="text-[10px] text-brand-teal font-medium truncate leading-tight">
+                                  {itemCode}
+                                </div>
+                              </div>
                             </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="text-sm font-bold text-brand-navy leading-tight">
-                                {machine.code}
-                              </div>
-                              <div className="text-xs text-brand-teal font-medium mt-0.5 truncate">
-                                {itemCode}
-                              </div>
-                              <div className="text-xs text-brand-navy-soft">
-                                {qty.toLocaleString('vi-VN')} pcs
-                              </div>
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               </div>
