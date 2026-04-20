@@ -5,54 +5,123 @@ import { getSession } from '@/lib/auth-server';
 
 export const runtime = 'nodejs';
 
-async function cropYellowLabel(inputBuffer: Buffer): Promise<Buffer> {
+// Tự động nhận dạng và crop vùng tem NVL — hỗ trợ nhiều màu tem khác nhau
+async function cropLabel(inputBuffer: Buffer): Promise<Buffer> {
   const meta = await sharp(inputBuffer).metadata();
   const origW = meta.width ?? 0;
   const origH = meta.height ?? 0;
   if (!origW || !origH) return inputBuffer;
 
-  // Resize xuống 800px để detection nhanh
   const detectW = 800;
   const detectH = Math.round(origH * (detectW / origW));
+  const total = detectW * detectH;
 
   const { data, info } = await sharp(inputBuffer)
     .resize(detectW, detectH)
     .raw()
     .toBuffer({ resolveWithObject: true });
 
-  const ch = info.channels; // 3 hoặc 4
-  let minX = detectW, maxX = 0, minY = detectH, maxY = 0;
-  let yellowCount = 0;
+  const ch = info.channels;
 
-  for (let y = 0; y < detectH; y++) {
-    for (let x = 0; x < detectW; x++) {
-      const i = (y * detectW + x) * ch;
-      const r = data[i], g = data[i + 1], b = data[i + 2];
-      // Màu vàng tem NVL: R cao, G trung cao, B thấp
-      if (r > 155 && g > 110 && b < 110 && r - b > 70 && g - b > 30) {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-        yellowCount++;
+  type BBox = { minX: number; maxX: number; minY: number; maxY: number; count: number };
+
+  function scan(pred: (r: number, g: number, b: number) => boolean): BBox {
+    let minX = detectW, maxX = -1, minY = detectH, maxY = -1, count = 0;
+    for (let y = 0; y < detectH; y++) {
+      for (let x = 0; x < detectW; x++) {
+        const i = (y * detectW + x) * ch;
+        if (pred(data[i], data[i + 1], data[i + 2])) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+          count++;
+        }
       }
     }
+    return { minX, maxX, minY, maxY, count };
   }
 
-  const yellowRatio = yellowCount / (detectW * detectH);
-  // Nếu không tìm thấy vùng vàng đủ lớn → trả về ảnh gốc
-  if (yellowRatio < 0.04 || maxX <= minX || maxY <= minY) return inputBuffer;
+  // Kiểm tra vùng hợp lệ: pixel đủ nhiều, bbox không quá nhỏ/lớn, mật độ > 30%
+  function valid(b: BBox, minR: number, maxR: number): boolean {
+    if (b.maxX < b.minX || b.maxY < b.minY) return false;
+    const ratio = b.count / total;
+    if (ratio < minR || ratio > maxR) return false;
+    const boxArea = (b.maxX - b.minX + 1) * (b.maxY - b.minY + 1);
+    return b.count / boxArea >= 0.28;
+  }
 
-  // Scale tọa độ về kích thước gốc + padding 2%
+  // Tỉ lệ pixel khớp ở viền ảnh (outer 8%) — dùng phán đoán nền
+  function borderRatio(pred: (r: number, g: number, b: number) => boolean): number {
+    const mg = Math.floor(Math.min(detectW, detectH) * 0.08);
+    let match = 0, tot = 0;
+    for (let y = 0; y < detectH; y++) {
+      for (let x = 0; x < detectW; x++) {
+        if (x < mg || x > detectW - mg || y < mg || y > detectH - mg) {
+          tot++;
+          const i = (y * detectW + x) * ch;
+          if (pred(data[i], data[i + 1], data[i + 2])) match++;
+        }
+      }
+    }
+    return match / tot;
+  }
+
+  // ── Màu sắc từng loại tem ────────────────────────────────────────
+  // 1. Vàng sáng — Daeho vàng (SWCH series)
+  const isYellow = (r: number, g: number, b: number) =>
+    r > 155 && g > 110 && b < 115 && r - b > 65 && g - b > 28;
+
+  // 2. Xanh dương/cyan — Daeho xanh (SCM/GSCM series)
+  const isCyan = (r: number, g: number, b: number) =>
+    b > 170 && g > 135 && r < 180 && b - r > 45;
+
+  // 3. Nền xanh lá nhà máy (sắt sơn xanh)
+  const isGreenBg = (r: number, g: number, b: number) =>
+    g > 90 && g > r * 1.10 && g > b * 1.02 && g < 210;
+
+  // 4. Trắng/kem — Daeho trắng, Vinh Thành, NGK, KOS
+  const isWhite = (r: number, g: number, b: number) =>
+    r > 185 && g > 185 && b > 185;
+
+  const greenBg  = borderRatio(isGreenBg);
+  const whiteBdr = borderRatio(isWhite);
+
+  let best: BBox | null = null;
+
+  // Ưu tiên 1: Tem vàng
+  const yellow = scan(isYellow);
+  if (valid(yellow, 0.04, 0.85)) { best = yellow; }
+
+  // Ưu tiên 2: Tem xanh dương/cyan
+  if (!best) {
+    const cyan = scan(isCyan);
+    if (valid(cyan, 0.04, 0.85)) { best = cyan; }
+  }
+
+  // Ưu tiên 3: Nền xanh lá → tìm vùng sáng không xanh lá (tem trắng, KOS, v.v.)
+  if (!best && greenBg > 0.18) {
+    const notGreen = scan((r, g, b) => !isGreenBg(r, g, b) && Math.max(r, g, b) > 100);
+    if (valid(notGreen, 0.05, 0.72)) { best = notGreen; }
+  }
+
+  // Ưu tiên 4: Vùng trắng (khi viền ảnh không trắng)
+  if (!best && whiteBdr < 0.22) {
+    const white = scan(isWhite);
+    if (valid(white, 0.05, 0.72)) { best = white; }
+  }
+
+  if (!best) return inputBuffer;
+
   const scaleX = origW / detectW;
   const scaleY = origH / detectH;
-  const padX = Math.floor((maxX - minX) * 0.02 * scaleX);
-  const padY = Math.floor((maxY - minY) * 0.02 * scaleY);
+  const padX   = Math.floor((best.maxX - best.minX) * 0.025 * scaleX);
+  const padY   = Math.floor((best.maxY - best.minY) * 0.025 * scaleY);
 
-  const left   = Math.max(0, Math.floor(minX * scaleX) - padX);
-  const top    = Math.max(0, Math.floor(minY * scaleY) - padY);
-  const right  = Math.min(origW, Math.ceil(maxX * scaleX) + padX);
-  const bottom = Math.min(origH, Math.ceil(maxY * scaleY) + padY);
+  const left   = Math.max(0, Math.floor(best.minX * scaleX) - padX);
+  const top    = Math.max(0, Math.floor(best.minY * scaleY) - padY);
+  const right  = Math.min(origW, Math.ceil(best.maxX * scaleX) + padX);
+  const bottom = Math.min(origH, Math.ceil(best.maxY * scaleY) + padY);
 
   return sharp(inputBuffer)
     .extract({ left, top, width: right - left, height: bottom - top })
@@ -115,7 +184,7 @@ export async function POST(req: Request) {
     const nameSuffix = typeof employeeName === 'string' && employeeName ? `__${employeeName}` : '';
     const path = `${date}/${Date.now()}_${rand}${nameSuffix}.${safeExt}`;
     const rawBuf = Buffer.from(await file.arrayBuffer());
-    const buf = await cropYellowLabel(rawBuf).catch(() => rawBuf);
+    const buf = await cropLabel(rawBuf).catch(() => rawBuf);
 
     const { error: upErr } = await supabaseAdmin.storage
       .from(BUCKET)
