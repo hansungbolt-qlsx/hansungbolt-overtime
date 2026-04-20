@@ -96,7 +96,7 @@ export default async function PrintViewPage({
           <PrintControls id={id} autoprint={autoprint} />
         </div>
 
-        <article className="bg-white p-6 md:p-10 shadow-sm print:shadow-none print:p-0 text-[13px] text-black">
+        <article className="ot-form bg-white p-6 md:p-10 shadow-sm print:shadow-none print:p-0 text-[13px] text-black">
           <div className="flex justify-between items-start mb-2">
             <div>
               <Image
@@ -120,11 +120,11 @@ export default async function PrintViewPage({
             </div>
           </div>
 
-          <header className="text-center mb-3">
-            <h1 className="font-bold text-2xl leading-tight">
+          <header className="text-center mb-2">
+            <h1 className="font-bold text-xl leading-tight">
               PHIẾU ĐĂNG KÝ TĂNG CA
             </h1>
-            <div className="text-base font-semibold mt-0.5">OVERTIME REGISTRATION FORM</div>
+            <div className="text-sm font-semibold mt-0.5">OVERTIME REGISTRATION FORM</div>
           </header>
 
           <div className="grid grid-cols-2 border border-black mb-0">
@@ -142,7 +142,24 @@ export default async function PrintViewPage({
             </div>
           </div>
 
-          <table className="w-full border-collapse border border-black text-center">
+          <table
+            className="w-full border-collapse border border-black text-center"
+            style={{ tableLayout: 'fixed' }}
+          >
+            <colgroup>
+              <col style={{ width: '3%' }} />
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '5%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '5%' }} />
+              <col style={{ width: '9%' }} />
+              <col style={{ width: '13%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '5%' }} />
+              <col style={{ width: '14%' }} />
+            </colgroup>
             <thead className="bg-gray-100">
               <tr>
                 <th className="border border-black px-1 py-1 w-10" rowSpan={2}>
@@ -223,10 +240,10 @@ export default async function PrintViewPage({
                         <td className="border border-black px-1 py-1" rowSpan={span}>
                           {stt}
                         </td>
-                        <td className="border border-black px-2 py-1 text-left" rowSpan={span}>
+                        <td className="border border-black px-2 py-1 text-left whitespace-nowrap" rowSpan={span}>
                           {group.full_name}
                         </td>
-                        <td className="border border-black px-1 py-1" rowSpan={span}>
+                        <td className="border border-black px-1 py-1 whitespace-nowrap" rowSpan={span}>
                           {timeLabel}
                         </td>
                         <td className="border border-black px-1 py-1" rowSpan={span}>
@@ -236,9 +253,9 @@ export default async function PrintViewPage({
                         <td className="border border-black px-1 py-1" rowSpan={span}></td>
                       </>
                     )}
-                    <td className="border border-black px-1 py-1">{row.code}</td>
-                    <td className="border border-black px-1 py-1">{row.item_code}</td>
-                    <td className="border border-black px-1 py-1 text-right">
+                    <td className="border border-black px-1 py-1 whitespace-nowrap">{row.code}</td>
+                    <td className="border border-black px-1 py-1 whitespace-nowrap">{row.item_code}</td>
+                    <td className="border border-black px-1 py-1 text-right whitespace-nowrap">
                       {row.qty.toLocaleString('vi-VN')}
                     </td>
                     <td className="border border-black px-1 py-1"></td>
@@ -253,35 +270,58 @@ export default async function PrintViewPage({
           </table>
 
           <div
-            className="grid border border-black mt-4 text-center"
+            className="ot-signatures grid border border-black mt-3 text-center"
             style={{ gridTemplateColumns: '1fr 1fr 1fr 1.5fr' }}
           >
             <div className="border-r border-black">
-              <div className="font-bold py-1.5 border-b border-black bg-gray-50">Người ghi</div>
-              <div className="h-20"></div>
+              <div className="font-bold py-1 border-b border-black bg-gray-50">Người ghi</div>
+              <div className="ot-sig-pad h-16"></div>
             </div>
             <div className="border-r border-black">
-              <div className="font-bold py-1.5 border-b border-black bg-gray-50">Kiểm Tra</div>
-              <div className="h-20"></div>
+              <div className="font-bold py-1 border-b border-black bg-gray-50">Kiểm Tra</div>
+              <div className="ot-sig-pad h-16"></div>
             </div>
             <div className="border-r border-black">
-              <div className="font-bold py-1.5 border-b border-black bg-gray-50">Giám sát</div>
-              <div className="h-20"></div>
+              <div className="font-bold py-1 border-b border-black bg-gray-50">Giám sát</div>
+              <div className="ot-sig-pad h-16"></div>
             </div>
             <div>
-              <div className="font-bold py-1.5 border-b border-black bg-gray-50">Nhân sự</div>
-              <div className="h-20"></div>
+              <div className="font-bold py-1 border-b border-black bg-gray-50">Nhân sự</div>
+              <div className="ot-sig-pad h-16"></div>
             </div>
           </div>
 
-          <p className="italic text-xs mt-3 leading-relaxed">{FOOTER_NOTE}</p>
+          <p className="ot-footer italic text-xs mt-2 leading-relaxed">{FOOTER_NOTE}</p>
         </article>
       </div>
 
       <style>{`
         @media print {
-          @page { size: A4 landscape; margin: 10mm; }
-          body { background: white !important; }
+          @page { size: A4 landscape; margin: 7mm; }
+          html, body { background: white !important; }
+          .ot-form {
+            font-size: 9pt !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          .ot-form h1 { font-size: 15pt !important; }
+          .ot-form table { font-size: 8.5pt !important; }
+          .ot-form table th,
+          .ot-form table td {
+            padding: 1px 3px !important;
+            line-height: 1.1 !important;
+          }
+          .ot-form .ot-sig-pad { height: 38px !important; }
+          .ot-form .ot-signatures .font-bold { padding: 2px 0 !important; }
+          .ot-form .ot-footer { font-size: 7.5pt !important; margin-top: 4px !important; }
+          .ot-form img { height: 36px !important; }
+          /* Force background colors to print */
+          .ot-form thead,
+          .ot-form .bg-gray-50,
+          .ot-form .bg-gray-100 {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
         }
       `}</style>
     </main>
