@@ -26,7 +26,11 @@ export async function middleware(req: NextRequest) {
 
   try {
     const session = await verifySession(token);
-    if (pathname.startsWith('/dashboard') && session.role !== 'admin') {
+    if (
+      pathname.startsWith('/dashboard') &&
+      !pathname.startsWith('/dashboard/registrations/') &&
+      session.role !== 'admin'
+    ) {
       return NextResponse.redirect(new URL('/register', req.url));
     }
     if (pathname.startsWith('/register') && session.role === 'admin') {
