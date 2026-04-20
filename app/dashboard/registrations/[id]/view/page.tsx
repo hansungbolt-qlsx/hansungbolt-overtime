@@ -207,13 +207,13 @@ export default async function PrintViewPage({
           >
             <colgroup>
               <col style={{ width: '4%' }} />
-              <col style={{ width: '15%' }} />
-              <col style={{ width: '9%' }} />
+              <col style={{ width: '20%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '5%' }} />
+              <col style={{ width: '8%' }} />
               <col style={{ width: '5%' }} />
               <col style={{ width: '9%' }} />
-              <col style={{ width: '5%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '13%' }} />
+              <col style={{ width: '11%' }} />
               <col style={{ width: '8%' }} />
               <col style={{ width: '8%' }} />
               <col style={{ width: '5%' }} />
@@ -328,7 +328,7 @@ export default async function PrintViewPage({
 
           <div
             className="ot-signatures grid ot-bordered mt-3 text-center"
-            style={{ gridTemplateColumns: '1fr 1fr 1fr 1.5fr' }}
+            style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}
           >
             <div className="ot-border-r">
               <div className="font-bold py-1 ot-border-b">Người ghi</div>
