@@ -1,8 +1,64 @@
 import { NextResponse } from 'next/server';
+import sharp from 'sharp';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
 
 export const runtime = 'nodejs';
+
+async function cropYellowLabel(inputBuffer: Buffer): Promise<Buffer> {
+  const meta = await sharp(inputBuffer).metadata();
+  const origW = meta.width ?? 0;
+  const origH = meta.height ?? 0;
+  if (!origW || !origH) return inputBuffer;
+
+  // Resize xuống 800px để detection nhanh
+  const detectW = 800;
+  const detectH = Math.round(origH * (detectW / origW));
+
+  const { data, info } = await sharp(inputBuffer)
+    .resize(detectW, detectH)
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const ch = info.channels; // 3 hoặc 4
+  let minX = detectW, maxX = 0, minY = detectH, maxY = 0;
+  let yellowCount = 0;
+
+  for (let y = 0; y < detectH; y++) {
+    for (let x = 0; x < detectW; x++) {
+      const i = (y * detectW + x) * ch;
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      // Màu vàng tem NVL: R cao, G trung cao, B thấp
+      if (r > 155 && g > 110 && b < 110 && r - b > 70 && g - b > 30) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+        yellowCount++;
+      }
+    }
+  }
+
+  const yellowRatio = yellowCount / (detectW * detectH);
+  // Nếu không tìm thấy vùng vàng đủ lớn → trả về ảnh gốc
+  if (yellowRatio < 0.04 || maxX <= minX || maxY <= minY) return inputBuffer;
+
+  // Scale tọa độ về kích thước gốc + padding 2%
+  const scaleX = origW / detectW;
+  const scaleY = origH / detectH;
+  const padX = Math.floor((maxX - minX) * 0.02 * scaleX);
+  const padY = Math.floor((maxY - minY) * 0.02 * scaleY);
+
+  const left   = Math.max(0, Math.floor(minX * scaleX) - padX);
+  const top    = Math.max(0, Math.floor(minY * scaleY) - padY);
+  const right  = Math.min(origW, Math.ceil(maxX * scaleX) + padX);
+  const bottom = Math.min(origH, Math.ceil(maxY * scaleY) + padY);
+
+  return sharp(inputBuffer)
+    .extract({ left, top, width: right - left, height: bottom - top })
+    .jpeg({ quality: 88 })
+    .toBuffer();
+}
 
 const BUCKET = 'material-labels';
 const MAX_FILES = 30;
@@ -58,7 +114,8 @@ export async function POST(req: Request) {
     const rand = Math.random().toString(36).slice(2, 8);
     const nameSuffix = typeof employeeName === 'string' && employeeName ? `__${employeeName}` : '';
     const path = `${date}/${Date.now()}_${rand}${nameSuffix}.${safeExt}`;
-    const buf = await file.arrayBuffer();
+    const rawBuf = Buffer.from(await file.arrayBuffer());
+    const buf = await cropYellowLabel(rawBuf).catch(() => rawBuf);
 
     const { error: upErr } = await supabaseAdmin.storage
       .from(BUCKET)
