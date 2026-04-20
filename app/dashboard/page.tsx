@@ -1,13 +1,10 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth-server';
 import { supabaseAdmin } from '@/lib/supabase';
-import LogoutButton from '@/components/LogoutButton';
-import ChangePasswordButton from '@/components/ChangePasswordButton';
+import DashboardHeader from '@/components/DashboardHeader';
 import MaterialLabelsAdminCard from '@/components/MaterialLabelsAdminCard';
 import OvertimeSummaryCard from '@/components/OvertimeSummaryCard';
-import UserManagementCard from '@/components/UserManagementCard';
 import DeleteRegistrationButton from '@/components/DeleteRegistrationButton';
 import { toTitleCase } from '@/lib/format';
 
@@ -95,31 +92,7 @@ export default async function DashboardPage({
   return (
     <main className="min-h-screen bg-brand-pattern p-4 md:p-8">
       <div className="max-w-5xl mx-auto">
-        <header className="flex justify-between items-center mb-6 gap-4">
-          <div className="flex items-center gap-3">
-            <Image
-              src="/logo.png"
-              alt="Hansungbolt"
-              width={890}
-              height={405}
-              priority
-              unoptimized
-              className="h-10 w-auto"
-            />
-            <div>
-              <h1 className="text-xl md:text-2xl font-bold text-brand-navy">
-                Dashboard Admin
-              </h1>
-              <p className="text-xs md:text-sm text-brand-navy-soft">
-                Xin chào, {toTitleCase(session.fullName)}
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-col gap-2 flex-shrink-0">
-            <LogoutButton />
-            <ChangePasswordButton />
-          </div>
-        </header>
+        <DashboardHeader fullName={session.fullName} active="overview" />
 
         <div className="grid gap-4 md:grid-cols-2 mb-6">
           <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-5">
@@ -242,10 +215,6 @@ export default async function DashboardPage({
 
         <div className="mt-6">
           <OvertimeSummaryCard />
-        </div>
-
-        <div className="mt-6">
-          <UserManagementCard />
         </div>
       </div>
     </main>
