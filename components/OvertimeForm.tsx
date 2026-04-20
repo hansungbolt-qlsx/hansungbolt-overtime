@@ -316,7 +316,7 @@ export default function OvertimeForm({ department }: { department: string }) {
                               </div>
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-baseline justify-between gap-1">
-                                  <span className="text-xs font-bold text-brand-navy leading-tight">
+                                  <span className="text-sm font-bold text-brand-navy leading-tight">
                                     {machine.code}
                                   </span>
                                   <span className="text-[10px] text-brand-navy-soft leading-tight">
