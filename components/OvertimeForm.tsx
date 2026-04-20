@@ -118,18 +118,8 @@ export default function OvertimeForm({ department }: { department: string }) {
     setRows((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
   }
 
-  // Nhóm thiết bị "HD-M4 (6EA)" → nhân số máy trong nhóm
-  function groupMultiplier(code: string): number {
-    const m = code.match(/\((\d+)\s*EA\)/i);
-    return m ? parseInt(m[1], 10) : 1;
-  }
-  // Nhóm "HD-M4 (6EA)" → Mã hàng tự là "M4"
-  function groupItemCode(code: string): string | null {
-    const m = code.match(/^HD-(M\d+)/i);
-    return m ? m[1].toUpperCase() : null;
-  }
-  function plannedQty(rpm: number, code: string) {
-    return Math.round(rpm * 60 * calcHours * groupMultiplier(code));
+  function plannedQty(rpm: number) {
+    return Math.round(rpm * 60 * calcHours);
   }
 
   async function submit() {
@@ -149,13 +139,12 @@ export default function OvertimeForm({ department }: { department: string }) {
         const machine = machines.find((m) => m.id === machineId)!;
         const firstItem = machine.items[0];
         if (!firstItem) continue;
-        const grpCode = groupItemCode(machine.code);
         items.push({
           employee_id: row.employeeId,
           equipment_id: machineId,
-          item_code: grpCode ?? firstItem.item_code,
-          item_name: grpCode ? grpCode : firstItem.item_name,
-          planned_quantity: plannedQty(machine.rpm, machine.code),
+          item_code: firstItem.item_code,
+          item_name: firstItem.item_name,
+          planned_quantity: plannedQty(machine.rpm),
         });
       }
     }
@@ -278,8 +267,8 @@ export default function OvertimeForm({ department }: { department: string }) {
                   <div className="grid grid-cols-2 gap-2">
                     {machines.map((machine) => {
                       const checked = row.checkedMachineIds.includes(machine.id);
-                      const itemCode = groupItemCode(machine.code) ?? machine.items[0]?.item_code ?? '—';
-                      const qty = plannedQty(machine.rpm, machine.code);
+                      const itemCode = machine.items[0]?.item_code ?? '—';
+                      const qty = plannedQty(machine.rpm);
                       return (
                         <button
                           key={machine.id}
