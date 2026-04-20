@@ -25,6 +25,7 @@ ALTER TABLE users ADD CONSTRAINT users_role_check
 -- 3. Wipe dữ liệu test cũ + user cũ (giữ admin)
 DELETE FROM overtime_items;
 DELETE FROM overtime_registrations;
+DELETE FROM material_label_photos;  -- record DB của tem NVL (file storage xóa thủ công ở Supabase)
 DELETE FROM users WHERE role <> 'admin';
 
 -- 4. Seed 25 user mới
