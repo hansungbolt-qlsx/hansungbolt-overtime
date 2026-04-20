@@ -11,6 +11,7 @@ export default function MaterialLabelsUpload({ date }: { date: string }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ kind: 'info' | 'error'; text: string } | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingAll, setDeletingAll] = useState(false);
   // undefined = chưa check localStorage, null = chưa chọn tên, string = đã chọn
   const [employeeName, setEmployeeName] = useState<string | null | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -68,6 +69,22 @@ export default function MaterialLabelsUpload({ date }: { date: string }) {
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
+  async function handleDeleteAll() {
+    if (!confirm(`Xóa toàn bộ ${photos.length} ảnh ngày ${date}?`)) return;
+    setDeletingAll(true);
+    try {
+      const res = await fetch(`/api/labels?date=${date}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        alert(`Xóa thất bại: ${d.error ?? res.statusText}`);
+        return;
+      }
+      setPhotos([]);
+    } finally {
+      setDeletingAll(false);
     }
   }
 
@@ -186,41 +203,53 @@ export default function MaterialLabelsUpload({ date }: { date: string }) {
         )}
 
         {photos.length > 0 && (
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-4">
-            {photos.map((p) => (
-              <div
-                key={p.id}
-                className="relative aspect-square bg-white rounded-lg overflow-hidden shadow-sm"
-              >
-                {p.url ? (
-                  <img
-                    src={p.url}
-                    alt="Tem NVL"
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-xs text-brand-navy-soft">
-                    (không tải được)
-                  </div>
-                )}
-                {p.employee_name && (
-                  <span className="absolute bottom-1 right-1 bg-[#063882]/80 text-white text-[10px] font-bold px-1 rounded leading-tight">
-                    {p.employee_name}
-                  </span>
-                )}
-                <button
-                  type="button"
-                  onClick={() => handleDelete(p.id)}
-                  disabled={deletingId === p.id}
-                  className="absolute top-1 right-1 bg-[#e32531] hover:bg-[#c01f2a] disabled:opacity-60 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-md"
-                  aria-label="Xóa"
+          <>
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-4">
+              {photos.map((p) => (
+                <div
+                  key={p.id}
+                  className="relative aspect-square bg-white rounded-lg overflow-hidden shadow-sm"
                 >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
+                  {p.url ? (
+                    <img
+                      src={p.url}
+                      alt="Tem NVL"
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-xs text-brand-navy-soft">
+                      (không tải được)
+                    </div>
+                  )}
+                  {p.employee_name && (
+                    <span className="absolute bottom-1 right-1 bg-[#063882]/80 text-white text-[10px] font-bold px-1 rounded leading-tight">
+                      {p.employee_name}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(p.id)}
+                    disabled={deletingId === p.id}
+                    className="absolute top-1 right-1 bg-[#e32531] hover:bg-[#c01f2a] disabled:opacity-60 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-md"
+                    aria-label="Xóa"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 flex justify-end">
+              <button
+                type="button"
+                onClick={handleDeleteAll}
+                disabled={deletingAll}
+                className="text-xs text-[#e32531] hover:text-[#c01f2a] font-semibold underline transition disabled:opacity-60"
+              >
+                {deletingAll ? 'Đang xóa...' : 'Xóa toàn bộ'}
+              </button>
+            </div>
+          </>
         )}
       </div>
     </div>

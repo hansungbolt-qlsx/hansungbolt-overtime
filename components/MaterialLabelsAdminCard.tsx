@@ -40,6 +40,23 @@ export default function MaterialLabelsAdminCard({ date }: { date: string }) {
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<Tab>('view');
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [deletingAll, setDeletingAll] = useState(false);
+
+  async function handleDeleteAll() {
+    if (!confirm(`Xóa toàn bộ ${photos.length} ảnh ngày ${date}?`)) return;
+    setDeletingAll(true);
+    try {
+      const res = await fetch(`/api/labels?date=${date}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        alert(`Xóa thất bại: ${d.error ?? res.statusText}`);
+        return;
+      }
+      setPhotos([]);
+    } finally {
+      setDeletingAll(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -113,6 +130,16 @@ export default function MaterialLabelsAdminCard({ date }: { date: string }) {
                       )}
                     </button>
                   ))}
+                </div>
+                <div className="mt-3 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleDeleteAll}
+                    disabled={deletingAll}
+                    className="text-xs text-[#e32531] hover:text-[#c01f2a] font-semibold underline transition disabled:opacity-60"
+                  >
+                    {deletingAll ? 'Đang xóa...' : 'Xóa toàn bộ'}
+                  </button>
                 </div>
                 {lightbox && (
                   <div

@@ -4,6 +4,7 @@ import { getSession } from '@/lib/auth-server';
 import { supabaseAdmin } from '@/lib/supabase';
 import LogoutButton from '@/components/LogoutButton';
 import MaterialLabelsAdminCard from '@/components/MaterialLabelsAdminCard';
+import OvertimeSummaryCard from '@/components/OvertimeSummaryCard';
 
 function todayISO() {
   const d = new Date();
@@ -227,6 +228,10 @@ export default async function DashboardPage({
 
         <div className="mt-6">
           <MaterialLabelsAdminCard date={selectedDate} />
+        </div>
+
+        <div className="mt-6">
+          <OvertimeSummaryCard />
         </div>
       </div>
     </main>

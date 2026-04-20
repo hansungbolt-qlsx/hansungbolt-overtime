@@ -245,6 +245,39 @@ export async function POST(req: Request) {
   });
 }
 
+export async function DELETE(req: Request) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
+
+  const isAdmin = session.role === 'admin';
+  const isHdLeader = session.role === 'leader' && session.department === 'HD';
+  if (!isAdmin && !isHdLeader) {
+    return NextResponse.json({ error: 'Không có quyền xóa toàn bộ' }, { status: 403 });
+  }
+
+  const url = new URL(req.url);
+  const date = url.searchParams.get('date');
+  if (!date) return NextResponse.json({ error: 'Thiếu date' }, { status: 400 });
+
+  const { data, error } = await supabaseAdmin
+    .from('material_label_photos')
+    .select('id, storage_path')
+    .eq('label_date', date);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!data || data.length === 0) return NextResponse.json({ deleted: 0 });
+
+  const paths = data.map((p) => p.storage_path);
+  await supabaseAdmin.storage.from(BUCKET).remove(paths);
+
+  const { error: delErr } = await supabaseAdmin
+    .from('material_label_photos')
+    .delete()
+    .eq('label_date', date);
+  if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
+
+  return NextResponse.json({ deleted: data.length });
+}
+
 export async function GET(req: Request) {
   const session = await getSession();
   if (!session) {
