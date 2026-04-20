@@ -11,15 +11,18 @@ const BUCKET = 'material-labels';
 // Matches "Copy Tem NVL.xlsx" template
 const SLOTS_PER_SHEET = 8;
 
-const SLOT_POSITIONS: Array<{ tl: { col: number; row: number }; br: { col: number; row: number } }> = [
-  { tl: { col: 0, row: 0 }, br: { col: 1, row: 1 } }, // A1
-  { tl: { col: 1, row: 0 }, br: { col: 2, row: 1 } }, // B1
-  { tl: { col: 0, row: 1 }, br: { col: 1, row: 2 } }, // A2
-  { tl: { col: 1, row: 1 }, br: { col: 2, row: 2 } }, // B2
-  { tl: { col: 0, row: 2 }, br: { col: 1, row: 3 } }, // A3
-  { tl: { col: 1, row: 2 }, br: { col: 2, row: 3 } }, // B3
-  { tl: { col: 0, row: 3 }, br: { col: 1, row: 4 } }, // A4
-  { tl: { col: 1, row: 3 }, br: { col: 2, row: 4 } }, // B4
+type AnchorCoord = { col: number; row: number; nativeCol: number; nativeRow: number; nativeColOff: number; nativeRowOff: number };
+const anchor = (col: number, row: number): AnchorCoord => ({ col, row, nativeCol: col, nativeRow: row, nativeColOff: 0, nativeRowOff: 0 });
+
+const SLOT_POSITIONS: Array<{ tl: AnchorCoord; br: AnchorCoord }> = [
+  { tl: anchor(0, 0), br: anchor(1, 1) }, // A1
+  { tl: anchor(1, 0), br: anchor(2, 1) }, // B1
+  { tl: anchor(0, 1), br: anchor(1, 2) }, // A2
+  { tl: anchor(1, 1), br: anchor(2, 2) }, // B2
+  { tl: anchor(0, 2), br: anchor(1, 3) }, // A3
+  { tl: anchor(1, 2), br: anchor(2, 3) }, // B3
+  { tl: anchor(0, 3), br: anchor(1, 4) }, // A4
+  { tl: anchor(1, 3), br: anchor(2, 4) }, // B4
 ];
 
 function configureSheet(sheet: ExcelJS.Worksheet) {
@@ -111,8 +114,8 @@ export async function GET(req: Request) {
         extension: img.ext,
       });
       sheet.addImage(imgId, {
-        tl: { col: slot.tl.col, row: slot.tl.row },
-        br: { col: slot.br.col, row: slot.br.row },
+        tl: slot.tl as unknown as ExcelJS.Anchor,
+        br: slot.br as unknown as ExcelJS.Anchor,
         editAs: 'twoCell',
       });
     }
