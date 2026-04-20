@@ -7,9 +7,10 @@ import { setSessionCookie } from '@/lib/auth-server';
 export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
-  const { username, password } = (await req.json()) as {
+  const { username, password, remember } = (await req.json()) as {
     username?: string;
     password?: string;
+    remember?: boolean;
   };
 
   if (!username || !password) {
@@ -47,7 +48,7 @@ export async function POST(req: Request) {
     role: user.role,
     department: user.department,
   });
-  await setSessionCookie(token);
+  await setSessionCookie(token, remember === true);
 
   return NextResponse.json({
     role: user.role,

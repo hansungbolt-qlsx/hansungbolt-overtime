@@ -11,8 +11,14 @@ export default function MaterialLabelsUpload({ date }: { date: string }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ kind: 'info' | 'error'; text: string } | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [employeeName, setEmployeeName] = useState<string | null>(null);
+  // undefined = chưa check localStorage, null = chưa chọn tên, string = đã chọn
+  const [employeeName, setEmployeeName] = useState<string | null | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('hd_employee_name');
+    setEmployeeName(saved); // null nếu chưa lưu
+  }, []);
 
   async function loadPhotos() {
     setLoading(true);
@@ -81,6 +87,9 @@ export default function MaterialLabelsUpload({ date }: { date: string }) {
     }
   }
 
+  // Đang đọc localStorage — tránh flash màn hình chọn tên
+  if (employeeName === undefined) return null;
+
   // Step 1: Name selector
   if (!employeeName) {
     return (
@@ -94,7 +103,10 @@ export default function MaterialLabelsUpload({ date }: { date: string }) {
             <button
               key={emp.full}
               type="button"
-              onClick={() => setEmployeeName(emp.display)}
+              onClick={() => {
+                localStorage.setItem('hd_employee_name', emp.display);
+                setEmployeeName(emp.display);
+              }}
               className="py-4 rounded-xl bg-[#dce8fa] hover:bg-[#063882] hover:text-white text-[#063882] font-bold text-lg transition active:scale-95 shadow-sm"
             >
               {emp.display}
@@ -123,7 +135,10 @@ export default function MaterialLabelsUpload({ date }: { date: string }) {
           </span>
           <button
             type="button"
-            onClick={() => setEmployeeName(null)}
+            onClick={() => {
+              localStorage.removeItem('hd_employee_name');
+              setEmployeeName(null);
+            }}
             className="text-xs text-blue-200 hover:text-white underline transition"
           >
             Đổi tên

@@ -10,6 +10,7 @@ export type Session = {
 
 export const SESSION_COOKIE = 'session';
 const SESSION_TTL_DAYS = 7;
+const SESSION_REMEMBER_TTL_DAYS = 90;
 
 const secret = new TextEncoder().encode(process.env.JWT_SECRET);
 
@@ -17,7 +18,7 @@ export async function signSession(session: Session): Promise<string> {
   return new SignJWT(session as unknown as JWTPayload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
-    .setExpirationTime(`${SESSION_TTL_DAYS}d`)
+    .setExpirationTime(`${SESSION_REMEMBER_TTL_DAYS}d`)
     .sign(secret);
 }
 
@@ -27,3 +28,4 @@ export async function verifySession(token: string): Promise<Session> {
 }
 
 export const SESSION_MAX_AGE = SESSION_TTL_DAYS * 24 * 60 * 60;
+export const SESSION_REMEMBER_MAX_AGE = SESSION_REMEMBER_TTL_DAYS * 24 * 60 * 60;

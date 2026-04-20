@@ -8,6 +8,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -19,7 +20,7 @@ export default function LoginPage() {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, remember }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -88,6 +89,39 @@ export default function LoginPage() {
               required
             />
           </div>
+
+          {/* Remember me */}
+          <label className="flex items-center gap-2.5 cursor-pointer select-none">
+            <div className="relative">
+              <input
+                type="checkbox"
+                className="sr-only"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+              />
+              <div
+                className={`w-5 h-5 rounded border-2 flex items-center justify-center transition ${
+                  remember
+                    ? 'bg-[#063882] border-[#063882]'
+                    : 'bg-white border-gray-300'
+                }`}
+              >
+                {remember && (
+                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 12 12">
+                    <path
+                      d="M2 6l3 3 5-5"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+              </div>
+            </div>
+            <span className="text-sm text-brand-navy">Ghi nhớ đăng nhập (90 ngày)</span>
+          </label>
+
           {error && (
             <div className="text-sm text-red-600 bg-red-50 border border-red-200 p-2.5 rounded-md">
               {error}

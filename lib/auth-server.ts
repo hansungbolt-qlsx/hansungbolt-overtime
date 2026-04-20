@@ -2,17 +2,18 @@ import { cookies } from 'next/headers';
 import {
   SESSION_COOKIE,
   SESSION_MAX_AGE,
+  SESSION_REMEMBER_MAX_AGE,
   verifySession,
   type Session,
 } from './auth';
 
-export async function setSessionCookie(token: string): Promise<void> {
+export async function setSessionCookie(token: string, remember = false): Promise<void> {
   const store = await cookies();
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: SESSION_MAX_AGE,
+    maxAge: remember ? SESSION_REMEMBER_MAX_AGE : SESSION_MAX_AGE,
     path: '/',
   });
 }
