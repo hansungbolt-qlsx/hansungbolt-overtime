@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth-server';
 import { supabaseAdmin } from '@/lib/supabase';
 import PrintControls from '@/components/PrintControls';
+import { toTitleCase } from '@/lib/format';
 
 const FOOTER_NOTE =
   '* Lưu ý: Đề nghị viết phiếu tăng ca và nộp cho phòng Nhân sự trước 14h30 trước khi tăng ca. Trường hợp tăng ca trước và nộp đơn sau thì sẽ không được tính tiền tăng ca của ngày đó.';
@@ -24,7 +25,7 @@ export default async function PrintViewPage({
   searchParams: Promise<{ autoprint?: string }>;
 }) {
   const session = await getSession();
-  if (!session || session.role !== 'admin') redirect('/login');
+  if (!session) redirect('/login');
 
   const { id } = await params;
   const sp = await searchParams;
@@ -40,6 +41,15 @@ export default async function PrintViewPage({
     return (
       <main className="min-h-screen p-8">
         <p className="text-red-600">Không tìm thấy phiếu.</p>
+      </main>
+    );
+  }
+
+  // Non-admin chỉ xem phiếu bộ phận mình
+  if (session.role !== 'admin' && session.department !== reg.department) {
+    return (
+      <main className="min-h-screen p-8">
+        <p className="text-red-600">Không có quyền xem phiếu này.</p>
       </main>
     );
   }
@@ -300,7 +310,7 @@ export default async function PrintViewPage({
                           {stt}
                         </td>
                         <td className="ot-cell px-2 py-1 text-left whitespace-nowrap" rowSpan={span}>
-                          {group.full_name}
+                          {toTitleCase(group.full_name)}
                         </td>
                         <td className="ot-cell px-1 py-1 whitespace-nowrap" rowSpan={span}>
                           {timeLabel}

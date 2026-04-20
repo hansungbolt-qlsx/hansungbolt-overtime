@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
+import { toTitleCase } from '@/lib/format';
 
 export const runtime = 'nodejs';
 
@@ -32,11 +33,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await getSession();
-  if (!session || session.role !== 'admin') {
-    return NextResponse.json(
-      { error: 'Chưa đăng nhập hoặc không có quyền' },
-      { status: 401 },
-    );
+  if (!session) {
+    return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
   }
 
   const { id } = await params;
@@ -48,6 +46,11 @@ export async function GET(
     .single();
   if (regErr || !reg) {
     return NextResponse.json({ error: 'Không tìm thấy phiếu' }, { status: 404 });
+  }
+
+  // Non-admin chỉ tải file của bộ phận mình
+  if (session.role !== 'admin' && session.department !== reg.department) {
+    return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   }
   if (reg.department !== 'HD' && reg.department !== 'RL') {
     return NextResponse.json({ error: 'Department không hợp lệ' }, { status: 500 });
@@ -197,7 +200,7 @@ export async function GET(
       const row = sheet.getRow(rowPtr);
       if (i === 0) {
         row.getCell(2).value = stt;
-        row.getCell(3).value = group.full_name;
+        row.getCell(3).value = toTitleCase(group.full_name);
         row.getCell(4).value = timeLabel;
         row.getCell(5).value = hours;
       }

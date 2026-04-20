@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { toTitleCase } from '@/lib/format';
 
 type DateEntry = { date: string; dayType: 'weekday' | 'sunday' };
 type EmpRow = { id: string; name: string; byDate: Record<string, number> };
@@ -155,7 +156,7 @@ export default function PrintClient({
               return (
                 <tr key={emp.id}>
                   <td className="stt">{idx + 1}</td>
-                  <td className="name">{emp.name}</td>
+                  <td className="name">{toTitleCase(emp.name)}</td>
                   {overtimeDates.map((d) => {
                     const h = emp.byDate[d.date];
                     return (

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { toTitleCase } from '@/lib/format';
 
 type Employee = { id: string; full_name: string; order_no: number };
 type PlanItem = { item_code: string; item_name: string | null };
@@ -255,7 +256,7 @@ export default function OvertimeForm({ department }: { department: string }) {
                     <option value="">— Chọn nhân viên —</option>
                     {employees.map((e) => (
                       <option key={e.id} value={e.id}>
-                        {e.order_no}. {e.full_name}
+                        {e.order_no}. {toTitleCase(e.full_name)}
                       </option>
                     ))}
                   </select>

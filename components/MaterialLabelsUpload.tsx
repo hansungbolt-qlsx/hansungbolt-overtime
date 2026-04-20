@@ -5,7 +5,13 @@ import { HD_EMPLOYEES } from '@/lib/hd-employees';
 
 type Photo = { id: string; url: string | null; uploaded_at: string; employee_name: string | null };
 
-export default function MaterialLabelsUpload({ date }: { date: string }) {
+export default function MaterialLabelsUpload({
+  date,
+  currentUserFullName,
+}: {
+  date: string;
+  currentUserFullName?: string | null;
+}) {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -17,9 +23,19 @@ export default function MaterialLabelsUpload({ date }: { date: string }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    // Ưu tiên: tên trong session (nếu match danh sách HD) → localStorage → null
+    const matched = currentUserFullName
+      ? HD_EMPLOYEES.find((e) => e.full === currentUserFullName)
+      : null;
+    if (matched) {
+      setEmployeeName(matched.display);
+      // Cập nhật localStorage để giữ nhất quán nếu user "Đổi tên" sau đó
+      localStorage.setItem('hd_employee_name', matched.display);
+      return;
+    }
     const saved = localStorage.getItem('hd_employee_name');
-    setEmployeeName(saved); // null nếu chưa lưu
-  }, []);
+    setEmployeeName(saved);
+  }, [currentUserFullName]);
 
   async function loadPhotos() {
     setLoading(true);

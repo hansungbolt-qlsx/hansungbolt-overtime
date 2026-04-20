@@ -25,12 +25,15 @@ export default async function PrintOvertimeSummaryPage({
   const startDate = `${month}-01`;
   const endDate = new Date(y, m, 0).toISOString().slice(0, 10);
 
-  const { data: regs } = await supabaseAdmin
+  const filterDept = session.role !== 'admin' && session.department ? session.department : null;
+  let regQuery = supabaseAdmin
     .from('overtime_registrations')
     .select('id, overtime_date, day_type')
     .gte('overtime_date', startDate)
     .lte('overtime_date', endDate)
     .order('overtime_date');
+  if (filterDept) regQuery = regQuery.eq('department', filterDept);
+  const { data: regs } = await regQuery;
 
   if (!regs || regs.length === 0) {
     return (

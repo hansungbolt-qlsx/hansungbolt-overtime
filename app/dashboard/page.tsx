@@ -1,10 +1,13 @@
 import Link from 'next/link';
 import Image from 'next/image';
+import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth-server';
 import { supabaseAdmin } from '@/lib/supabase';
 import LogoutButton from '@/components/LogoutButton';
 import MaterialLabelsAdminCard from '@/components/MaterialLabelsAdminCard';
 import OvertimeSummaryCard from '@/components/OvertimeSummaryCard';
+import UserManagementCard from '@/components/UserManagementCard';
+import { toTitleCase } from '@/lib/format';
 
 function todayISO() {
   const d = new Date();
@@ -33,7 +36,8 @@ export default async function DashboardPage({
   searchParams: Promise<{ date?: string }>;
 }) {
   const session = await getSession();
-  if (!session) return null;
+  if (!session) redirect('/login');
+  if (session.role !== 'admin') redirect('/register');
 
   const today = todayISO();
   const sp = await searchParams;
@@ -105,7 +109,7 @@ export default async function DashboardPage({
                 Dashboard Admin
               </h1>
               <p className="text-xs md:text-sm text-brand-navy-soft">
-                Xin chào, {session.fullName}
+                Xin chào, {toTitleCase(session.fullName)}
               </p>
             </div>
           </div>
@@ -197,7 +201,7 @@ export default async function DashboardPage({
                         {itemCountMap.get(r.id) ?? 0}
                       </td>
                       <td className="px-4 py-3 text-brand-navy-soft">
-                        {userMap.get(r.registered_by) ?? '—'}
+                        {toTitleCase(userMap.get(r.registered_by)) || '—'}
                       </td>
                       <td className="px-4 py-3 text-brand-navy-soft">
                         {formatDateTime(r.created_at)}
@@ -232,6 +236,10 @@ export default async function DashboardPage({
 
         <div className="mt-6">
           <OvertimeSummaryCard />
+        </div>
+
+        <div className="mt-6">
+          <UserManagementCard />
         </div>
       </div>
     </main>

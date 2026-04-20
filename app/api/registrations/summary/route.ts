@@ -21,11 +21,16 @@ export async function GET(req: Request) {
   const startDate = `${month}-01`;
   const endDate = new Date(y, m, 0).toISOString().slice(0, 10); // last day of month
 
-  const { data: regs, error: regErr } = await supabaseAdmin
+  // Non-admin chỉ xem dữ liệu bộ phận mình
+  const filterDept = session.role !== 'admin' && session.department ? session.department : null;
+
+  let regQuery = supabaseAdmin
     .from('overtime_registrations')
     .select('id, day_type')
     .gte('overtime_date', startDate)
     .lte('overtime_date', endDate);
+  if (filterDept) regQuery = regQuery.eq('department', filterDept);
+  const { data: regs, error: regErr } = await regQuery;
 
   if (regErr) return NextResponse.json({ error: regErr.message }, { status: 500 });
   if (!regs || regs.length === 0) return NextResponse.json({ month, summary: [] });

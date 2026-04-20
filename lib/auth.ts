@@ -4,7 +4,7 @@ export type Session = {
   userId: string;
   username: string;
   fullName: string;
-  role: 'admin' | 'leader';
+  role: 'admin' | 'leader' | 'worker';
   department: 'HD' | 'RL' | null;
 };
 

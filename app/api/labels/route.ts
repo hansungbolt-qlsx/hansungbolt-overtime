@@ -158,9 +158,16 @@ const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 export async function POST(req: Request) {
   const session = await getSession();
-  if (!session || session.role !== 'leader' || session.department !== 'HD') {
+  // HD leader + worker đều được upload; admin cũng OK
+  if (
+    !session ||
+    !(
+      session.role === 'admin' ||
+      ((session.role === 'leader' || session.role === 'worker') && session.department === 'HD')
+    )
+  ) {
     return NextResponse.json(
-      { error: 'Chỉ tổ trưởng HD được upload tem NVL' },
+      { error: 'Chỉ nhân viên HD được upload tem NVL' },
       { status: 403 },
     );
   }
@@ -249,6 +256,7 @@ export async function DELETE(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
 
+  // Chỉ admin và HD leader mới được xóa toàn bộ (worker không có quyền xóa hàng loạt)
   const isAdmin = session.role === 'admin';
   const isHdLeader = session.role === 'leader' && session.department === 'HD';
   if (!isAdmin && !isHdLeader) {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { toTitleCase } from '@/lib/format';
 
 type SummaryRow = {
   employee_id: string;
@@ -83,7 +84,7 @@ export default function OvertimeSummaryCard() {
                 <tbody className="divide-y divide-[#e8f0fb]">
                   {rows.map((r) => (
                     <tr key={r.employee_id} className="hover:bg-[#f0f5ff]">
-                      <td className="px-4 py-2.5 font-semibold text-brand-navy">{r.employee_name}</td>
+                      <td className="px-4 py-2.5 font-semibold text-brand-navy">{toTitleCase(r.employee_name)}</td>
                       <td className="px-4 py-2.5 text-right text-brand-navy-soft">
                         {r.weekday_count > 0 ? `${r.weekday_count} ngày` : '—'}
                       </td>
