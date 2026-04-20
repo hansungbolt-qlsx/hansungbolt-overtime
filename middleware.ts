@@ -29,7 +29,7 @@ export async function middleware(req: NextRequest) {
     if (pathname.startsWith('/dashboard') && session.role !== 'admin') {
       return NextResponse.redirect(new URL('/register', req.url));
     }
-    if (pathname.startsWith('/register') && session.role !== 'leader') {
+    if (pathname.startsWith('/register') && session.role === 'admin') {
       return NextResponse.redirect(new URL('/dashboard', req.url));
     }
     return NextResponse.next();
