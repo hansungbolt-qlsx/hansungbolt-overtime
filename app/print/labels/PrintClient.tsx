@@ -63,6 +63,19 @@ export default function PrintClient({
           font-weight: 600;
           cursor: pointer;
         }
+        .btn-close {
+          margin-left: auto;
+          padding: 6px 12px;
+          background: #e5e7eb;
+          color: #374151;
+          border: none;
+          border-radius: 6px;
+          font-size: 16px;
+          font-weight: 700;
+          cursor: pointer;
+          line-height: 1;
+        }
+        .btn-close:hover { background: #d1d5db; }
         @media print { .no-print { display: none; } }
       `}</style>
 
@@ -71,6 +84,7 @@ export default function PrintClient({
           Tem NVL ngày {date} — {photos.length} ảnh — {sheets.length} tờ
         </span>
         <button onClick={() => window.print()}>In ngay</button>
+        <button className="btn-close" onClick={() => window.close()} title="Đóng">✕</button>
       </div>
 
       {sheets.map((sheet, si) => (
