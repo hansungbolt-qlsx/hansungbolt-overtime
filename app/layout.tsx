@@ -15,6 +15,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Hansungbolt — Đăng ký tăng ca",
   description: "Hệ thống đăng ký tăng ca Hansungbolt Vietnam",
+  appleWebApp: {
+    title: "Hansungbolt",
+    capable: true,
+    statusBarStyle: "default",
+  },
 };
 
 export default function RootLayout({
