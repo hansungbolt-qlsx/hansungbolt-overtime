@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
+import { toStorageKey, resolveDisplayName } from '@/lib/hd-employees';
 
 export const runtime = 'nodejs';
 
@@ -181,7 +182,9 @@ export async function POST(req: Request) {
     const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
     const safeExt = ['jpg', 'jpeg', 'png', 'webp'].includes(ext) ? ext : 'jpg';
     const rand = Math.random().toString(36).slice(2, 8);
-    const nameSuffix = typeof employeeName === 'string' && employeeName ? `__${employeeName}` : '';
+    const nameSuffix = typeof employeeName === 'string' && employeeName
+      ? `__${toStorageKey(employeeName)}`
+      : '';
     const path = `${date}/${Date.now()}_${rand}${nameSuffix}.${safeExt}`;
     const rawBuf = Buffer.from(await file.arrayBuffer());
     const buf = await cropLabel(rawBuf).catch(() => rawBuf);
@@ -248,7 +251,8 @@ export async function GET(req: Request) {
       const filename = p.storage_path.split('/').pop() ?? '';
       const nameWithoutExt = filename.replace(/\.[^.]+$/, '');
       const parts = nameWithoutExt.split('__');
-      const employee_name = parts.length >= 2 ? parts[1] : null;
+      const rawKey = parts.length >= 2 ? parts[1] : null;
+      const employee_name = rawKey ? resolveDisplayName(rawKey) : null;
       return {
         id: p.id,
         url: signed?.signedUrl ?? null,

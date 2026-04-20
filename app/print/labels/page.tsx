@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth-server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { resolveDisplayName } from '@/lib/hd-employees';
 import PrintClient from './PrintClient';
 
 export default async function PrintLabelsPage({
@@ -28,7 +29,8 @@ export default async function PrintLabelsPage({
         .createSignedUrl(p.storage_path, 3600);
       const filename = p.storage_path.split('/').pop() ?? '';
       const parts = filename.replace(/\.[^.]+$/, '').split('__');
-      const employee_name = parts.length >= 2 ? parts[1] : null;
+      const rawKey = parts.length >= 2 ? parts[1] : null;
+      const employee_name = rawKey ? resolveDisplayName(rawKey) : null;
       return { id: p.id, url: signed?.signedUrl ?? null, employee_name };
     }),
   );
