@@ -2,8 +2,38 @@
 
 import { useEffect, useState } from 'react';
 
-type Photo = { id: string; url: string | null; uploaded_at: string };
+type Photo = { id: string; url: string | null; uploaded_at: string; employee_name: string | null };
 type Tab = 'view' | 'download' | 'print';
+
+const TABS: {
+  id: Tab;
+  label: string;
+  activeCls: string;
+  inactiveCls: string;
+  bgCls: string;
+}[] = [
+  {
+    id: 'view',
+    label: 'Xem ảnh',
+    activeCls: 'bg-[#063882] text-white shadow',
+    inactiveCls: 'bg-[#dce8fa] text-[#063882] hover:bg-[#c4d8f5]',
+    bgCls: 'bg-[#f0f5ff]',
+  },
+  {
+    id: 'download',
+    label: 'Tải Excel',
+    activeCls: 'bg-[#2db5a1] text-white shadow',
+    inactiveCls: 'bg-[#d1f4ef] text-[#0a7f70] hover:bg-[#b8ece6]',
+    bgCls: 'bg-[#f0faf9]',
+  },
+  {
+    id: 'print',
+    label: 'In tem',
+    activeCls: 'bg-[#e32531] text-white shadow',
+    inactiveCls: 'bg-[#fde8e9] text-[#c01f2a] hover:bg-[#fcd0d2]',
+    bgCls: 'bg-[#fff5f5]',
+  },
+];
 
 export default function MaterialLabelsAdminCard({ date }: { date: string }) {
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -23,96 +53,111 @@ export default function MaterialLabelsAdminCard({ date }: { date: string }) {
   }, [date]);
 
   const sheetsNeeded = Math.ceil(photos.length / 8) || 0;
-
-  const tabCls = (t: Tab) =>
-    `py-2 rounded-lg text-sm font-semibold transition flex-1 ${
-      tab === t
-        ? 'bg-white text-brand-navy shadow-sm'
-        : 'text-brand-navy-soft hover:text-brand-navy'
-    }`;
+  const activeCfg = TABS.find((t) => t.id === tab)!;
 
   return (
-    <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-5">
-      <div className="mb-3">
-        <h2 className="text-lg font-semibold text-brand-navy">Tem NVL ngày {date}</h2>
-        <p className="text-sm text-brand-navy-soft">
+    <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden">
+      <div className="px-5 py-4 border-b border-brand-surface-alt">
+        <h2 className="text-base font-bold text-[#063882]">Tem NVL ngày {date}</h2>
+        <p className="text-xs text-brand-navy-soft mt-0.5">
           {loading
             ? 'Đang tải...'
             : photos.length === 0
               ? 'Chưa có tem nào'
-              : `${photos.length} ảnh • ${sheetsNeeded} tờ in (8 ảnh/tờ)`}
+              : `${photos.length} ảnh — ${sheetsNeeded} tờ in (8 ảnh/tờ)`}
         </p>
       </div>
 
       {photos.length > 0 && (
         <>
-          <div className="flex gap-1 bg-brand-surface-alt rounded-xl p-1 mb-4">
-            <button type="button" onClick={() => setTab('view')} className={tabCls('view')}>
-              Xem
-            </button>
-            <button type="button" onClick={() => setTab('download')} className={tabCls('download')}>
-              Tải xuống
-            </button>
-            <button type="button" onClick={() => setTab('print')} className={tabCls('print')}>
-              In
-            </button>
+          {/* Tab bar */}
+          <div className="flex gap-2 px-3 pt-3 bg-white">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                className={`flex-1 py-2.5 rounded-t-xl text-sm font-bold transition active:scale-95 ${
+                  tab === t.id ? t.activeCls : t.inactiveCls
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
 
-          {tab === 'view' && (
-            <>
-              <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-1.5">
-                {photos.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => p.url && setLightbox(p.url)}
-                    className="aspect-square bg-brand-surface-alt rounded overflow-hidden hover:ring-2 hover:ring-brand-teal transition"
-                  >
-                    {p.url ? (
-                      <img src={p.url} alt="Tem" className="w-full h-full object-cover" loading="lazy" />
-                    ) : null}
-                  </button>
-                ))}
-              </div>
-              {lightbox && (
-                <div
-                  className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 cursor-zoom-out"
-                  onClick={() => setLightbox(null)}
-                >
-                  <img src={lightbox} alt="Tem NVL zoom" className="max-w-full max-h-full object-contain" />
+          {/* Content */}
+          <div className={`p-4 min-h-[160px] ${activeCfg.bgCls}`}>
+            {tab === 'view' && (
+              <>
+                <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5">
+                  {photos.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => p.url && setLightbox(p.url)}
+                      className="relative aspect-square bg-white rounded-lg overflow-hidden shadow-sm hover:ring-2 hover:ring-[#063882] transition"
+                    >
+                      {p.url && (
+                        <img
+                          src={p.url}
+                          alt="Tem"
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      )}
+                      {p.employee_name && (
+                        <span className="absolute bottom-0.5 right-0.5 bg-[#063882]/80 text-white text-[9px] font-bold px-1 py-px rounded leading-tight">
+                          {p.employee_name}
+                        </span>
+                      )}
+                    </button>
+                  ))}
                 </div>
-              )}
-            </>
-          )}
+                {lightbox && (
+                  <div
+                    className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 cursor-zoom-out"
+                    onClick={() => setLightbox(null)}
+                  >
+                    <img
+                      src={lightbox}
+                      alt="Tem NVL zoom"
+                      className="max-w-full max-h-full object-contain"
+                    />
+                  </div>
+                )}
+              </>
+            )}
 
-          {tab === 'download' && (
-            <div className="flex flex-col items-center gap-3 py-4">
-              <p className="text-sm text-brand-navy-soft text-center">
-                Xuất {photos.length} ảnh thành file Excel ({sheetsNeeded} trang), mỗi trang 2×4 ảnh.
-              </p>
-              <a
-                href={`/api/labels/export?date=${date}`}
-                className="bg-brand-teal hover:bg-brand-teal-dark text-white font-semibold py-2.5 px-6 rounded-md shadow-md shadow-brand-teal/30 transition text-sm"
-              >
-                Tải Excel (.xlsx)
-              </a>
-            </div>
-          )}
+            {tab === 'download' && (
+              <div className="flex flex-col items-center gap-4 py-6">
+                <p className="text-sm text-[#0a7f70] font-medium text-center">
+                  {photos.length} ảnh — {sheetsNeeded} trang Excel, mỗi trang 2×4 ảnh khổ A4
+                </p>
+                <a
+                  href={`/api/labels/export?date=${date}`}
+                  className="bg-[#2db5a1] hover:bg-[#0f9080] active:scale-95 text-white font-bold py-3 px-8 rounded-xl shadow-md transition text-sm"
+                >
+                  Tải Excel (.xlsx)
+                </a>
+              </div>
+            )}
 
-          {tab === 'print' && (
-            <div className="flex flex-col items-center gap-3 py-4">
-              <p className="text-sm text-brand-navy-soft text-center">
-                Mở trang in — ảnh xếp lưới 2×4 trên giấy A4, tự động hiện hộp thoại in.
-              </p>
-              <button
-                type="button"
-                onClick={() => window.open(`/print/labels?date=${date}`, '_blank')}
-                className="bg-brand-navy hover:bg-brand-navy-soft text-white font-semibold py-2.5 px-6 rounded-md transition text-sm"
-              >
-                Mở trang in
-              </button>
-            </div>
-          )}
+            {tab === 'print' && (
+              <div className="flex flex-col items-center gap-4 py-6">
+                <p className="text-sm text-[#c01f2a] font-medium text-center">
+                  {photos.length} ảnh — {sheetsNeeded} tờ A4, lưới 2×4, tự mở hộp thoại in
+                </p>
+                <button
+                  type="button"
+                  onClick={() => window.open(`/print/labels?date=${date}`, '_blank')}
+                  className="bg-[#e32531] hover:bg-[#c01f2a] active:scale-95 text-white font-bold py-3 px-8 rounded-xl shadow-md transition text-sm"
+                >
+                  Mở trang in
+                </button>
+              </div>
+            )}
+          </div>
         </>
       )}
     </section>

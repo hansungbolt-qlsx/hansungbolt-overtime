@@ -84,16 +84,18 @@ export default function MaterialLabelsUpload({ date }: { date: string }) {
   // Step 1: Name selector
   if (!employeeName) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-4 mt-6">
-        <h2 className="text-base font-semibold text-brand-navy mb-1">Chọn tên của bạn</h2>
-        <p className="text-xs text-brand-navy-soft mb-4">Tên sẽ hiển thị trên tem khi in ra</p>
-        <div className="grid grid-cols-2 gap-2">
+      <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden mt-6">
+        <div className="bg-[#063882] px-5 py-4">
+          <h2 className="text-base font-bold text-white">Chọn tên của bạn</h2>
+          <p className="text-xs text-blue-200 mt-0.5">Tên sẽ hiển thị trên tem khi in ra</p>
+        </div>
+        <div className="p-3 grid grid-cols-2 gap-2">
           {HD_EMPLOYEES.map((emp) => (
             <button
               key={emp.full}
               type="button"
               onClick={() => setEmployeeName(emp.display)}
-              className="py-4 rounded-xl bg-brand-surface-alt hover:bg-brand-teal hover:text-white text-brand-navy font-bold text-lg transition active:scale-95"
+              className="py-4 rounded-xl bg-[#dce8fa] hover:bg-[#063882] hover:text-white text-[#063882] font-bold text-lg transition active:scale-95 shadow-sm"
             >
               {emp.display}
             </button>
@@ -105,99 +107,107 @@ export default function MaterialLabelsUpload({ date }: { date: string }) {
 
   // Step 2: Upload form
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-4 mt-6">
-      <div className="flex items-center justify-between mb-3">
+    <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden mt-6">
+      {/* Header */}
+      <div className="bg-[#063882] px-5 py-4 flex items-center justify-between">
         <div>
-          <h2 className="text-base font-semibold text-brand-navy">Tem NVL ngày {date}</h2>
-          <p className="text-xs text-brand-navy-soft mt-0.5">
+          <h2 className="text-base font-bold text-white">Tem NVL ngày {date}</h2>
+          <p className="text-xs text-blue-200 mt-0.5">
             Đang upload với tên:{' '}
-            <span className="font-bold text-brand-teal">{employeeName}</span>
+            <span className="font-bold text-white">{employeeName}</span>
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-brand-navy-soft bg-brand-surface-alt px-2 py-1 rounded">
+          <span className="text-xs font-semibold text-blue-200 bg-[#052f6e] px-2 py-1 rounded">
             {photos.length} ảnh
           </span>
           <button
             type="button"
             onClick={() => setEmployeeName(null)}
-            className="text-xs text-brand-navy-soft hover:text-brand-navy underline"
+            className="text-xs text-blue-200 hover:text-white underline transition"
           >
             Đổi tên
           </button>
         </div>
       </div>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        multiple
-        capture="environment"
-        onChange={onFilesSelected}
-        disabled={uploading}
-        className="hidden"
-        id="material-file-input"
-      />
-      <label
-        htmlFor="material-file-input"
-        className={`block w-full py-3 rounded-md border-2 border-dashed text-center font-medium cursor-pointer transition ${
-          uploading
-            ? 'border-gray-300 text-gray-400 cursor-not-allowed'
-            : 'border-brand-teal text-brand-teal hover:bg-brand-teal/5'
-        }`}
-      >
-        {uploading ? 'Đang upload...' : '+ Thêm ảnh tem (có thể chọn nhiều)'}
-      </label>
-
-      {message && (
-        <div
-          className={`mt-3 text-sm p-2.5 rounded-md border ${
-            message.kind === 'error'
-              ? 'text-red-600 bg-red-50 border-red-200'
-              : 'text-green-700 bg-green-50 border-green-200'
+      <div className="p-4 bg-[#f0f5ff]">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          multiple
+          capture="environment"
+          onChange={onFilesSelected}
+          disabled={uploading}
+          className="hidden"
+          id="material-file-input"
+        />
+        <label
+          htmlFor="material-file-input"
+          className={`block w-full py-4 rounded-xl border-2 border-dashed text-center font-bold cursor-pointer transition text-base ${
+            uploading
+              ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-50'
+              : 'border-[#063882] text-[#063882] hover:bg-[#063882] hover:text-white hover:border-solid active:scale-95'
           }`}
         >
-          {message.text}
-        </div>
-      )}
+          {uploading ? 'Đang upload...' : '+ Chụp / chọn ảnh tem'}
+        </label>
 
-      {loading && photos.length === 0 && (
-        <p className="text-sm text-brand-navy-soft text-center py-4">Đang tải...</p>
-      )}
+        {message && (
+          <div
+            className={`mt-3 text-sm p-2.5 rounded-lg border ${
+              message.kind === 'error'
+                ? 'text-red-600 bg-red-50 border-red-200'
+                : 'text-green-700 bg-green-50 border-green-200'
+            }`}
+          >
+            {message.text}
+          </div>
+        )}
 
-      {photos.length > 0 && (
-        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-4">
-          {photos.map((p) => (
-            <div
-              key={p.id}
-              className="relative aspect-square bg-brand-surface-alt rounded-md overflow-hidden group"
-            >
-              {p.url ? (
-                <img src={p.url} alt="Tem NVL" className="w-full h-full object-cover" loading="lazy" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-xs text-brand-navy-soft">
-                  (không tải được)
-                </div>
-              )}
-              {p.employee_name && (
-                <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[10px] font-bold px-1 rounded leading-tight">
-                  {p.employee_name}
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={() => handleDelete(p.id)}
-                disabled={deletingId === p.id}
-                className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-md"
-                aria-label="Xóa"
+        {loading && photos.length === 0 && (
+          <p className="text-sm text-brand-navy-soft text-center py-4">Đang tải...</p>
+        )}
+
+        {photos.length > 0 && (
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-4">
+            {photos.map((p) => (
+              <div
+                key={p.id}
+                className="relative aspect-square bg-white rounded-lg overflow-hidden shadow-sm"
               >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+                {p.url ? (
+                  <img
+                    src={p.url}
+                    alt="Tem NVL"
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-xs text-brand-navy-soft">
+                    (không tải được)
+                  </div>
+                )}
+                {p.employee_name && (
+                  <span className="absolute bottom-1 right-1 bg-[#063882]/80 text-white text-[10px] font-bold px-1 rounded leading-tight">
+                    {p.employee_name}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleDelete(p.id)}
+                  disabled={deletingId === p.id}
+                  className="absolute top-1 right-1 bg-[#e32531] hover:bg-[#c01f2a] disabled:opacity-60 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center shadow-md"
+                  aria-label="Xóa"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
