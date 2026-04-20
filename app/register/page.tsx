@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth-server';
 import LogoutButton from '@/components/LogoutButton';
 import RegisterLayout from '@/components/RegisterLayout';
+import OvertimeSummaryCard from '@/components/OvertimeSummaryCard';
 
 export default async function RegisterPage() {
   const session = await getSession();
@@ -22,6 +23,10 @@ export default async function RegisterPage() {
         </header>
 
         <RegisterLayout department={session.department} />
+
+        <div className="mt-6">
+          <OvertimeSummaryCard />
+        </div>
       </div>
     </main>
   );
