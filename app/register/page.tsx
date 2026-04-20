@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth-server';
 import LogoutButton from '@/components/LogoutButton';
-import OvertimeForm from '@/components/OvertimeForm';
+import RegisterLayout from '@/components/RegisterLayout';
 
 export default async function RegisterPage() {
   const session = await getSession();
@@ -14,14 +14,14 @@ export default async function RegisterPage() {
         <header className="flex justify-between items-start mb-5 gap-4">
           <div>
             <h1 className="text-xl font-bold text-brand-navy">
-              Đăng ký tăng ca — Bộ phận {session.department}
+              Bộ phận {session.department}
             </h1>
             <p className="text-sm text-brand-navy-soft">{session.fullName}</p>
           </div>
           <LogoutButton />
         </header>
 
-        <OvertimeForm department={session.department} />
+        <RegisterLayout department={session.department} />
       </div>
     </main>
   );

@@ -7,44 +7,42 @@ export const runtime = 'nodejs';
 
 const BUCKET = 'material-labels';
 
-const SLOT_RANGES = [
-  'B1:C5',
-  'E1:F5',
-  'B7:C11',
-  'E7:F11',
-  'B13:C17',
-  'E13:F17',
-  'B19:C23',
-  'E19:F23',
+// Layout: 2 cols (A, B) × 4 rows = 8 slots per sheet
+// Matches "Copy Tem NVL.xlsx" template
+const SLOTS_PER_SHEET = 8;
+
+const SLOT_POSITIONS: Array<{ tl: { col: number; row: number }; br: { col: number; row: number } }> = [
+  { tl: { col: 0, row: 0 }, br: { col: 1, row: 1 } }, // A1
+  { tl: { col: 1, row: 0 }, br: { col: 2, row: 1 } }, // B1
+  { tl: { col: 0, row: 1 }, br: { col: 1, row: 2 } }, // A2
+  { tl: { col: 1, row: 1 }, br: { col: 2, row: 2 } }, // B2
+  { tl: { col: 0, row: 2 }, br: { col: 1, row: 3 } }, // A3
+  { tl: { col: 1, row: 2 }, br: { col: 2, row: 3 } }, // B3
+  { tl: { col: 0, row: 3 }, br: { col: 1, row: 4 } }, // A4
+  { tl: { col: 1, row: 3 }, br: { col: 2, row: 4 } }, // B4
 ];
 
 function configureSheet(sheet: ExcelJS.Worksheet) {
-  sheet.getColumn('A').width = 2;
-  sheet.getColumn('B').width = 22;
-  sheet.getColumn('C').width = 22;
-  sheet.getColumn('D').width = 3;
-  sheet.getColumn('E').width = 22;
-  sheet.getColumn('F').width = 22;
-  sheet.getColumn('G').width = 2;
-  for (let r = 1; r <= 24; r++) {
-    sheet.getRow(r).height = 22;
+  // 2 wide columns matching the template (76.25 char units each)
+  sheet.getColumn('A').width = 76.25;
+  sheet.getColumn('B').width = 76.25;
+
+  // 4 tall rows matching the template (333 pt each)
+  for (let r = 1; r <= 4; r++) {
+    sheet.getRow(r).height = 333;
   }
-  for (const range of SLOT_RANGES) {
-    sheet.mergeCells(range);
-  }
+
   sheet.pageSetup = {
-    paperSize: 9,
+    paperSize: 9,          // A4
     orientation: 'portrait',
-    fitToPage: true,
-    fitToWidth: 1,
-    fitToHeight: 1,
+    scale: 62,             // 62% scale — matches template
     margins: {
-      left: 0.3,
-      right: 0.3,
-      top: 0.4,
-      bottom: 0.4,
-      header: 0.2,
-      footer: 0.2,
+      left: 0,
+      right: 0.197,
+      top: 0,
+      bottom: 0,
+      header: 0,
+      footer: 0,
     },
   };
 }
@@ -73,10 +71,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: photoErr.message }, { status: 500 });
   }
   if (!photos || photos.length === 0) {
-    return NextResponse.json(
-      { error: 'Ngày này chưa có tem nào' },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: 'Ngày này chưa có tem nào' }, { status: 400 });
   }
 
   const buffers: Array<{ buffer: Buffer; ext: 'jpeg' | 'png' }> = [];
@@ -95,31 +90,38 @@ export async function GET(req: Request) {
   }
 
   const wb = new ExcelJS.Workbook();
+
+  // Split into chunks of 8 (one sheet per chunk)
   const chunks: Array<typeof buffers> = [];
-  for (let i = 0; i < buffers.length; i += 8) {
-    chunks.push(buffers.slice(i, i + 8));
+  for (let i = 0; i < buffers.length; i += SLOTS_PER_SHEET) {
+    chunks.push(buffers.slice(i, i + SLOTS_PER_SHEET));
   }
 
   for (let c = 0; c < chunks.length; c++) {
-    const name = chunks.length === 1 ? 'Label' : `Label (${c + 1})`;
+    const name = chunks.length === 1 ? 'Tem NVL' : `Tem NVL (${c + 1})`;
     const sheet = wb.addWorksheet(name);
     configureSheet(sheet);
+
     const chunk = chunks[c];
     for (let i = 0; i < chunk.length; i++) {
       const img = chunk[i];
+      const slot = SLOT_POSITIONS[i];
       const imgId = wb.addImage({
         buffer: img.buffer as unknown as ArrayBuffer,
         extension: img.ext,
       });
-      sheet.addImage(imgId, SLOT_RANGES[i]);
+      sheet.addImage(imgId, {
+        tl: { col: slot.tl.col, row: slot.tl.row },
+        br: { col: slot.br.col, row: slot.br.row },
+        editAs: 'twoCell',
+      });
     }
   }
 
   const outBuf = await wb.xlsx.writeBuffer();
   return new Response(outBuf as BodyInit, {
     headers: {
-      'Content-Type':
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename="Tem_NVL_HD_${date}.xlsx"`,
     },
   });
