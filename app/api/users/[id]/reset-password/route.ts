@@ -5,7 +5,9 @@ import { getSession } from '@/lib/auth-server';
 
 export const runtime = 'nodejs';
 
-// POST /api/users/[id]/reset-password — reset về username
+const DEFAULT_PASSWORD = 'hd123';
+
+// POST /api/users/[id]/reset-password — reset về 'hd123'
 export async function POST(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -19,7 +21,7 @@ export async function POST(
 
   const { data: user } = await supabaseAdmin
     .from('users')
-    .select('username')
+    .select('id')
     .eq('id', id)
     .maybeSingle();
 
@@ -27,13 +29,13 @@ export async function POST(
     return NextResponse.json({ error: 'Không tìm thấy user' }, { status: 404 });
   }
 
-  const newHash = await bcrypt.hash(user.username, 10);
+  const newHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
   const { error } = await supabaseAdmin
     .from('users')
-    .update({ password_hash: newHash })
+    .update({ password_hash: newHash, password_plain: DEFAULT_PASSWORD })
     .eq('id', id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ ok: true, password: user.username });
+  return NextResponse.json({ ok: true, password: DEFAULT_PASSWORD });
 }

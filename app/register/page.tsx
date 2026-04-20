@@ -2,6 +2,7 @@ import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth-server';
 import LogoutButton from '@/components/LogoutButton';
+import ChangePasswordButton from '@/components/ChangePasswordButton';
 import RegisterLayout from '@/components/RegisterLayout';
 import OvertimeSummaryCard from '@/components/OvertimeSummaryCard';
 import { toTitleCase } from '@/lib/format';
@@ -31,10 +32,15 @@ export default async function RegisterPage() {
               <h1 className="text-xl font-bold text-brand-navy">
                 Bộ phận {session.department}
               </h1>
-              <p className="text-sm text-brand-navy-soft truncate">{toTitleCase(session.fullName)}</p>
+              <p className="text-sm text-brand-navy-soft truncate">
+                Xin chào, {toTitleCase(session.fullName)}
+              </p>
             </div>
           </div>
-          <LogoutButton />
+          <div className="flex flex-col gap-2 flex-shrink-0">
+            <LogoutButton />
+            <ChangePasswordButton />
+          </div>
         </header>
 
         <RegisterLayout

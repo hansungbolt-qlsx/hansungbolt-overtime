@@ -13,7 +13,7 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from('users')
-    .select('id, username, full_name, role, department, created_at')
+    .select('id, username, full_name, role, department, password_plain, created_at')
     .order('role', { ascending: false }) // admin → leader → worker (desc theo alphabet)
     .order('department', { ascending: true })
     .order('full_name', { ascending: true });

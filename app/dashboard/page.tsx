@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth-server';
 import { supabaseAdmin } from '@/lib/supabase';
 import LogoutButton from '@/components/LogoutButton';
+import ChangePasswordButton from '@/components/ChangePasswordButton';
 import MaterialLabelsAdminCard from '@/components/MaterialLabelsAdminCard';
 import OvertimeSummaryCard from '@/components/OvertimeSummaryCard';
 import UserManagementCard from '@/components/UserManagementCard';
@@ -114,7 +115,10 @@ export default async function DashboardPage({
               </p>
             </div>
           </div>
-          <LogoutButton />
+          <div className="flex flex-col gap-2 flex-shrink-0">
+            <LogoutButton />
+            <ChangePasswordButton />
+          </div>
         </header>
 
         <div className="grid gap-4 md:grid-cols-2 mb-6">
