@@ -214,7 +214,14 @@ export default function OvertimeForm({ department }: { department: string }) {
       {!loadingOpts && machines.length > 0 && (
         <>
           <div className="space-y-4">
-            {rows.map((row, idx) => (
+            {rows.map((row, idx) => {
+              // Máy đã được nhân viên khác trong cùng phiếu chọn → ẩn khỏi danh sách
+              const usedByOthers = new Set<string>();
+              rows.forEach((r, i) => {
+                if (i !== idx) r.checkedMachineIds.forEach((id) => usedByOthers.add(id));
+              });
+              const visibleMachines = machines.filter((m) => !usedByOthers.has(m.id));
+              return (
               <div
                 key={idx}
                 className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-4 space-y-4"
@@ -265,7 +272,7 @@ export default function OvertimeForm({ department }: { department: string }) {
                     )}
                   </label>
                   <div className="grid grid-cols-2 gap-2">
-                    {machines.map((machine) => {
+                    {visibleMachines.map((machine) => {
                       const checked = row.checkedMachineIds.includes(machine.id);
                       const itemCode = machine.items[0]?.item_code ?? '—';
                       const qty = plannedQty(machine.rpm);
@@ -319,7 +326,8 @@ export default function OvertimeForm({ department }: { department: string }) {
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
 
           <button
