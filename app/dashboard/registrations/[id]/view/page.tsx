@@ -143,15 +143,16 @@ export default async function PrintViewPage({
   const hours = reg.day_type === 'sunday' ? 8 : 3;
   const { d: dd, m: mm, y: yyyy } = formatDateVN(reg.overtime_date);
 
-  // Chiều cao dòng tự cân để fit 1 trang A4 dọc.
+  // Chiều cao dòng tự cân để fit 1 trang A4 dọc — RÀNG BUỘC CỨNG.
   // A4 portrait: 297mm. Margin 8mm × 2 = 16mm. Vùng in 281mm.
-  // Header logo+date 19mm + title 13mm + requestor 12mm + table-thead 14mm
-  //   + signature 24mm + footer 7mm = ~89mm fixed.
-  // Còn lại cho tbody: 281 - 89 = 192mm
+  // Fixed: top 18mm + title 9mm + requestor 12mm + thead 14mm
+  //   + sig (22mm pad + 9mm header/margin) + footer 7mm = ~91mm
+  // Còn lại cho tbody: 281 - 91 = 190mm. Conservative: 178mm (chừa 12mm buffer).
+  // Sig pad 22mm > row max 13mm → row ký tên lớn hơn 70% so với row mã hàng.
   const totalRows = sortedGroups.reduce((s, g) => s + g.rows.length, 0);
-  const availMm = 188; // chừa 4mm an toàn
+  const availMm = 178;
   const rowHeightMm = totalRows > 0
-    ? Math.min(16, Math.max(5.5, availMm / totalRows))
+    ? Math.min(13, Math.max(5, availMm / totalRows))
     : 10;
 
   // Format số kiểu US: 13,500 thay vì 13.500
@@ -398,26 +399,26 @@ export default async function PrintViewPage({
             padding: 0 !important;
             margin: 0 !important;
           }
-          .ot-form h1 { font-size: 14pt !important; line-height: 1.1 !important; }
-          .ot-form header { margin-bottom: 4px !important; }
-          .ot-form header > div { font-size: 9.5pt !important; line-height: 1.1 !important; }
+          .ot-form h1 { font-size: 13pt !important; line-height: 1.1 !important; }
+          .ot-form header { margin-bottom: 2px !important; }
+          .ot-form header > div { font-size: 9pt !important; line-height: 1.1 !important; }
           .ot-form table { font-size: 8pt !important; }
           .ot-form table th {
-            padding: 2px 1px !important;
-            line-height: 1.1 !important;
+            padding: 1px 1px !important;
+            line-height: 1.05 !important;
           }
           .ot-form table td {
             padding: 1px 2px !important;
-            line-height: 1.15 !important;
+            line-height: 1.1 !important;
             height: ${rowHeightMm}mm !important;
           }
-          .ot-form table th .text-\\[10px\\] { font-size: 6.5pt !important; }
-          /* Sig pad cao hơn row mã hàng (max 16mm) để có chỗ ký tên */
-          .ot-form .ot-sig-pad { height: 25mm !important; }
-          .ot-form .ot-signatures { margin-top: 4px !important; }
+          .ot-form table th .text-\\[10px\\] { font-size: 6pt !important; }
+          /* Sig pad 22mm > row mã hàng max 13mm → chỗ ký tên cao hơn 70% */
+          .ot-form .ot-sig-pad { height: 22mm !important; }
+          .ot-form .ot-signatures { margin-top: 3px !important; }
           .ot-form .ot-signatures .font-bold { padding: 2px 0 !important; font-size: 9pt !important; }
-          .ot-form .ot-footer { font-size: 7.5pt !important; margin-top: 3px !important; line-height: 1.2 !important; }
-          .ot-form img { height: 38px !important; }
+          .ot-form .ot-footer { font-size: 7pt !important; margin-top: 2px !important; line-height: 1.2 !important; }
+          .ot-form img { height: 34px !important; }
           /* Đảm bảo border in chính xác */
           .ot-form * {
             -webkit-print-color-adjust: exact !important;
