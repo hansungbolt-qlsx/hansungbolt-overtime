@@ -35,7 +35,8 @@ export default function PrintClient({
       <style>{`
         * { margin: 0; padding: 0; box-sizing: border-box; }
         @page { size: A4 landscape; margin: 1cm; }
-        body { background: white; font-family: 'Times New Roman', serif; font-size: 10pt; color: #000; }
+        body { background: white; font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000; }
+        .page, .page * { font-family: Arial, Helvetica, sans-serif !important; }
 
         .no-print {
           padding: 10px 14px;
