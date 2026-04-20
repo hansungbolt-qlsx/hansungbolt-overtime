@@ -7,6 +7,7 @@ import LogoutButton from '@/components/LogoutButton';
 import MaterialLabelsAdminCard from '@/components/MaterialLabelsAdminCard';
 import OvertimeSummaryCard from '@/components/OvertimeSummaryCard';
 import UserManagementCard from '@/components/UserManagementCard';
+import DeleteRegistrationButton from '@/components/DeleteRegistrationButton';
 import { toTitleCase } from '@/lib/format';
 
 function todayISO() {
@@ -220,6 +221,7 @@ export default async function DashboardPage({
                           >
                             Xem
                           </Link>
+                          <DeleteRegistrationButton id={r.id} />
                         </div>
                       </td>
                     </tr>

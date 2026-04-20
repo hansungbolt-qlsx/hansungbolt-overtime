@@ -9,20 +9,24 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await getSession();
-  if (!session || session.role !== 'leader') {
-    return NextResponse.json({ error: 'Chưa đăng nhập hoặc không có quyền' }, { status: 401 });
+  if (!session) {
+    return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
   }
 
   const { id } = await params;
 
   const { data: reg, error: regErr } = await supabaseAdmin
     .from('overtime_registrations')
-    .select('id, registered_by')
+    .select('id, registered_by, department')
     .eq('id', id)
     .maybeSingle();
   if (regErr) return NextResponse.json({ error: regErr.message }, { status: 500 });
   if (!reg) return NextResponse.json({ error: 'Không tìm thấy phiếu' }, { status: 404 });
-  if (reg.registered_by !== session.userId) {
+
+  // Admin xóa được mọi phiếu; leader chỉ xóa được phiếu của bộ phận mình
+  const isAdmin = session.role === 'admin';
+  const isOwnDeptLeader = session.role === 'leader' && session.department === reg.department;
+  if (!isAdmin && !isOwnDeptLeader) {
     return NextResponse.json({ error: 'Không có quyền xóa phiếu này' }, { status: 403 });
   }
 
