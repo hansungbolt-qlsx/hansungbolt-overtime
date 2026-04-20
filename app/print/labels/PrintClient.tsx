@@ -41,6 +41,7 @@ export default function PrintClient({
           align-items: center;
           justify-content: center;
           background: #fff;
+          border: 1px solid #000;
         }
         .cell img { width: 100%; height: 100%; object-fit: fill; display: block; }
         .no-print {
