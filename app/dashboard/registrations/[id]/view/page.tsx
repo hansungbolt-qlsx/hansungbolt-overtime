@@ -81,7 +81,8 @@ export default async function PrintViewPage({
   const sortedGroups = [...groups.values()].sort((a, b) => a.order_no - b.order_no);
 
   const timeLabel = `${formatTime(reg.time_from)}-${formatTime(reg.time_to)}`;
-  const hours = Number(reg.duration_hours);
+  // Giờ hiển thị (hardcode theo day_type — bỏ qua duration_hours cũ)
+  const hours = reg.day_type === 'sunday' ? 8 : 3;
   const { d: dd, m: mm, y: yyyy } = formatDateVN(reg.overtime_date);
 
   return (
@@ -147,18 +148,18 @@ export default async function PrintViewPage({
             style={{ tableLayout: 'fixed' }}
           >
             <colgroup>
-              <col style={{ width: '3%' }} />
-              <col style={{ width: '14%' }} />
-              <col style={{ width: '8%' }} />
-              <col style={{ width: '5%' }} />
-              <col style={{ width: '8%' }} />
+              <col style={{ width: '4%' }} />
+              <col style={{ width: '15%' }} />
+              <col style={{ width: '9%' }} />
               <col style={{ width: '5%' }} />
               <col style={{ width: '9%' }} />
+              <col style={{ width: '5%' }} />
+              <col style={{ width: '10%' }} />
               <col style={{ width: '13%' }} />
               <col style={{ width: '8%' }} />
               <col style={{ width: '8%' }} />
               <col style={{ width: '5%' }} />
-              <col style={{ width: '14%' }} />
+              <col style={{ width: '9%' }} />
             </colgroup>
             <thead className="bg-gray-100">
               <tr>
@@ -297,24 +298,26 @@ export default async function PrintViewPage({
 
       <style>{`
         @media print {
-          @page { size: A4 landscape; margin: 7mm; }
+          @page { size: A4 portrait; margin: 8mm; }
           html, body { background: white !important; }
           .ot-form {
-            font-size: 9pt !important;
+            font-size: 8pt !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
           }
-          .ot-form h1 { font-size: 15pt !important; }
-          .ot-form table { font-size: 8.5pt !important; }
+          .ot-form h1 { font-size: 14pt !important; }
+          .ot-form header > div { font-size: 9pt !important; }
+          .ot-form table { font-size: 7.5pt !important; }
           .ot-form table th,
           .ot-form table td {
-            padding: 1px 3px !important;
+            padding: 1px 2px !important;
             line-height: 1.1 !important;
           }
-          .ot-form .ot-sig-pad { height: 38px !important; }
-          .ot-form .ot-signatures .font-bold { padding: 2px 0 !important; }
-          .ot-form .ot-footer { font-size: 7.5pt !important; margin-top: 4px !important; }
-          .ot-form img { height: 36px !important; }
+          .ot-form table th .text-\\[10px\\] { font-size: 6.5pt !important; }
+          .ot-form .ot-sig-pad { height: 32px !important; }
+          .ot-form .ot-signatures .font-bold { padding: 2px 0 !important; font-size: 8pt !important; }
+          .ot-form .ot-footer { font-size: 6.5pt !important; margin-top: 3px !important; }
+          .ot-form img { height: 32px !important; }
           /* Force background colors to print */
           .ot-form thead,
           .ot-form .bg-gray-50,

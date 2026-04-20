@@ -54,14 +54,32 @@ export async function GET(req: Request) {
       .from('equipments')
       .select('id, code, rpm, spec')
       .eq('department', session.department)
-      .in('code', planCodes)
-      .order('code', { ascending: true });
+      .in('code', planCodes);
     if (eqErr) return NextResponse.json({ error: eqErr.message }, { status: 500 });
-    machines = (eqs ?? []).map((eq) => ({
-      ...eq,
-      items: itemsByCode[eq.code] ?? [],
-    }));
+    machines = (eqs ?? [])
+      .map((eq) => ({ ...eq, items: itemsByCode[eq.code] ?? [] }))
+      .sort((a, b) => naturalCompare(a.code, b.code));
   }
 
   return NextResponse.json({ employees: emps ?? [], machines });
+}
+
+// Sort: HD-01, HD-1A, HD-02, HD-03, HD-04, HD-4A,..., HD-M4 (6EA), HD-M3 (6EA)
+function naturalKey(code: string): [number, number, string] {
+  // Nhóm "HD-Mx (yEA)" — đẩy về cuối, M4 trước M3
+  const grp = code.match(/^HD-M(\d+)/i);
+  if (grp) return [2, -parseInt(grp[1], 10), code];
+  // Máy "HD-NN[A]" — sort theo số rồi đến hậu tố chữ cái
+  const m = code.match(/^HD-(\d+)([A-Z]*)$/i);
+  if (m) return [1, parseInt(m[1], 10), m[2].toUpperCase()];
+  // Khác — đặt trước nhóm M, sort alphabet
+  return [3, 0, code];
+}
+
+function naturalCompare(a: string, b: string): number {
+  const [ka1, ka2, ka3] = naturalKey(a);
+  const [kb1, kb2, kb3] = naturalKey(b);
+  if (ka1 !== kb1) return ka1 - kb1;
+  if (ka2 !== kb2) return ka2 - kb2;
+  return ka3.localeCompare(kb3);
 }

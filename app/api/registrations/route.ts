@@ -12,8 +12,10 @@ type ItemInput = {
   planned_quantity: number;
 };
 
+// duration_hours = giờ hiển thị trên phiếu (3h, 8h)
+// Số giờ tính sản lượng dự kiến nằm ở client (2.5h, 7.5h) — xem OvertimeForm
 const DAY_PRESETS = {
-  weekday: { time_from: '16:30:00', time_to: '19:30:00', duration_hours: 2.5 },
+  weekday: { time_from: '16:30:00', time_to: '19:30:00', duration_hours: 3 },
   sunday: { time_from: '06:00:00', time_to: '14:00:00', duration_hours: 8 },
 } as const;
 

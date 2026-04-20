@@ -43,8 +43,9 @@ export default function OvertimeForm({ department }: { department: string }) {
   const [myRegs, setMyRegs] = useState<MyRegistration[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const duration = dayType === 'weekday' ? 2.5 : 8;
-  const timeLabel = dayType === 'weekday' ? '16:30 – 19:30 (2.5 giờ)' : '06:00 – 14:00 (8 giờ)';
+  // Giờ tính sản lượng (trừ break) — KHÁC giờ hiển thị
+  const calcHours = dayType === 'weekday' ? 2.5 : 7.5;
+  const timeLabel = dayType === 'weekday' ? '16:30 – 19:30 (3 giờ)' : '06:00 – 14:00 (8 giờ)';
   const totalItems = rows.reduce((sum, row) => sum + row.checkedMachineIds.length, 0);
 
   useEffect(() => {
@@ -117,7 +118,14 @@ export default function OvertimeForm({ department }: { department: string }) {
     setRows((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
   }
 
-  function plannedQty(rpm: number) { return Math.round(rpm * 60 * duration); }
+  // Nhóm thiết bị "HD-M4 (6EA)" → nhân số máy trong nhóm
+  function groupMultiplier(code: string): number {
+    const m = code.match(/\((\d+)\s*EA\)/i);
+    return m ? parseInt(m[1], 10) : 1;
+  }
+  function plannedQty(rpm: number, code: string) {
+    return Math.round(rpm * 60 * calcHours * groupMultiplier(code));
+  }
 
   async function submit() {
     setError('');
@@ -141,7 +149,7 @@ export default function OvertimeForm({ department }: { department: string }) {
           equipment_id: machineId,
           item_code: firstItem.item_code,
           item_name: firstItem.item_name,
-          planned_quantity: plannedQty(machine.rpm),
+          planned_quantity: plannedQty(machine.rpm, machine.code),
         });
       }
     }
@@ -265,7 +273,7 @@ export default function OvertimeForm({ department }: { department: string }) {
                     {machines.map((machine) => {
                       const checked = row.checkedMachineIds.includes(machine.id);
                       const itemCode = machine.items[0]?.item_code ?? '—';
-                      const qty = plannedQty(machine.rpm);
+                      const qty = plannedQty(machine.rpm, machine.code);
                       return (
                         <button
                           key={machine.id}
