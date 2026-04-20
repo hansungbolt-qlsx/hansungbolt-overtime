@@ -17,27 +17,30 @@ export default async function RegisterPage() {
   return (
     <main className="min-h-screen bg-brand-pattern p-4">
       <div className="max-w-lg mx-auto">
-        <header className="flex justify-between items-start mb-5 gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <Image
-              src="/logo.png"
-              alt="Hansungbolt"
-              width={890}
-              height={405}
-              priority
-              unoptimized
-              className="h-9 w-auto flex-shrink-0"
-            />
+        <header className="flex justify-between items-center mb-5 gap-3">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="relative h-11 w-12 overflow-hidden flex-shrink-0">
+              <Image
+                src="/logo.png"
+                alt="Hansungbolt"
+                width={890}
+                height={405}
+                priority
+                unoptimized
+                className="absolute max-w-none"
+                style={{ width: '160px', height: 'auto', left: '-56px', top: '0' }}
+              />
+            </div>
             <div className="min-w-0">
-              <h1 className="text-xl font-bold text-brand-navy">
+              <h1 className="text-lg font-bold text-brand-navy leading-tight whitespace-nowrap">
                 Bộ phận {session.department}
               </h1>
-              <p className="text-sm text-brand-navy-soft truncate">
-                Xin chào, {toTitleCase(session.fullName)}
+              <p className="text-xs text-brand-navy-soft truncate">
+                Xin chào {toTitleCase(session.fullName)}
               </p>
             </div>
           </div>
-          <div className="flex flex-col gap-2 flex-shrink-0">
+          <div className="flex flex-col gap-1.5 flex-shrink-0">
             <LogoutButton />
             <ChangePasswordButton />
           </div>

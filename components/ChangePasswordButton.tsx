@@ -59,7 +59,7 @@ export default function ChangePasswordButton() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-sm px-3 py-2 border border-brand-surface-alt rounded-md text-brand-navy hover:bg-brand-surface-alt transition"
+        className="text-xs px-2.5 py-1.5 border border-brand-surface-alt rounded-md text-brand-navy hover:bg-brand-surface-alt transition whitespace-nowrap"
       >
         Đổi mật khẩu
       </button>

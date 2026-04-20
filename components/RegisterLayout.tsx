@@ -61,14 +61,14 @@ export default function RegisterLayout({
   // Cả 2 tab: hiển thị tab bar
   return (
     <>
-      <div className="grid grid-cols-2 gap-1 bg-brand-surface-alt rounded-xl p-1 mb-5">
+      <div className="grid grid-cols-2 gap-2 mb-5">
         <button
           type="button"
           onClick={() => setActiveTab('overtime')}
-          className={`py-2.5 rounded-lg text-sm font-semibold transition ${
+          className={`py-2.5 rounded-xl text-sm font-semibold transition border ${
             activeTab === 'overtime'
-              ? 'bg-white text-brand-navy shadow-sm'
-              : 'text-brand-navy-soft hover:text-brand-navy'
+              ? 'bg-brand-teal text-white border-brand-teal shadow-md shadow-brand-teal/30'
+              : 'bg-white text-brand-teal border-brand-teal/30 hover:bg-brand-teal/10'
           }`}
         >
           Đăng ký tăng ca
@@ -76,10 +76,10 @@ export default function RegisterLayout({
         <button
           type="button"
           onClick={() => setActiveTab('labels')}
-          className={`py-2.5 rounded-lg text-sm font-semibold transition ${
+          className={`py-2.5 rounded-xl text-sm font-semibold transition border ${
             activeTab === 'labels'
-              ? 'bg-white text-brand-navy shadow-sm'
-              : 'text-brand-navy-soft hover:text-brand-navy'
+              ? 'bg-brand-navy text-white border-brand-navy shadow-md shadow-brand-navy/30'
+              : 'bg-white text-brand-navy border-brand-navy/30 hover:bg-brand-navy/10'
           }`}
         >
           Tem NVL
