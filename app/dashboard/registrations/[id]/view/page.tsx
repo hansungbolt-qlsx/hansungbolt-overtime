@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth-server';
 import { supabaseAdmin } from '@/lib/supabase';
@@ -8,6 +9,11 @@ const FOOTER_NOTE =
 
 function formatTime(t: string) {
   return t.slice(0, 5).replace(':', 'h');
+}
+
+function formatDateVN(iso: string) {
+  const [y, m, d] = iso.split('-');
+  return { d, m, y };
 }
 
 export default async function PrintViewPage({
@@ -76,6 +82,7 @@ export default async function PrintViewPage({
 
   const timeLabel = `${formatTime(reg.time_from)}-${formatTime(reg.time_to)}`;
   const hours = Number(reg.duration_hours);
+  const { d: dd, m: mm, y: yyyy } = formatDateVN(reg.overtime_date);
 
   return (
     <main className="min-h-screen bg-brand-surface p-4 print:p-0 print:bg-white">
@@ -90,12 +97,34 @@ export default async function PrintViewPage({
         </div>
 
         <article className="bg-white p-6 md:p-10 shadow-sm print:shadow-none print:p-0 text-[13px] text-black">
-          <header className="text-center mb-4">
-            <h1 className="font-bold text-lg leading-tight">
+          <div className="flex justify-between items-start mb-2">
+            <div>
+              <Image
+                src="/logo.png"
+                alt="Hansungbolt Vina"
+                width={890}
+                height={405}
+                priority
+                unoptimized
+                className="h-12 w-auto"
+              />
+              <div className="mt-2 text-sm">
+                Số:
+                <span className="inline-block border-b border-black w-24 ml-1 align-bottom">&nbsp;</span>
+              </div>
+            </div>
+            <div className="text-sm font-semibold whitespace-nowrap pt-1">
+              Ngày <span className="inline-block border-b border-dotted border-black px-2">{dd}</span>{' '}
+              tháng <span className="inline-block border-b border-dotted border-black px-2">{mm}</span>{' '}
+              Năm <span className="inline-block border-b border-dotted border-black px-2">{yyyy}</span>
+            </div>
+          </div>
+
+          <header className="text-center mb-3">
+            <h1 className="font-bold text-2xl leading-tight">
               PHIẾU ĐĂNG KÝ TĂNG CA
-              <br />
-              <span className="text-sm italic font-normal">OVERTIME REGISTRATION FORM</span>
             </h1>
+            <div className="text-base font-semibold mt-0.5">OVERTIME REGISTRATION FORM</div>
           </header>
 
           <div className="grid grid-cols-2 border border-black mb-0">
@@ -223,7 +252,29 @@ export default async function PrintViewPage({
             </tbody>
           </table>
 
-          <p className="italic text-xs mt-4 leading-relaxed">{FOOTER_NOTE}</p>
+          <div
+            className="grid border border-black mt-4 text-center"
+            style={{ gridTemplateColumns: '1fr 1fr 1fr 1.5fr' }}
+          >
+            <div className="border-r border-black">
+              <div className="font-bold py-1.5 border-b border-black bg-gray-50">Người ghi</div>
+              <div className="h-20"></div>
+            </div>
+            <div className="border-r border-black">
+              <div className="font-bold py-1.5 border-b border-black bg-gray-50">Kiểm Tra</div>
+              <div className="h-20"></div>
+            </div>
+            <div className="border-r border-black">
+              <div className="font-bold py-1.5 border-b border-black bg-gray-50">Giám sát</div>
+              <div className="h-20"></div>
+            </div>
+            <div>
+              <div className="font-bold py-1.5 border-b border-black bg-gray-50">Nhân sự</div>
+              <div className="h-20"></div>
+            </div>
+          </div>
+
+          <p className="italic text-xs mt-3 leading-relaxed">{FOOTER_NOTE}</p>
         </article>
       </div>
 
