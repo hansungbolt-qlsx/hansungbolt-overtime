@@ -133,6 +133,16 @@ export default async function PrintViewPage({
   const hours = reg.day_type === 'sunday' ? 8 : 3;
   const { d: dd, m: mm, y: yyyy } = formatDateVN(reg.overtime_date);
 
+  // Chiều cao dòng tự cân theo số dòng để fit 1 trang A4 dọc
+  const totalRows = sortedGroups.reduce((s, g) => s + g.rows.length, 0);
+  const availMm = 165; // không gian còn lại cho tbody sau header/footer/signature
+  const rowHeightMm = totalRows > 0
+    ? Math.min(18, Math.max(6.5, availMm / totalRows))
+    : 12;
+
+  // Format số kiểu US: 13,500 thay vì 13.500
+  const fmtQty = (n: number) => n.toLocaleString('en-US');
+
   return (
     <main className="min-h-screen bg-brand-surface p-4 print:p-0 print:bg-white">
       <div className="max-w-5xl mx-auto">
@@ -155,7 +165,7 @@ export default async function PrintViewPage({
                 height={405}
                 priority
                 unoptimized
-                className="h-12 w-auto"
+                className="h-16 w-auto"
               />
               <div className="mt-2 text-sm">
                 Số:
@@ -176,8 +186,8 @@ export default async function PrintViewPage({
             <div className="text-sm font-semibold mt-0.5">OVERTIME REGISTRATION FORM</div>
           </header>
 
-          <div className="grid grid-cols-2 border border-black mb-0">
-            <div className="p-2 border-r border-black">
+          <div className="grid grid-cols-2 ot-bordered mb-0">
+            <div className="p-2 ot-border-r">
               <div>
                 Người yêu cầu: <strong>HOÀNG CHÍNH HỮU</strong>
               </div>
@@ -192,7 +202,7 @@ export default async function PrintViewPage({
           </div>
 
           <table
-            className="w-full border-collapse border border-black text-center"
+            className="w-full border-collapse text-center"
             style={{ tableLayout: 'fixed' }}
           >
             <colgroup>
@@ -211,61 +221,61 @@ export default async function PrintViewPage({
             </colgroup>
             <thead className="bg-gray-100">
               <tr>
-                <th className="border border-black px-1 py-1 w-10" rowSpan={2}>
+                <th className="ot-cell px-1 py-1 w-10" rowSpan={2}>
                   STT
                   <div className="text-[10px] italic font-normal">No.</div>
                 </th>
-                <th className="border border-black px-2 py-1" rowSpan={2}>
+                <th className="ot-cell px-2 py-1" rowSpan={2}>
                   Họ và tên
                   <div className="text-[10px] italic font-normal">Full Name</div>
                 </th>
-                <th className="border border-black px-1 py-1" colSpan={2}>
+                <th className="ot-cell px-1 py-1" colSpan={2}>
                   Thời gian đăng ký tăng ca
                   <div className="text-[10px] italic font-normal">Registration time overtime</div>
                 </th>
-                <th className="border border-black px-1 py-1" colSpan={2}>
+                <th className="ot-cell px-1 py-1" colSpan={2}>
                   Thời gian tăng ca thực tế
                   <div className="text-[10px] italic font-normal">Actual overtime</div>
                 </th>
-                <th className="border border-black px-1 py-1" rowSpan={2}>
+                <th className="ot-cell px-1 py-1" rowSpan={2}>
                   Thiết bị
                   <br />
                   sản xuất
                 </th>
-                <th className="border border-black px-1 py-1" rowSpan={2}>
+                <th className="ot-cell px-1 py-1" rowSpan={2}>
                   Mã hàng
                 </th>
-                <th className="border border-black px-1 py-1" rowSpan={2}>
+                <th className="ot-cell px-1 py-1" rowSpan={2}>
                   Số lượng
                   <br />
                   kế hoạch
                 </th>
-                <th className="border border-black px-1 py-1" rowSpan={2}>
+                <th className="ot-cell px-1 py-1" rowSpan={2}>
                   Số lượng
                   <br />
                   thực tế
                 </th>
-                <th className="border border-black px-1 py-1 w-12" rowSpan={2}>
+                <th className="ot-cell px-1 py-1 w-12" rowSpan={2}>
                   Tỉ lệ
                 </th>
-                <th className="border border-black px-1 py-1" rowSpan={2}>
+                <th className="ot-cell px-1 py-1" rowSpan={2}>
                   Ghi chú
                 </th>
               </tr>
               <tr>
-                <th className="border border-black px-1 py-1 font-normal text-xs">
+                <th className="ot-cell px-1 py-1 font-normal text-xs">
                   Từ – Đến
                   <div className="text-[10px] italic">From…to</div>
                 </th>
-                <th className="border border-black px-1 py-1 font-normal text-xs">
+                <th className="ot-cell px-1 py-1 font-normal text-xs">
                   Số giờ
                   <div className="text-[10px] italic">Total hour</div>
                 </th>
-                <th className="border border-black px-1 py-1 font-normal text-xs">
+                <th className="ot-cell px-1 py-1 font-normal text-xs">
                   Giờ kết thúc
                   <div className="text-[10px] italic">Finish time</div>
                 </th>
-                <th className="border border-black px-1 py-1 font-normal text-xs">
+                <th className="ot-cell px-1 py-1 font-normal text-xs">
                   Số giờ
                   <div className="text-[10px] italic">Total hour</div>
                 </th>
@@ -274,7 +284,7 @@ export default async function PrintViewPage({
             <tbody>
               {sortedGroups.length === 0 && (
                 <tr>
-                  <td className="border border-black p-4 text-gray-400 italic" colSpan={12}>
+                  <td className="ot-cell p-4 text-gray-400 italic" colSpan={12}>
                     Phiếu không có dòng nào
                   </td>
                 </tr>
@@ -283,35 +293,33 @@ export default async function PrintViewPage({
                 const span = group.rows.length;
                 const stt = gIdx + 1;
                 return group.rows.map((row, rIdx) => (
-                  <tr key={`${gIdx}-${rIdx}`}>
+                  <tr key={`${gIdx}-${rIdx}`} className="ot-row">
                     {rIdx === 0 && (
                       <>
-                        <td className="border border-black px-1 py-1" rowSpan={span}>
+                        <td className="ot-cell px-1 py-1" rowSpan={span}>
                           {stt}
                         </td>
-                        <td className="border border-black px-2 py-1 text-left whitespace-nowrap" rowSpan={span}>
+                        <td className="ot-cell px-2 py-1 text-left whitespace-nowrap" rowSpan={span}>
                           {group.full_name}
                         </td>
-                        <td className="border border-black px-1 py-1 whitespace-nowrap" rowSpan={span}>
+                        <td className="ot-cell px-1 py-1 whitespace-nowrap" rowSpan={span}>
                           {timeLabel}
                         </td>
-                        <td className="border border-black px-1 py-1" rowSpan={span}>
+                        <td className="ot-cell px-1 py-1" rowSpan={span}>
                           {hours}
                         </td>
-                        <td className="border border-black px-1 py-1" rowSpan={span}></td>
-                        <td className="border border-black px-1 py-1" rowSpan={span}></td>
+                        <td className="ot-cell px-1 py-1" rowSpan={span}></td>
+                        <td className="ot-cell px-1 py-1" rowSpan={span}></td>
                       </>
                     )}
-                    <td className="border border-black px-1 py-1 whitespace-nowrap">{row.code}</td>
-                    <td className="border border-black px-1 py-1 whitespace-nowrap">{row.item_code}</td>
-                    <td className="border border-black px-1 py-1 text-right whitespace-nowrap">
-                      {row.qty.toLocaleString('vi-VN')}
+                    <td className="ot-cell px-1 py-1 whitespace-nowrap">{row.code}</td>
+                    <td className="ot-cell px-1 py-1 whitespace-nowrap">{row.item_code}</td>
+                    <td className="ot-cell px-1 py-1 text-center whitespace-nowrap">
+                      {fmtQty(row.qty)}
                     </td>
-                    <td className="border border-black px-1 py-1"></td>
-                    <td className="border border-black px-1 py-1"></td>
-                    {rIdx === 0 && (
-                      <td className="border border-black px-1 py-1" rowSpan={span}></td>
-                    )}
+                    <td className="ot-cell px-1 py-1"></td>
+                    <td className="ot-cell px-1 py-1"></td>
+                    <td className="ot-cell px-1 py-1"></td>
                   </tr>
                 ));
               })}
@@ -319,24 +327,24 @@ export default async function PrintViewPage({
           </table>
 
           <div
-            className="ot-signatures grid border border-black mt-3 text-center"
+            className="ot-signatures grid ot-bordered mt-3 text-center"
             style={{ gridTemplateColumns: '1fr 1fr 1fr 1.5fr' }}
           >
-            <div className="border-r border-black">
-              <div className="font-bold py-1 border-b border-black bg-gray-50">Người ghi</div>
-              <div className="ot-sig-pad h-16"></div>
+            <div className="ot-border-r">
+              <div className="font-bold py-1 ot-border-b">Người ghi</div>
+              <div className="ot-sig-pad h-32"></div>
             </div>
-            <div className="border-r border-black">
-              <div className="font-bold py-1 border-b border-black bg-gray-50">Kiểm Tra</div>
-              <div className="ot-sig-pad h-16"></div>
+            <div className="ot-border-r">
+              <div className="font-bold py-1 ot-border-b">Kiểm Tra</div>
+              <div className="ot-sig-pad h-32"></div>
             </div>
-            <div className="border-r border-black">
-              <div className="font-bold py-1 border-b border-black bg-gray-50">Giám sát</div>
-              <div className="ot-sig-pad h-16"></div>
+            <div className="ot-border-r">
+              <div className="font-bold py-1 ot-border-b">Giám sát</div>
+              <div className="ot-sig-pad h-32"></div>
             </div>
             <div>
-              <div className="font-bold py-1 border-b border-black bg-gray-50">Nhân sự</div>
-              <div className="ot-sig-pad h-16"></div>
+              <div className="font-bold py-1 ot-border-b">Nhân sự</div>
+              <div className="ot-sig-pad h-32"></div>
             </div>
           </div>
 
@@ -345,31 +353,44 @@ export default async function PrintViewPage({
       </div>
 
       <style>{`
+        /* Border đồng bộ 1px solid đen — dùng chung cho mọi nơi */
+        .ot-cell { border: 1px solid #000; }
+        .ot-bordered { border: 1px solid #000; }
+        .ot-border-r { border-right: 1px solid #000; }
+        .ot-border-b { border-bottom: 1px solid #000; }
+
+        /* Font đồng bộ 1 font duy nhất trên toàn phiếu */
+        .ot-form, .ot-form * {
+          font-family: var(--font-geist-sans), system-ui, sans-serif !important;
+        }
+
         @media print {
           @page { size: A4 portrait; margin: 8mm; }
           html, body { background: white !important; }
           .ot-form {
-            font-size: 8pt !important;
+            font-size: 9pt !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
           }
-          .ot-form h1 { font-size: 14pt !important; }
-          .ot-form header > div { font-size: 9pt !important; }
-          .ot-form table { font-size: 7.5pt !important; }
-          .ot-form table th,
-          .ot-form table td {
-            padding: 1px 2px !important;
-            line-height: 1.1 !important;
+          .ot-form h1 { font-size: 15pt !important; }
+          .ot-form header > div { font-size: 10pt !important; }
+          .ot-form table { font-size: 8.5pt !important; }
+          .ot-form table th {
+            padding: 3px 2px !important;
+            line-height: 1.15 !important;
           }
-          .ot-form table th .text-\\[10px\\] { font-size: 6.5pt !important; }
-          .ot-form .ot-sig-pad { height: 32px !important; }
-          .ot-form .ot-signatures .font-bold { padding: 2px 0 !important; font-size: 8pt !important; }
-          .ot-form .ot-footer { font-size: 6.5pt !important; margin-top: 3px !important; }
-          .ot-form img { height: 32px !important; }
-          /* Force background colors to print */
-          .ot-form thead,
-          .ot-form .bg-gray-50,
-          .ot-form .bg-gray-100 {
+          .ot-form table td {
+            padding: 2px 3px !important;
+            line-height: 1.2 !important;
+            height: ${rowHeightMm}mm !important;
+          }
+          .ot-form table th .text-\\[10px\\] { font-size: 7pt !important; }
+          .ot-form .ot-sig-pad { height: 64px !important; }
+          .ot-form .ot-signatures .font-bold { padding: 4px 0 !important; font-size: 10pt !important; }
+          .ot-form .ot-footer { font-size: 8pt !important; margin-top: 4px !important; }
+          .ot-form img { height: 42px !important; }
+          /* Đảm bảo border in chính xác */
+          .ot-form * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }

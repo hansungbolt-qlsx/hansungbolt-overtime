@@ -79,6 +79,16 @@ export async function GET(
   const empMap = new Map((emps ?? []).map((e) => [e.id, e]));
   const eqMap = new Map((eqs ?? []).map((e) => [e.id, e]));
 
+  // HD-15..HD-31 = nhóm M4, HD-50..HD-55 = nhóm M3
+  function machineGroup(code: string): 'M4' | 'M3' | null {
+    const m = code.match(/^HD-(\d+)$/i);
+    if (!m) return null;
+    const n = parseInt(m[1], 10);
+    if (n >= 15 && n <= 31) return 'M4';
+    if (n >= 50 && n <= 55) return 'M3';
+    return null;
+  }
+
   type GroupRow = {
     code: string;
     item_code: string;
@@ -87,7 +97,13 @@ export async function GET(
   };
   const groups = new Map<
     string,
-    { order_no: number; full_name: string; rows: GroupRow[] }
+    {
+      order_no: number;
+      full_name: string;
+      individual: GroupRow[];
+      m4: GroupRow[];
+      m3: GroupRow[];
+    }
   >();
   for (const it of items) {
     const emp = empMap.get(it.employee_id);
@@ -97,18 +113,47 @@ export async function GET(
       groups.set(emp.id, {
         order_no: emp.order_no,
         full_name: emp.full_name,
-        rows: [],
+        individual: [],
+        m4: [],
+        m3: [],
       });
     }
-    groups.get(emp.id)!.rows.push({
+    const row: GroupRow = {
       code: eq.code,
       item_code: it.item_code,
       item_name: it.item_name,
       qty: it.planned_quantity,
-    });
+    };
+    const grp = machineGroup(eq.code);
+    const slot = groups.get(emp.id)!;
+    if (grp === 'M4') slot.m4.push(row);
+    else if (grp === 'M3') slot.m3.push(row);
+    else slot.individual.push(row);
   }
 
-  const sortedGroups = [...groups.values()].sort((a, b) => a.order_no - b.order_no);
+  // Gộp M4/M3 thành 1 dòng "HD-M{x} (NEA)" với mã hàng "M{x}", số lượng = tổng
+  const sortedGroups = [...groups.values()]
+    .sort((a, b) => a.order_no - b.order_no)
+    .map((g) => {
+      const rows: GroupRow[] = [...g.individual];
+      if (g.m4.length > 0) {
+        rows.push({
+          code: `HD-M4 (${g.m4.length}EA)`,
+          item_code: 'M4',
+          item_name: 'M4',
+          qty: g.m4.reduce((s, r) => s + r.qty, 0),
+        });
+      }
+      if (g.m3.length > 0) {
+        rows.push({
+          code: `HD-M3 (${g.m3.length}EA)`,
+          item_code: 'M3',
+          item_name: 'M3',
+          qty: g.m3.reduce((s, r) => s + r.qty, 0),
+        });
+      }
+      return { order_no: g.order_no, full_name: g.full_name, rows };
+    });
 
   const buf = await fs.readFile(TEMPLATE_PATH);
   const wb = new ExcelJS.Workbook();
@@ -137,7 +182,8 @@ export async function GET(
   sheet.getCell('H5').value = `Bộ phận:  ${department}\r\nDepartment:`;
 
   const timeLabel = `${formatTime(reg.time_from)}-${formatTime(reg.time_to)}`;
-  const hours = Number(reg.duration_hours);
+  // Giờ hiển thị (3h hoặc 8h theo day_type) — bỏ qua duration_hours cũ trong DB
+  const hours = reg.day_type === 'sunday' ? 8 : 3;
 
   let rowPtr = 9;
   let stt = 1;
@@ -157,7 +203,11 @@ export async function GET(
       }
       row.getCell(8).value = item.code;
       row.getCell(9).value = item.item_code;
-      row.getCell(10).value = item.qty;
+      // Giữ là số (calculable), format dấu , là phân cách hàng nghìn
+      const qtyCell = row.getCell(10);
+      qtyCell.value = item.qty;
+      qtyCell.numFmt = '#,##0';
+      qtyCell.alignment = { ...qtyCell.alignment, horizontal: 'center', vertical: 'middle' };
       rowPtr++;
     }
 
