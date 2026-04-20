@@ -11,19 +11,8 @@ const BUCKET = 'material-labels';
 // Matches "Copy Tem NVL.xlsx" template
 const SLOTS_PER_SHEET = 8;
 
-type AnchorCoord = { col: number; row: number; nativeCol: number; nativeRow: number; nativeColOff: number; nativeRowOff: number };
-const anchor = (col: number, row: number): AnchorCoord => ({ col, row, nativeCol: col, nativeRow: row, nativeColOff: 0, nativeRowOff: 0 });
-
-const SLOT_POSITIONS: Array<{ tl: AnchorCoord; br: AnchorCoord }> = [
-  { tl: anchor(0, 0), br: anchor(1, 1) }, // A1
-  { tl: anchor(1, 0), br: anchor(2, 1) }, // B1
-  { tl: anchor(0, 1), br: anchor(1, 2) }, // A2
-  { tl: anchor(1, 1), br: anchor(2, 2) }, // B2
-  { tl: anchor(0, 2), br: anchor(1, 3) }, // A3
-  { tl: anchor(1, 2), br: anchor(2, 3) }, // B3
-  { tl: anchor(0, 3), br: anchor(1, 4) }, // A4
-  { tl: anchor(1, 3), br: anchor(2, 4) }, // B4
-];
+// Single-cell string ranges: 'A1:A1' anchors image exactly to cell A1
+const SLOT_CELLS = ['A1', 'B1', 'A2', 'B2', 'A3', 'B3', 'A4', 'B4'] as const;
 
 function configureSheet(sheet: ExcelJS.Worksheet) {
   // 2 wide columns matching the template (76.25 char units each)
@@ -108,16 +97,12 @@ export async function GET(req: Request) {
     const chunk = chunks[c];
     for (let i = 0; i < chunk.length; i++) {
       const img = chunk[i];
-      const slot = SLOT_POSITIONS[i];
       const imgId = wb.addImage({
         buffer: img.buffer as unknown as ArrayBuffer,
         extension: img.ext,
       });
-      sheet.addImage(imgId, {
-        tl: slot.tl as unknown as ExcelJS.Anchor,
-        br: slot.br as unknown as ExcelJS.Anchor,
-        editAs: 'twoCell',
-      });
+      const cell = SLOT_CELLS[i];
+      sheet.addImage(imgId, `${cell}:${cell}`);
     }
   }
 
