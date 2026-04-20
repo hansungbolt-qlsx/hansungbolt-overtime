@@ -17,7 +17,7 @@ export default async function PrintLabelsPage({
 
   const { data } = await supabaseAdmin
     .from('material_label_photos')
-    .select('id, storage_path, employee_name')
+    .select('id, storage_path')
     .eq('label_date', date)
     .order('uploaded_at', { ascending: true });
 
@@ -26,7 +26,10 @@ export default async function PrintLabelsPage({
       const { data: signed } = await supabaseAdmin.storage
         .from('material-labels')
         .createSignedUrl(p.storage_path, 3600);
-      return { id: p.id, url: signed?.signedUrl ?? null, employee_name: p.employee_name ?? null };
+      const filename = p.storage_path.split('/').pop() ?? '';
+      const parts = filename.replace(/\.[^.]+$/, '').split('__');
+      const employee_name = parts.length >= 2 ? parts[1] : null;
+      return { id: p.id, url: signed?.signedUrl ?? null, employee_name };
     }),
   );
 

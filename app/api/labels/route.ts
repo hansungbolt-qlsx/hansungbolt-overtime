@@ -56,7 +56,8 @@ export async function POST(req: Request) {
     const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
     const safeExt = ['jpg', 'jpeg', 'png', 'webp'].includes(ext) ? ext : 'jpg';
     const rand = Math.random().toString(36).slice(2, 8);
-    const path = `${date}/${Date.now()}_${rand}.${safeExt}`;
+    const nameSuffix = typeof employeeName === 'string' && employeeName ? `__${employeeName}` : '';
+    const path = `${date}/${Date.now()}_${rand}${nameSuffix}.${safeExt}`;
     const buf = await file.arrayBuffer();
 
     const { error: upErr } = await supabaseAdmin.storage
@@ -76,7 +77,6 @@ export async function POST(req: Request) {
         label_date: date,
         storage_path: path,
         uploaded_by: session.userId,
-        employee_name: typeof employeeName === 'string' ? employeeName : null,
       })
       .select('id')
       .single();
@@ -109,7 +109,7 @@ export async function GET(req: Request) {
 
   const { data, error } = await supabaseAdmin
     .from('material_label_photos')
-    .select('id, storage_path, uploaded_at, uploaded_by, employee_name')
+    .select('id, storage_path, uploaded_at, uploaded_by')
     .eq('label_date', date)
     .order('uploaded_at', { ascending: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -119,12 +119,16 @@ export async function GET(req: Request) {
       const { data: signed } = await supabaseAdmin.storage
         .from(BUCKET)
         .createSignedUrl(p.storage_path, 3600);
+      const filename = p.storage_path.split('/').pop() ?? '';
+      const nameWithoutExt = filename.replace(/\.[^.]+$/, '');
+      const parts = nameWithoutExt.split('__');
+      const employee_name = parts.length >= 2 ? parts[1] : null;
       return {
         id: p.id,
         url: signed?.signedUrl ?? null,
         uploaded_at: p.uploaded_at,
         uploaded_by: p.uploaded_by,
-        employee_name: p.employee_name ?? null,
+        employee_name,
       };
     }),
   );
