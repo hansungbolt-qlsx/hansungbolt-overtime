@@ -143,21 +143,25 @@ export default async function PrintViewPage({
   const hours = reg.day_type === 'sunday' ? 8 : 3;
   const { d: dd, m: mm, y: yyyy } = formatDateVN(reg.overtime_date);
 
-  // Chiều cao dòng tự cân theo số dòng để fit 1 trang A4 dọc
+  // Chiều cao dòng tự cân để fit 1 trang A4 dọc.
+  // A4 portrait: 297mm. Margin 8mm × 2 = 16mm. Vùng in 281mm.
+  // Header logo+date 19mm + title 13mm + requestor 12mm + table-thead 14mm
+  //   + signature 24mm + footer 7mm = ~89mm fixed.
+  // Còn lại cho tbody: 281 - 89 = 192mm
   const totalRows = sortedGroups.reduce((s, g) => s + g.rows.length, 0);
-  const availMm = 165; // không gian còn lại cho tbody sau header/footer/signature
+  const availMm = 188; // chừa 4mm an toàn
   const rowHeightMm = totalRows > 0
-    ? Math.min(18, Math.max(6.5, availMm / totalRows))
-    : 12;
+    ? Math.min(16, Math.max(5.5, availMm / totalRows))
+    : 10;
 
   // Format số kiểu US: 13,500 thay vì 13.500
   const fmtQty = (n: number) => n.toLocaleString('en-US');
 
   return (
-    <main className="min-h-screen bg-brand-surface p-4 print:p-0 print:bg-white">
-      <div className="max-w-5xl mx-auto">
-        <div className="flex justify-between items-center mb-4">
-          <div className="print:hidden">
+    <main className="min-h-screen bg-brand-surface p-4 print:min-h-0 print:p-0 print:bg-white">
+      <div className="max-w-5xl mx-auto print:max-w-none">
+        <div className="flex justify-between items-center mb-4 print:hidden">
+          <div>
             <p className="text-sm text-brand-navy-soft">
               Phiếu ngày {reg.overtime_date} • Bộ phận {reg.department}
             </p>
@@ -216,18 +220,18 @@ export default async function PrintViewPage({
             style={{ tableLayout: 'fixed' }}
           >
             <colgroup>
+              <col style={{ width: '3%' }} />
+              <col style={{ width: '17%' }} />
+              <col style={{ width: '9%' }} />
               <col style={{ width: '4%' }} />
-              <col style={{ width: '20%' }} />
               <col style={{ width: '8%' }} />
-              <col style={{ width: '5%' }} />
-              <col style={{ width: '8%' }} />
-              <col style={{ width: '5%' }} />
-              <col style={{ width: '9%' }} />
+              <col style={{ width: '4%' }} />
               <col style={{ width: '11%' }} />
+              <col style={{ width: '14%' }} />
               <col style={{ width: '8%' }} />
               <col style={{ width: '8%' }} />
-              <col style={{ width: '5%' }} />
-              <col style={{ width: '9%' }} />
+              <col style={{ width: '4%' }} />
+              <col style={{ width: '10%' }} />
             </colgroup>
             <thead className="bg-gray-100">
               <tr>
@@ -273,21 +277,21 @@ export default async function PrintViewPage({
                 </th>
               </tr>
               <tr>
-                <th className="ot-cell px-1 py-1 font-normal text-xs">
+                <th className="ot-cell px-1 py-1 font-semibold">
                   Từ – Đến
-                  <div className="text-[10px] italic">From…to</div>
+                  <div className="text-[10px] italic font-normal">From…to</div>
                 </th>
-                <th className="ot-cell px-1 py-1 font-normal text-xs">
+                <th className="ot-cell px-1 py-1 font-semibold">
                   Số giờ
-                  <div className="text-[10px] italic">Total hour</div>
+                  <div className="text-[10px] italic font-normal">Total hour</div>
                 </th>
-                <th className="ot-cell px-1 py-1 font-normal text-xs">
+                <th className="ot-cell px-1 py-1 font-semibold">
                   Giờ kết thúc
-                  <div className="text-[10px] italic">Finish time</div>
+                  <div className="text-[10px] italic font-normal">Finish time</div>
                 </th>
-                <th className="ot-cell px-1 py-1 font-normal text-xs">
+                <th className="ot-cell px-1 py-1 font-semibold">
                   Số giờ
-                  <div className="text-[10px] italic">Total hour</div>
+                  <div className="text-[10px] italic font-normal">Total hour</div>
                 </th>
               </tr>
             </thead>
@@ -322,8 +326,8 @@ export default async function PrintViewPage({
                         <td className="ot-cell px-1 py-1" rowSpan={span}></td>
                       </>
                     )}
-                    <td className="ot-cell px-1 py-1 whitespace-nowrap">{row.code}</td>
-                    <td className="ot-cell px-1 py-1 whitespace-nowrap">{row.item_code}</td>
+                    <td className="ot-cell px-1 py-1 ot-code">{row.code}</td>
+                    <td className="ot-cell px-1 py-1 ot-code">{row.item_code}</td>
                     <td className="ot-cell px-1 py-1 text-center whitespace-nowrap">
                       {fmtQty(row.qty)}
                     </td>
@@ -369,36 +373,50 @@ export default async function PrintViewPage({
         .ot-border-r { border-right: 1px solid #000; }
         .ot-border-b { border-bottom: 1px solid #000; }
 
-        /* Font đồng bộ 1 font duy nhất trên toàn phiếu */
+        /* Font Arial cho toàn phiếu (đồng bộ với phiếu tổng hợp) */
         .ot-form, .ot-form * {
-          font-family: var(--font-geist-sans), system-ui, sans-serif !important;
+          font-family: Arial, Helvetica, sans-serif !important;
+        }
+
+        /* Mã máy / mã hàng: cho phép wrap khi quá dài, không nowrap */
+        .ot-code {
+          white-space: normal;
+          word-break: break-all;
+          overflow-wrap: anywhere;
+          line-height: 1.15;
         }
 
         @media print {
           @page { size: A4 portrait; margin: 8mm; }
-          html, body { background: white !important; }
+          html, body { background: white !important; margin: 0 !important; padding: 0 !important; }
+          main { min-height: 0 !important; padding: 0 !important; background: white !important; }
           .ot-form {
-            font-size: 9pt !important;
+            font-size: 8.5pt !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
           }
-          .ot-form h1 { font-size: 15pt !important; }
-          .ot-form header > div { font-size: 10pt !important; }
-          .ot-form table { font-size: 8.5pt !important; }
+          .ot-form h1 { font-size: 14pt !important; line-height: 1.1 !important; }
+          .ot-form header { margin-bottom: 4px !important; }
+          .ot-form header > div { font-size: 9.5pt !important; line-height: 1.1 !important; }
+          .ot-form table { font-size: 8pt !important; }
           .ot-form table th {
-            padding: 3px 2px !important;
-            line-height: 1.15 !important;
+            padding: 2px 1px !important;
+            line-height: 1.1 !important;
           }
           .ot-form table td {
-            padding: 2px 3px !important;
-            line-height: 1.2 !important;
+            padding: 1px 2px !important;
+            line-height: 1.15 !important;
             height: ${rowHeightMm}mm !important;
           }
-          .ot-form table th .text-\\[10px\\] { font-size: 7pt !important; }
-          .ot-form .ot-sig-pad { height: 64px !important; }
-          .ot-form .ot-signatures .font-bold { padding: 4px 0 !important; font-size: 10pt !important; }
-          .ot-form .ot-footer { font-size: 8pt !important; margin-top: 4px !important; }
-          .ot-form img { height: 42px !important; }
+          .ot-form table th .text-\\[10px\\] { font-size: 6.5pt !important; }
+          .ot-form .ot-sig-pad { height: 50px !important; }
+          .ot-form .ot-signatures { margin-top: 4px !important; }
+          .ot-form .ot-signatures .font-bold { padding: 2px 0 !important; font-size: 9pt !important; }
+          .ot-form .ot-footer { font-size: 7.5pt !important; margin-top: 3px !important; line-height: 1.2 !important; }
+          .ot-form img { height: 38px !important; }
           /* Đảm bảo border in chính xác */
           .ot-form * {
             -webkit-print-color-adjust: exact !important;
