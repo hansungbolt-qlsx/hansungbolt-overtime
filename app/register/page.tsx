@@ -4,7 +4,6 @@ import { getSession } from '@/lib/auth-server';
 import LogoutButton from '@/components/LogoutButton';
 import ChangePasswordButton from '@/components/ChangePasswordButton';
 import RegisterLayout from '@/components/RegisterLayout';
-import OvertimeSummaryCard from '@/components/OvertimeSummaryCard';
 import { toTitleCase } from '@/lib/format';
 
 export default async function RegisterPage() {
@@ -51,10 +50,6 @@ export default async function RegisterPage() {
           isLeader={isLeader}
           currentUserFullName={session.fullName}
         />
-
-        <div className="mt-6">
-          <OvertimeSummaryCard />
-        </div>
       </div>
     </main>
   );

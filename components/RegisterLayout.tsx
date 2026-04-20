@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import OvertimeForm from './OvertimeForm';
 import MaterialLabelsUpload from './MaterialLabelsUpload';
+import OvertimeSummaryCard from './OvertimeSummaryCard';
 
 const todayISO = () => {
   const d = new Date();
@@ -34,11 +35,20 @@ export default function RegisterLayout({
   const [activeTab, setActiveTab] = useState<Tab>(defaultTab);
   const [labelsDate, setLabelsDate] = useState(todayISO());
 
-  // Cả 2 tab cùng false → worker RL: không hiển thị section nào ở đây (summary card ở ngoài)
-  if (!showOvertimeTab && !showLabelsTab) return null;
+  // Worker RL: không có tab nào → chỉ hiển thị tổng hợp giờ
+  if (!showOvertimeTab && !showLabelsTab) return <OvertimeSummaryCard />;
 
-  // Chỉ 1 tab hiển thị: bỏ tab bar
-  if (showOvertimeTab && !showLabelsTab) return <OvertimeForm department={department} />;
+  // Chỉ 1 tab: bỏ tab bar
+  if (showOvertimeTab && !showLabelsTab) {
+    return (
+      <>
+        <OvertimeForm department={department} />
+        <div className="mt-6">
+          <OvertimeSummaryCard />
+        </div>
+      </>
+    );
+  }
   if (!showOvertimeTab && showLabelsTab) {
     return (
       <div className="space-y-4">
@@ -86,7 +96,14 @@ export default function RegisterLayout({
         </button>
       </div>
 
-      {activeTab === 'overtime' && <OvertimeForm department={department} />}
+      {activeTab === 'overtime' && (
+        <>
+          <OvertimeForm department={department} />
+          <div className="mt-6">
+            <OvertimeSummaryCard />
+          </div>
+        </>
+      )}
 
       {activeTab === 'labels' && (
         <div className="space-y-4">
