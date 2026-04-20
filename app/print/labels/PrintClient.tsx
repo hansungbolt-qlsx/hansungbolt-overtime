@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 
-type Photo = { id: string; url: string | null };
+type Photo = { id: string; url: string | null; employee_name: string | null };
 
 export default function PrintClient({
   date,
@@ -36,6 +36,7 @@ export default function PrintClient({
           break-after: page;
         }
         .cell {
+          position: relative;
           overflow: hidden;
           display: flex;
           align-items: center;
@@ -44,6 +45,19 @@ export default function PrintClient({
           border: 1px solid #000;
         }
         .cell img { width: 100%; height: 100%; object-fit: fill; display: block; }
+        .name-tag {
+          position: absolute;
+          bottom: 6px;
+          right: 6px;
+          background: rgba(255,255,255,0.88);
+          color: #000;
+          font-size: 13pt;
+          font-weight: 700;
+          padding: 2px 6px;
+          border-radius: 3px;
+          line-height: 1.2;
+          letter-spacing: 0.03em;
+        }
         .no-print {
           padding: 12px 16px;
           background: #f0f4ff;
@@ -95,6 +109,9 @@ export default function PrintClient({
               <div key={i} className="cell">
                 {photo?.url ? (
                   <img src={photo.url} alt={`Tem ${si * 8 + i + 1}`} />
+                ) : null}
+                {photo?.employee_name ? (
+                  <span className="name-tag">{photo.employee_name}</span>
                 ) : null}
               </div>
             );

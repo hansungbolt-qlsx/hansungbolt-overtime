@@ -1,0 +1,16 @@
+export const HD_EMPLOYEES: { full: string; display: string }[] = [
+  { full: 'TRẦN ANH TUẤN',    display: 'TUẤN'     },
+  { full: 'NGUYỄN TIẾN DŨNG', display: 'DŨNG'     },
+  { full: 'NGUYỄN XUÂN QUANG',display: 'QUANG'    },
+  { full: 'PHẠM TUẤN VŨ',     display: 'VŨ'       },
+  { full: 'PHẠM TẤN PHONG',   display: 'PHONG'    },
+  { full: 'HÀ QUỐC ĐIỆP',     display: 'ĐIỆP'     },
+  { full: 'PHẠM HỮU ANH',     display: 'HỮU ANH'  },
+  { full: 'VŨ CÔNG THAO',     display: 'THAO'     },
+  { full: 'NGUYỄN ĐỨC GIÁP', display: 'GIÁP'     },
+  { full: 'NGUYỄN CẢNH THIẾT',display: 'THIẾT'    },
+  { full: 'NGUYỄN QUỐC BẢO', display: 'BẢO'      },
+  { full: 'TRẦN XUÂN ĐẠT',   display: 'ĐẠT'      },
+  { full: 'HỨA TẤN ANH',     display: 'TẤN ANH'  },
+  { full: 'ĐINH MẠNH HOÀNG', display: 'HOÀNG'    },
+];

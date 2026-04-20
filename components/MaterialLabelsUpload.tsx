@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { HD_EMPLOYEES } from '@/lib/hd-employees';
 
-type Photo = { id: string; url: string | null; uploaded_at: string };
+type Photo = { id: string; url: string | null; uploaded_at: string; employee_name: string | null };
 
 export default function MaterialLabelsUpload({ date }: { date: string }) {
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -10,6 +11,7 @@ export default function MaterialLabelsUpload({ date }: { date: string }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ kind: 'info' | 'error'; text: string } | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [employeeName, setEmployeeName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function loadPhotos() {
@@ -38,6 +40,7 @@ export default function MaterialLabelsUpload({ date }: { date: string }) {
 
     const formData = new FormData();
     formData.append('date', date);
+    if (employeeName) formData.append('employee_name', employeeName);
     for (const f of files) formData.append('files', f);
 
     try {
@@ -78,18 +81,51 @@ export default function MaterialLabelsUpload({ date }: { date: string }) {
     }
   }
 
+  // Step 1: Name selector
+  if (!employeeName) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-4 mt-6">
+        <h2 className="text-base font-semibold text-brand-navy mb-1">Chọn tên của bạn</h2>
+        <p className="text-xs text-brand-navy-soft mb-4">Tên sẽ hiển thị trên tem khi in ra</p>
+        <div className="grid grid-cols-2 gap-2">
+          {HD_EMPLOYEES.map((emp) => (
+            <button
+              key={emp.full}
+              type="button"
+              onClick={() => setEmployeeName(emp.display)}
+              className="py-4 rounded-xl bg-brand-surface-alt hover:bg-brand-teal hover:text-white text-brand-navy font-bold text-lg transition active:scale-95"
+            >
+              {emp.display}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Step 2: Upload form
   return (
     <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-4 mt-6">
       <div className="flex items-center justify-between mb-3">
         <div>
           <h2 className="text-base font-semibold text-brand-navy">Tem NVL ngày {date}</h2>
           <p className="text-xs text-brand-navy-soft mt-0.5">
-            Chụp/chọn ảnh tem nguyên liệu, upload lên để admin in
+            Đang upload với tên:{' '}
+            <span className="font-bold text-brand-teal">{employeeName}</span>
           </p>
         </div>
-        <span className="text-xs font-semibold text-brand-navy-soft bg-brand-surface-alt px-2 py-1 rounded">
-          {photos.length} ảnh
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-brand-navy-soft bg-brand-surface-alt px-2 py-1 rounded">
+            {photos.length} ảnh
+          </span>
+          <button
+            type="button"
+            onClick={() => setEmployeeName(null)}
+            className="text-xs text-brand-navy-soft hover:text-brand-navy underline"
+          >
+            Đổi tên
+          </button>
+        </div>
       </div>
 
       <input
@@ -138,16 +174,16 @@ export default function MaterialLabelsUpload({ date }: { date: string }) {
               className="relative aspect-square bg-brand-surface-alt rounded-md overflow-hidden group"
             >
               {p.url ? (
-                <img
-                  src={p.url}
-                  alt="Tem NVL"
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
+                <img src={p.url} alt="Tem NVL" className="w-full h-full object-cover" loading="lazy" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-xs text-brand-navy-soft">
                   (không tải được)
                 </div>
+              )}
+              {p.employee_name && (
+                <span className="absolute bottom-1 right-1 bg-black/60 text-white text-[10px] font-bold px-1 rounded leading-tight">
+                  {p.employee_name}
+                </span>
               )}
               <button
                 type="button"

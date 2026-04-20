@@ -20,6 +20,7 @@ export async function POST(req: Request) {
 
   const form = await req.formData();
   const date = form.get('date');
+  const employeeName = form.get('employee_name');
   const files = form.getAll('files');
 
   if (typeof date !== 'string' || !date) {
@@ -75,6 +76,7 @@ export async function POST(req: Request) {
         label_date: date,
         storage_path: path,
         uploaded_by: session.userId,
+        employee_name: typeof employeeName === 'string' ? employeeName : null,
       })
       .select('id')
       .single();
@@ -107,7 +109,7 @@ export async function GET(req: Request) {
 
   const { data, error } = await supabaseAdmin
     .from('material_label_photos')
-    .select('id, storage_path, uploaded_at, uploaded_by')
+    .select('id, storage_path, uploaded_at, uploaded_by, employee_name')
     .eq('label_date', date)
     .order('uploaded_at', { ascending: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -122,6 +124,7 @@ export async function GET(req: Request) {
         url: signed?.signedUrl ?? null,
         uploaded_at: p.uploaded_at,
         uploaded_by: p.uploaded_by,
+        employee_name: p.employee_name ?? null,
       };
     }),
   );
