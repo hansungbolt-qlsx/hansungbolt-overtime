@@ -42,12 +42,23 @@ export default function OvertimeSummaryCard() {
             Ngày thường = 3h · Chủ nhật = 8h
           </p>
         </div>
-        <input
-          type="month"
-          value={month}
-          onChange={(e) => setMonth(e.target.value)}
-          className="px-3 py-1.5 border border-gray-300 rounded-md text-brand-navy text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal"
-        />
+        <div className="flex items-center gap-2">
+          <input
+            type="month"
+            value={month}
+            onChange={(e) => setMonth(e.target.value)}
+            className="px-3 py-1.5 border border-gray-300 rounded-md text-brand-navy text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal"
+          />
+          {rows.length > 0 && (
+            <button
+              type="button"
+              onClick={() => window.open(`/print/overtime-summary?month=${month}`, '_blank')}
+              className="bg-[#e32531] hover:bg-[#c01f2a] active:scale-95 text-white text-sm font-bold py-1.5 px-4 rounded-lg shadow-sm transition"
+            >
+              In / Xuất
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="p-4 bg-[#f0f5ff] min-h-[80px]">
