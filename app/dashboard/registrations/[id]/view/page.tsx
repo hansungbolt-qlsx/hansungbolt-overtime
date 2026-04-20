@@ -412,7 +412,8 @@ export default async function PrintViewPage({
             height: ${rowHeightMm}mm !important;
           }
           .ot-form table th .text-\\[10px\\] { font-size: 6.5pt !important; }
-          .ot-form .ot-sig-pad { height: 50px !important; }
+          /* Sig pad cao hơn row mã hàng (max 16mm) để có chỗ ký tên */
+          .ot-form .ot-sig-pad { height: 25mm !important; }
           .ot-form .ot-signatures { margin-top: 4px !important; }
           .ot-form .ot-signatures .font-bold { padding: 2px 0 !important; font-size: 9pt !important; }
           .ot-form .ot-footer { font-size: 7.5pt !important; margin-top: 3px !important; line-height: 1.2 !important; }

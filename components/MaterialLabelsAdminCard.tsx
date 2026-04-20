@@ -75,8 +75,9 @@ export default function MaterialLabelsAdminCard({ date }: { date: string }) {
   return (
     <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden">
       <div className="px-5 py-4 border-b border-brand-surface-alt">
-        <h2 className="text-base font-bold text-[#063882]">Tem NVL ngày {date}</h2>
-        <p className="text-xs text-brand-navy-soft mt-0.5">
+        <h2 className="text-base font-bold text-[#063882] leading-tight">Tem NVL</h2>
+        <div className="text-sm font-semibold text-[#063882] mt-0.5">Ngày {date}</div>
+        <p className="text-xs text-brand-navy-soft mt-1">
           {loading
             ? 'Đang tải...'
             : photos.length === 0

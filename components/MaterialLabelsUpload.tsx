@@ -154,16 +154,17 @@ export default function MaterialLabelsUpload({
   return (
     <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden mt-6">
       {/* Header */}
-      <div className="bg-[#063882] px-5 py-4 flex items-center justify-between">
-        <div>
-          <h2 className="text-base font-bold text-white">Tem NVL ngày {date}</h2>
-          <p className="text-xs text-blue-200 mt-0.5">
+      <div className="bg-[#063882] px-5 py-4 flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-base font-bold text-white leading-tight">Tem NVL</h2>
+          <div className="text-sm font-semibold text-white mt-0.5">Ngày {date}</div>
+          <p className="text-xs text-blue-200 mt-1">
             Đang upload với tên:{' '}
             <span className="font-bold text-white">{employeeName}</span>
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-blue-200 bg-[#052f6e] px-2 py-1 rounded">
+        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+          <span className="text-xs font-semibold text-blue-200 bg-[#052f6e] px-2 py-1 rounded whitespace-nowrap">
             {photos.length} ảnh
           </span>
           <button
