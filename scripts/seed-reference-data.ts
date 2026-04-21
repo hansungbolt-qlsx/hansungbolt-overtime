@@ -91,6 +91,7 @@ const equipments = [
   ...range('RL', 5, 8, 'M6', 'ROLLING', 140, 'RL'),
   ...range('RL', 9, 14, 'M4', 'ROLLING (T/S-1)', 215, 'RL'),
   ...range('RL', 15, 23, 'M4', 'ROLLING', 215, 'RL'),
+  { code: 'RL-24', department: 'RL', spec: 'M4', machine_type: 'ROLLING', rpm: 60 },
   ...range('RL', 40, 42, 'M3', 'ROLLING', 350, 'RL'),
 
   // SM (thuộc RL)
