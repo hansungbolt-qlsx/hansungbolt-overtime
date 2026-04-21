@@ -23,23 +23,6 @@ export async function GET(req: Request) {
     .order('order_no', { ascending: true });
   if (empErr) return NextResponse.json({ error: empErr.message }, { status: 500 });
 
-  const { data: plans, error: planErr } = await supabaseAdmin
-    .from('daily_plans')
-    .select('equipment_code, item_code, item_name')
-    .eq('plan_date', date);
-  if (planErr) return NextResponse.json({ error: planErr.message }, { status: 500 });
-
-  const planCodes = Array.from(new Set((plans ?? []).map((p) => p.equipment_code)));
-
-  // Build map: equipment_code -> deduplicated items[]
-  const itemsByCode: Record<string, Array<{ item_code: string; item_name: string | null }>> = {};
-  for (const p of plans ?? []) {
-    if (!itemsByCode[p.equipment_code]) itemsByCode[p.equipment_code] = [];
-    if (!itemsByCode[p.equipment_code].some((x) => x.item_code === p.item_code)) {
-      itemsByCode[p.equipment_code].push({ item_code: p.item_code, item_name: p.item_name });
-    }
-  }
-
   type MachineWithItems = {
     id: string;
     code: string;
@@ -49,36 +32,81 @@ export async function GET(req: Request) {
   };
 
   let machines: MachineWithItems[] = [];
-  if (planCodes.length > 0) {
+
+  if (session.department === 'HD') {
+    // HD: chỉ hiện máy có trong kế hoạch của ngày đó + item_code auto từ plan
+    const { data: plans, error: planErr } = await supabaseAdmin
+      .from('daily_plans')
+      .select('equipment_code, item_code, item_name')
+      .eq('plan_date', date);
+    if (planErr) return NextResponse.json({ error: planErr.message }, { status: 500 });
+
+    const planCodes = Array.from(new Set((plans ?? []).map((p) => p.equipment_code)));
+    const itemsByCode: Record<string, Array<{ item_code: string; item_name: string | null }>> = {};
+    for (const p of plans ?? []) {
+      if (!itemsByCode[p.equipment_code]) itemsByCode[p.equipment_code] = [];
+      if (!itemsByCode[p.equipment_code].some((x) => x.item_code === p.item_code)) {
+        itemsByCode[p.equipment_code].push({ item_code: p.item_code, item_name: p.item_name });
+      }
+    }
+
+    if (planCodes.length > 0) {
+      const { data: eqs, error: eqErr } = await supabaseAdmin
+        .from('equipments')
+        .select('id, code, rpm, spec')
+        .eq('department', 'HD')
+        .neq('machine_type', 'OTHER')
+        .in('code', planCodes);
+      if (eqErr) return NextResponse.json({ error: eqErr.message }, { status: 500 });
+      machines = (eqs ?? [])
+        .map((eq) => ({ ...eq, items: itemsByCode[eq.code] ?? [] }))
+        .sort((a, b) => hdNaturalCompare(a.code, b.code));
+    }
+  } else {
+    // RL: hiện toàn bộ máy (RL/SM/CT), không lọc theo kế hoạch; mã hàng tổ trưởng nhập tay
     const { data: eqs, error: eqErr } = await supabaseAdmin
       .from('equipments')
       .select('id, code, rpm, spec')
       .eq('department', session.department)
-      .in('code', planCodes);
+      .neq('machine_type', 'OTHER');
     if (eqErr) return NextResponse.json({ error: eqErr.message }, { status: 500 });
     machines = (eqs ?? [])
-      .map((eq) => ({ ...eq, items: itemsByCode[eq.code] ?? [] }))
-      .sort((a, b) => naturalCompare(a.code, b.code));
+      .map((eq) => ({ ...eq, items: [] }))
+      .sort((a, b) => rlNaturalCompare(a.code, b.code));
   }
 
   return NextResponse.json({ employees: emps ?? [], machines });
 }
 
-// Sort: HD-01, HD-1A, HD-02, HD-03, HD-04, HD-4A,..., HD-M4 (6EA), HD-M3 (6EA)
-function naturalKey(code: string): [number, number, string] {
-  // Nhóm "HD-Mx (yEA)" — đẩy về cuối, M4 trước M3
+// Sort HD: HD-01, HD-1A, HD-02, ..., HD-M4 (6EA), HD-M3 (6EA)
+function hdNaturalKey(code: string): [number, number, string] {
   const grp = code.match(/^HD-M(\d+)/i);
   if (grp) return [2, -parseInt(grp[1], 10), code];
-  // Máy "HD-NN[A]" — sort theo số rồi đến hậu tố chữ cái
   const m = code.match(/^HD-(\d+)([A-Z]*)$/i);
   if (m) return [1, parseInt(m[1], 10), m[2].toUpperCase()];
-  // Khác — đặt trước nhóm M, sort alphabet
   return [3, 0, code];
 }
 
-function naturalCompare(a: string, b: string): number {
-  const [ka1, ka2, ka3] = naturalKey(a);
-  const [kb1, kb2, kb3] = naturalKey(b);
+function hdNaturalCompare(a: string, b: string): number {
+  const [ka1, ka2, ka3] = hdNaturalKey(a);
+  const [kb1, kb2, kb3] = hdNaturalKey(b);
+  if (ka1 !== kb1) return ka1 - kb1;
+  if (ka2 !== kb2) return ka2 - kb2;
+  return ka3.localeCompare(kb3);
+}
+
+// Sort RL: nhóm RL- trước, đến SM-, rồi CT-, trong nhóm sort theo số
+function rlNaturalKey(code: string): [number, number, string] {
+  const prefixOrder: Record<string, number> = { RL: 1, SM: 2, CT: 3 };
+  const m = code.match(/^([A-Z]+)-(\d+)([A-Z]*)$/i);
+  if (!m) return [9, 0, code];
+  const group = prefixOrder[m[1].toUpperCase()] ?? 8;
+  return [group, parseInt(m[2], 10), m[3].toUpperCase()];
+}
+
+function rlNaturalCompare(a: string, b: string): number {
+  const [ka1, ka2, ka3] = rlNaturalKey(a);
+  const [kb1, kb2, kb3] = rlNaturalKey(b);
   if (ka1 !== kb1) return ka1 - kb1;
   if (ka2 !== kb2) return ka2 - kb2;
   return ka3.localeCompare(kb3);

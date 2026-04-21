@@ -19,6 +19,8 @@ type MyRegistration = {
 type EmployeeRow = {
   employeeId: string;
   checkedMachineIds: string[];
+  // Mã hàng nhập tay cho máy không có trong kế hoạch (RL luôn, HD chỉ khi không có plan item)
+  machineItemCodes: Record<string, string>;
   useOther: boolean;
   otherTask: string;
 };
@@ -34,6 +36,7 @@ const todayISO = () => {
 const emptyRow = (): EmployeeRow => ({
   employeeId: '',
   checkedMachineIds: [],
+  machineItemCodes: {},
   useOther: false,
   otherTask: '',
 });
@@ -143,6 +146,18 @@ export default function OvertimeForm({ department }: { department: string }) {
     });
   }
 
+  function updateMachineItemCode(rowIdx: number, machineId: string, value: string) {
+    setRows((prev) => {
+      const next = [...prev];
+      const row = next[rowIdx];
+      next[rowIdx] = {
+        ...row,
+        machineItemCodes: { ...row.machineItemCodes, [machineId]: value },
+      };
+      return next;
+    });
+  }
+
   function updateEmployee(rowIdx: number, employeeId: string) {
     setRows((prev) => {
       const next = [...prev];
@@ -171,6 +186,14 @@ export default function OvertimeForm({ department }: { department: string }) {
           return setError(`Nhân viên ${i + 1}: chưa nhập nội dung Công việc khác`);
       } else if (r.checkedMachineIds.length === 0) {
         return setError(`Nhân viên ${i + 1}: chưa chọn máy hoặc Công việc khác`);
+      } else {
+        for (const mId of r.checkedMachineIds) {
+          const m = machines.find((mm) => mm.id === mId);
+          if (!m) continue;
+          if (!m.items[0] && !r.machineItemCodes[mId]?.trim()) {
+            return setError(`Nhân viên ${i + 1}: máy ${m.code} chưa nhập mã hàng`);
+          }
+        }
       }
     }
     const items: Array<{
@@ -193,13 +216,15 @@ export default function OvertimeForm({ department }: { department: string }) {
       }
       for (const machineId of row.checkedMachineIds) {
         const machine = machines.find((m) => m.id === machineId)!;
-        const firstItem = machine.items[0];
-        if (!firstItem) continue;
+        const planItem = machine.items[0];
+        const typedCode = (row.machineItemCodes[machineId] ?? '').trim();
+        const itemCode = planItem?.item_code ?? typedCode;
+        if (!itemCode) continue;
         items.push({
           employee_id: row.employeeId,
           equipment_id: machineId,
-          item_code: firstItem.item_code,
-          item_name: firstItem.item_name,
+          item_code: itemCode,
+          item_name: planItem?.item_name ?? null,
           planned_quantity: plannedQty(machine.rpm),
         });
       }
@@ -263,7 +288,13 @@ export default function OvertimeForm({ department }: { department: string }) {
 
       {noPlan && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm p-3 rounded-md">
-          Ngày <strong>{date}</strong> chưa có kế hoạch sản xuất. Liên hệ admin upload kế hoạch trước.
+          {department === 'HD' ? (
+            <>
+              Ngày <strong>{date}</strong> chưa có kế hoạch sản xuất. Liên hệ admin upload kế hoạch trước.
+            </>
+          ) : (
+            <>Chưa có máy nào khả dụng cho bộ phận {department}.</>
+          )}
         </div>
       )}
 
@@ -336,54 +367,73 @@ export default function OvertimeForm({ department }: { department: string }) {
                     <div className={`grid grid-cols-2 gap-1.5 ${row.useOther ? 'opacity-50' : ''}`}>
                       {visibleMachines.map((machine) => {
                         const checked = row.checkedMachineIds.includes(machine.id);
-                        const itemCode = machine.items[0]?.item_code ?? '—';
+                        const planItem = machine.items[0];
+                        const needsManualCode = !planItem;
+                        const itemCodeLabel = planItem?.item_code ?? '—';
                         const qty = plannedQty(machine.rpm);
                         return (
-                          <button
+                          <div
                             key={machine.id}
-                            type="button"
-                            onClick={() => toggleMachine(idx, machine.id)}
-                            className={`text-left px-2 py-1.5 rounded-md border transition ${
+                            className={`rounded-md border transition ${
                               checked
                                 ? 'bg-brand-teal/10 border-brand-teal'
                                 : 'bg-white border-gray-200 hover:border-brand-teal/40'
                             }`}
                           >
-                            <div className="flex items-center gap-1.5">
-                              <div
-                                className={`w-3.5 h-3.5 rounded flex-shrink-0 flex items-center justify-center border transition ${
-                                  checked
-                                    ? 'bg-brand-teal border-brand-teal'
-                                    : 'border-gray-300 bg-white'
-                                }`}
-                              >
-                                {checked && (
-                                  <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 10 8">
-                                    <path
-                                      d="M1 4l3 3 5-6"
-                                      stroke="currentColor"
-                                      strokeWidth="2"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                    />
-                                  </svg>
-                                )}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-baseline justify-between gap-1">
-                                  <span className="text-sm font-bold text-brand-navy leading-tight">
-                                    {machine.code}
-                                  </span>
-                                  <span className="text-[10px] text-brand-navy-soft leading-tight">
-                                    {qty.toLocaleString('vi-VN')}
-                                  </span>
+                            <button
+                              type="button"
+                              onClick={() => toggleMachine(idx, machine.id)}
+                              className="w-full text-left px-2 py-1.5"
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <div
+                                  className={`w-3.5 h-3.5 rounded flex-shrink-0 flex items-center justify-center border transition ${
+                                    checked
+                                      ? 'bg-brand-teal border-brand-teal'
+                                      : 'border-gray-300 bg-white'
+                                  }`}
+                                >
+                                  {checked && (
+                                    <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 10 8">
+                                      <path
+                                        d="M1 4l3 3 5-6"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                      />
+                                    </svg>
+                                  )}
                                 </div>
-                                <div className="text-[10px] text-brand-teal font-medium truncate leading-tight">
-                                  {itemCode}
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-baseline justify-between gap-1">
+                                    <span className="text-sm font-bold text-brand-navy leading-tight">
+                                      {machine.code}
+                                    </span>
+                                    <span className="text-[10px] text-brand-navy-soft leading-tight">
+                                      {qty.toLocaleString('vi-VN')}
+                                    </span>
+                                  </div>
+                                  <div className="text-[10px] text-brand-teal font-medium truncate leading-tight">
+                                    {itemCodeLabel}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </button>
+                            </button>
+                            {checked && needsManualCode && (
+                              <div className="px-2 pb-1.5">
+                                <input
+                                  type="text"
+                                  value={row.machineItemCodes[machine.id] ?? ''}
+                                  onChange={(e) =>
+                                    updateMachineItemCode(idx, machine.id, e.target.value)
+                                  }
+                                  placeholder="Nhập mã hàng"
+                                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-brand-teal bg-white"
+                                />
+                              </div>
+                            )}
+                          </div>
                         );
                       })}
                     </div>
