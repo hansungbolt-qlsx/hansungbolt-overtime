@@ -1,10 +1,22 @@
 {
   "permissions": {
+    "defaultMode": "acceptEdits",
     "allow": [
-      "Bash(npm install *)",
-      "Bash(npx tsx *)",
-      "Bash(node -e \"console.log\\(require\\('crypto'\\).randomBytes\\(32\\).toString\\('base64'\\)\\)\")",
-      "Bash(node -e ' *)"
+      "Bash(*)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd c:/hansungbolt-overtime && git diff --quiet && git diff --cached --quiet || (git add -A -- ':!.claude/' && git diff --cached --quiet || (git commit -m 'auto: deploy update' && git push origin main)) 2>/dev/null || true",
+            "timeout": 60,
+            "statusMessage": "Đang deploy lên Vercel..."
+          }
+        ]
+      }
     ]
   }
 }
