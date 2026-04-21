@@ -56,7 +56,9 @@ export default async function PrintViewPage({
 
   const { data: items } = await supabaseAdmin
     .from('overtime_items')
-    .select('employee_id, equipment_id, item_code, planned_quantity')
+    .select(
+      'employee_id, equipment_id, item_code, planned_quantity, time_from, time_to, duration_hours',
+    )
     .eq('registration_id', id);
 
   const empIds = Array.from(new Set((items ?? []).map((i) => i.employee_id)));
@@ -94,6 +96,9 @@ export default async function PrintViewPage({
     {
       order_no: number;
       full_name: string;
+      time_from: string;
+      time_to: string;
+      duration_hours: number;
       individual: GroupRow[];
       m4: GroupRow[];
       m3: GroupRow[];
@@ -104,9 +109,13 @@ export default async function PrintViewPage({
     const eq = eqMap.get(it.equipment_id);
     if (!emp || !eq) continue;
     if (!groups.has(emp.id)) {
+      // Giờ hiển thị lấy từ item (nếu admin đã sửa per-row), fallback header
       groups.set(emp.id, {
         order_no: emp.order_no,
         full_name: emp.full_name,
+        time_from: it.time_from ?? reg.time_from,
+        time_to: it.time_to ?? reg.time_to,
+        duration_hours: Number(it.duration_hours ?? reg.duration_hours),
         individual: [],
         m4: [],
         m3: [],
@@ -150,13 +159,17 @@ export default async function PrintViewPage({
           qty: g.m3.reduce((s, r) => s + r.qty, 0),
         });
       }
-      return { full_name: g.full_name, rows };
+      return {
+        full_name: g.full_name,
+        time_from: g.time_from,
+        time_to: g.time_to,
+        duration_hours: g.duration_hours,
+        rows,
+      };
     });
 
-  const timeLabel = `${formatTime(reg.time_from)}-${formatTime(reg.time_to)}`;
-  // Giờ hiển thị trên phiếu = duration_hours thực tế (admin có thể đã sửa).
-  // Number.toString tự ra "3" cho integer, "4.5" cho fractional.
-  const hours = Number(reg.duration_hours);
+  // Giờ hiển thị per nhân viên — đã tính sẵn khi build groups phía trên.
+  // Header time (reg.time_from/to) giờ chỉ dùng fallback cho dòng chưa có time riêng.
   const { d: dd, m: mm, y: yyyy } = formatDateVN(reg.overtime_date);
 
   // Chiều cao dòng tự cân để fit 1 trang A4 dọc — RÀNG BUỘC CỨNG.
@@ -334,10 +347,10 @@ export default async function PrintViewPage({
                           {toTitleCase(group.full_name)}
                         </td>
                         <td className="ot-cell px-1 py-1 whitespace-nowrap" rowSpan={span}>
-                          {timeLabel}
+                          {formatTime(group.time_from)}-{formatTime(group.time_to)}
                         </td>
                         <td className="ot-cell px-1 py-1" rowSpan={span}>
-                          {hours}
+                          {group.duration_hours}
                         </td>
                         <td className="ot-cell px-1 py-1" rowSpan={span}></td>
                         <td className="ot-cell px-1 py-1" rowSpan={span}></td>

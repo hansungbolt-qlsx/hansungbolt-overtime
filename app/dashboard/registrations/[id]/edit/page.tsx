@@ -31,7 +31,9 @@ export default async function EditRegistrationPage({
   const [{ data: items }, { data: employees }, { data: equipments }] = await Promise.all([
     supabaseAdmin
       .from('overtime_items')
-      .select('id, employee_id, equipment_id, item_code, item_name, planned_quantity')
+      .select(
+        'id, employee_id, equipment_id, item_code, item_name, planned_quantity, time_from, time_to, duration_hours',
+      )
       .eq('registration_id', id),
     supabaseAdmin
       .from('employees')
