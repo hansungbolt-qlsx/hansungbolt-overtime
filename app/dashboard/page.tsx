@@ -187,10 +187,10 @@ export default async function DashboardPage({
                       <td className="px-4 py-3 text-right">
                         <div className="inline-flex gap-1.5">
                           <Link
-                            href={`/dashboard/registrations/${r.id}/view?autoprint=1`}
+                            href={`/dashboard/registrations/${r.id}/edit`}
                             className="bg-brand-teal hover:bg-brand-teal-dark text-white text-xs font-semibold py-1.5 px-3 rounded-md shadow-sm shadow-brand-teal/30 transition"
                           >
-                            In
+                            Sửa
                           </Link>
                           <Link
                             href={`/dashboard/registrations/${r.id}/view`}

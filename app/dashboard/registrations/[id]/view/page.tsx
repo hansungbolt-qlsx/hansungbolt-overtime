@@ -154,8 +154,9 @@ export default async function PrintViewPage({
     });
 
   const timeLabel = `${formatTime(reg.time_from)}-${formatTime(reg.time_to)}`;
-  // Giờ hiển thị (hardcode theo day_type — bỏ qua duration_hours cũ)
-  const hours = reg.day_type === 'sunday' ? 8 : 3;
+  // Giờ hiển thị trên phiếu = duration_hours thực tế (admin có thể đã sửa).
+  // Number.toString tự ra "3" cho integer, "4.5" cho fractional.
+  const hours = Number(reg.duration_hours);
   const { d: dd, m: mm, y: yyyy } = formatDateVN(reg.overtime_date);
 
   // Chiều cao dòng tự cân để fit 1 trang A4 dọc — RÀNG BUỘC CỨNG.
