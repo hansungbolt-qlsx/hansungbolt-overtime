@@ -28,7 +28,7 @@ export default async function PrintOvertimeSummaryPage({
   const filterDept = session.role !== 'admin' && session.department ? session.department : null;
   let regQuery = supabaseAdmin
     .from('overtime_registrations')
-    .select('id, overtime_date, day_type')
+    .select('id, overtime_date, day_type, duration_hours')
     .gte('overtime_date', startDate)
     .lte('overtime_date', endDate)
     .order('overtime_date');
@@ -46,28 +46,43 @@ export default async function PrintOvertimeSummaryPage({
 
   // Map: date -> day_type
   const dateTypeMap = new Map<string, 'weekday' | 'sunday'>();
-  const regMap = new Map<string, { date: string; dayType: 'weekday' | 'sunday' }>();
+  const regMap = new Map<
+    string,
+    { date: string; dayType: 'weekday' | 'sunday'; durationHours: number }
+  >();
   for (const r of regs) {
     dateTypeMap.set(r.overtime_date, r.day_type as 'weekday' | 'sunday');
-    regMap.set(r.id, { date: r.overtime_date, dayType: r.day_type as 'weekday' | 'sunday' });
+    regMap.set(r.id, {
+      date: r.overtime_date,
+      dayType: r.day_type as 'weekday' | 'sunday',
+      durationHours: Number(r.duration_hours ?? 0),
+    });
   }
 
   const regIds = regs.map((r) => r.id);
   const { data: items } = await supabaseAdmin
     .from('overtime_items')
-    .select('employee_id, registration_id')
+    .select('employee_id, registration_id, duration_hours')
     .in('registration_id', regIds);
 
-  // Build: empId -> { date -> hours }
+  // Build: empId -> { date -> hours thực tế }
+  // Ưu tiên duration_hours của item (từ migration 06 — admin đã sửa per-row),
+  // fallback duration_hours của registration (leader submit ban đầu),
+  // fallback hardcoded theo day_type.
+  // Nếu 1 NV có nhiều item cùng ngày với duration khác nhau → lấy MAX.
   const empDateMap = new Map<string, Map<string, number>>();
   for (const it of items ?? []) {
     const reg = regMap.get(it.registration_id);
     if (!reg) continue;
     if (!empDateMap.has(it.employee_id)) empDateMap.set(it.employee_id, new Map());
     const dateMap = empDateMap.get(it.employee_id)!;
-    if (!dateMap.has(reg.date)) {
-      dateMap.set(reg.date, reg.dayType === 'sunday' ? 8 : 3);
-    }
+    const hours = Number(
+      it.duration_hours ??
+        reg.durationHours ??
+        (reg.dayType === 'sunday' ? 8 : 3),
+    );
+    const existing = dateMap.get(reg.date) ?? 0;
+    if (hours > existing) dateMap.set(reg.date, hours);
   }
 
   const empIds = Array.from(empDateMap.keys());

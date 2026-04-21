@@ -147,13 +147,14 @@ export default function PrintClient({
           </thead>
           <tbody>
             {employees.map((emp, idx) => {
-              const weekdayCount = overtimeDates.filter(
-                (d) => d.dayType === 'weekday' && emp.byDate[d.date],
-              ).length;
-              const sundayCount = overtimeDates.filter(
-                (d) => d.dayType === 'sunday' && emp.byDate[d.date],
-              ).length;
-              const total = weekdayCount * 3 + sundayCount * 8;
+              // Tổng giờ ngày thường = sum giờ thực tế mọi ngày weekday NV đã tăng ca
+              const weekdayHours = overtimeDates
+                .filter((d) => d.dayType === 'weekday')
+                .reduce((s, d) => s + (emp.byDate[d.date] ?? 0), 0);
+              const sundayHours = overtimeDates
+                .filter((d) => d.dayType === 'sunday')
+                .reduce((s, d) => s + (emp.byDate[d.date] ?? 0), 0);
+              const total = weekdayHours + sundayHours;
               return (
                 <tr key={emp.id}>
                   <td className="stt">{idx + 1}</td>
@@ -169,8 +170,8 @@ export default function PrintClient({
                       </td>
                     );
                   })}
-                  <td className="total-col">{weekdayCount > 0 ? weekdayCount : ''}</td>
-                  <td className="total-col">{sundayCount > 0 ? sundayCount : ''}</td>
+                  <td className="total-col">{weekdayHours > 0 ? `${weekdayHours}h` : ''}</td>
+                  <td className="total-col">{sundayHours > 0 ? `${sundayHours}h` : ''}</td>
                   <td className="total-col">{total > 0 ? `${total}h` : ''}</td>
                 </tr>
               );
@@ -193,11 +194,11 @@ export default function PrintClient({
         <div className="legend">
           <div className="legend-item">
             <span className="swatch" style={{ background: '#e8f4e8' }}></span>
-            Ngày thường (3h)
+            Ngày thường
           </div>
           <div className="legend-item">
             <span className="swatch" style={{ background: '#fff0d0' }}></span>
-            Chủ nhật (8h)
+            Chủ nhật
           </div>
         </div>
       </div>

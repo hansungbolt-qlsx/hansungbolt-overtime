@@ -40,7 +40,7 @@ export default function OvertimeSummaryCard() {
         <div>
           <h2 className="text-lg font-semibold text-brand-navy">Tổng hợp giờ tăng ca</h2>
           <p className="text-xs text-brand-navy-soft mt-0.5">
-            Ngày thường = 3h · Chủ nhật = 8h
+            Tổng giờ = tổng giờ thực tế từng phiếu (admin sửa được per-người)
           </p>
         </div>
         <div className="flex items-center gap-2">

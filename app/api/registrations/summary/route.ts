@@ -4,9 +4,6 @@ import { getSession } from '@/lib/auth-server';
 
 export const runtime = 'nodejs';
 
-const WEEKDAY_HOURS = 3;
-const SUNDAY_HOURS = 8;
-
 export async function GET(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
@@ -26,7 +23,7 @@ export async function GET(req: Request) {
 
   let regQuery = supabaseAdmin
     .from('overtime_registrations')
-    .select('id, day_type')
+    .select('id, overtime_date, day_type, duration_hours')
     .gte('overtime_date', startDate)
     .lte('overtime_date', endDate);
   if (filterDept) regQuery = regQuery.eq('department', filterDept);
@@ -35,25 +32,54 @@ export async function GET(req: Request) {
   if (regErr) return NextResponse.json({ error: regErr.message }, { status: 500 });
   if (!regs || regs.length === 0) return NextResponse.json({ month, summary: [] });
 
-  const regMap = new Map(regs.map((r) => [r.id, r.day_type as 'weekday' | 'sunday']));
+  const regMap = new Map(
+    regs.map((r) => [
+      r.id,
+      {
+        date: r.overtime_date as string,
+        dayType: r.day_type as 'weekday' | 'sunday',
+        durationHours: Number(r.duration_hours ?? 0),
+      },
+    ]),
+  );
   const regIds = regs.map((r) => r.id);
 
   const { data: items, error: itemErr } = await supabaseAdmin
     .from('overtime_items')
-    .select('employee_id, registration_id')
+    .select('employee_id, registration_id, duration_hours')
     .in('registration_id', regIds);
 
   if (itemErr) return NextResponse.json({ error: itemErr.message }, { status: 500 });
 
-  // Count distinct registrations per employee per day_type
-  const empMap = new Map<string, { weekday: Set<string>; sunday: Set<string> }>();
+  // Per employee per date: hours thực tế
+  //   Ưu tiên duration_hours item (admin sửa per-row), fallback reg.duration_hours,
+  //   fallback hardcoded 3/8 theo day_type. Nhiều item cùng ngày → lấy MAX.
+  type Bucket = { weekdayDays: Set<string>; sundayDays: Set<string>; totalHours: number };
+  const empMap = new Map<string, Bucket>();
+  // Trước tiên collect hours per (emp, date) để tránh double-count khi cùng NV có nhiều items/ngày
+  const empDateHours = new Map<string, Map<string, { hours: number; dayType: 'weekday' | 'sunday' }>>();
   for (const it of items ?? []) {
-    const dayType = regMap.get(it.registration_id) ?? 'weekday';
-    if (!empMap.has(it.employee_id)) {
-      empMap.set(it.employee_id, { weekday: new Set(), sunday: new Set() });
+    const reg = regMap.get(it.registration_id);
+    if (!reg) continue;
+    if (!empDateHours.has(it.employee_id)) empDateHours.set(it.employee_id, new Map());
+    const dateMap = empDateHours.get(it.employee_id)!;
+    const hours = Number(
+      it.duration_hours ?? reg.durationHours ?? (reg.dayType === 'sunday' ? 8 : 3),
+    );
+    const existing = dateMap.get(reg.date);
+    if (!existing || hours > existing.hours) {
+      dateMap.set(reg.date, { hours, dayType: reg.dayType });
     }
-    const cur = empMap.get(it.employee_id)!;
-    cur[dayType].add(it.registration_id);
+  }
+
+  for (const [empId, dateMap] of empDateHours) {
+    const b: Bucket = { weekdayDays: new Set(), sundayDays: new Set(), totalHours: 0 };
+    for (const [date, { hours, dayType }] of dateMap) {
+      if (dayType === 'sunday') b.sundayDays.add(date);
+      else b.weekdayDays.add(date);
+      b.totalHours += hours;
+    }
+    empMap.set(empId, b);
   }
 
   if (empMap.size === 0) return NextResponse.json({ month, summary: [] });
@@ -69,12 +95,12 @@ export async function GET(req: Request) {
   const orderMap = new Map((emps ?? []).map((e) => [e.id, e.order_no ?? 9999]));
 
   const summary = Array.from(empMap.entries())
-    .map(([id, counts]) => ({
+    .map(([id, b]) => ({
       employee_id: id,
       employee_name: nameMap.get(id) ?? id,
-      weekday_count: counts.weekday.size,
-      sunday_count: counts.sunday.size,
-      total_hours: counts.weekday.size * WEEKDAY_HOURS + counts.sunday.size * SUNDAY_HOURS,
+      weekday_count: b.weekdayDays.size,
+      sunday_count: b.sundayDays.size,
+      total_hours: Number(b.totalHours.toFixed(2)),
     }))
     .sort((a, b) => (orderMap.get(a.employee_id) ?? 9999) - (orderMap.get(b.employee_id) ?? 9999));
 
