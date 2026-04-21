@@ -19,6 +19,8 @@ type MyRegistration = {
 type EmployeeRow = {
   employeeId: string;
   checkedMachineIds: string[];
+  useOther: boolean;
+  otherTask: string;
 };
 
 const todayISO = () => {
@@ -29,7 +31,12 @@ const todayISO = () => {
   return `${y}-${m}-${day}`;
 };
 
-const emptyRow = (): EmployeeRow => ({ employeeId: '', checkedMachineIds: [] });
+const emptyRow = (): EmployeeRow => ({
+  employeeId: '',
+  checkedMachineIds: [],
+  useOther: false,
+  otherTask: '',
+});
 
 export default function OvertimeForm({ department }: { department: string }) {
   const [date, setDate] = useState(todayISO());
@@ -47,7 +54,10 @@ export default function OvertimeForm({ department }: { department: string }) {
   // Giờ tính sản lượng (trừ break) — KHÁC giờ hiển thị
   const calcHours = dayType === 'weekday' ? 2.5 : 7.5;
   const timeLabel = dayType === 'weekday' ? '16:30 – 19:30 (3 giờ)' : '06:00 – 14:00 (8 giờ)';
-  const totalItems = rows.reduce((sum, row) => sum + row.checkedMachineIds.length, 0);
+  const totalItems = rows.reduce(
+    (sum, row) => sum + row.checkedMachineIds.length + (row.useOther ? 1 : 0),
+    0,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -98,10 +108,37 @@ export default function OvertimeForm({ department }: { department: string }) {
       const already = row.checkedMachineIds.includes(machineId);
       next[rowIdx] = {
         ...row,
+        // Chọn máy thật → tự tắt chế độ "Công việc khác"
+        useOther: false,
+        otherTask: '',
         checkedMachineIds: already
           ? row.checkedMachineIds.filter((id) => id !== machineId)
           : [...row.checkedMachineIds, machineId],
       };
+      return next;
+    });
+  }
+
+  function toggleOther(rowIdx: number) {
+    setRows((prev) => {
+      const next = [...prev];
+      const row = next[rowIdx];
+      const turningOn = !row.useOther;
+      next[rowIdx] = {
+        ...row,
+        useOther: turningOn,
+        otherTask: turningOn ? row.otherTask : '',
+        // Bật "Công việc khác" → xóa máy đã chọn (tách biệt)
+        checkedMachineIds: turningOn ? [] : row.checkedMachineIds,
+      };
+      return next;
+    });
+  }
+
+  function updateOtherTask(rowIdx: number, value: string) {
+    setRows((prev) => {
+      const next = [...prev];
+      next[rowIdx] = { ...next[rowIdx], otherTask: value };
       return next;
     });
   }
@@ -129,13 +166,31 @@ export default function OvertimeForm({ department }: { department: string }) {
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i];
       if (!r.employeeId) return setError(`Nhân viên ${i + 1}: chưa chọn tên`);
-      if (r.checkedMachineIds.length === 0) return setError(`Nhân viên ${i + 1}: chưa chọn máy nào`);
+      if (r.useOther) {
+        if (!r.otherTask.trim())
+          return setError(`Nhân viên ${i + 1}: chưa nhập nội dung Công việc khác`);
+      } else if (r.checkedMachineIds.length === 0) {
+        return setError(`Nhân viên ${i + 1}: chưa chọn máy hoặc Công việc khác`);
+      }
     }
     const items: Array<{
-      employee_id: string; equipment_id: string;
-      item_code: string; item_name: string | null; planned_quantity: number;
+      employee_id: string;
+      equipment_id?: string;
+      item_code?: string;
+      item_name?: string | null;
+      planned_quantity?: number;
+      is_other?: boolean;
+      other_description?: string;
     }> = [];
     for (const row of rows) {
+      if (row.useOther) {
+        items.push({
+          employee_id: row.employeeId,
+          is_other: true,
+          other_description: row.otherTask.trim(),
+        });
+        continue;
+      }
       for (const machineId of row.checkedMachineIds) {
         const machine = machines.find((m) => m.id === machineId)!;
         const firstItem = machine.items[0];
@@ -278,7 +333,7 @@ export default function OvertimeForm({ department }: { department: string }) {
                     </span>
                   </div>
                   <div className="max-h-[360px] overflow-y-auto border border-brand-surface-alt rounded-lg p-1.5 bg-brand-surface/40">
-                    <div className="grid grid-cols-2 gap-1.5">
+                    <div className={`grid grid-cols-2 gap-1.5 ${row.useOther ? 'opacity-50' : ''}`}>
                       {visibleMachines.map((machine) => {
                         const checked = row.checkedMachineIds.includes(machine.id);
                         const itemCode = machine.items[0]?.item_code ?? '—';
@@ -331,6 +386,54 @@ export default function OvertimeForm({ department }: { department: string }) {
                           </button>
                         );
                       })}
+                    </div>
+
+                    {/* Công việc khác — full-width, cuối danh sách, màu cam phân biệt với máy */}
+                    <div className="mt-1.5">
+                      <button
+                        type="button"
+                        onClick={() => toggleOther(idx)}
+                        className={`w-full text-left px-2 py-1.5 rounded-md border transition ${
+                          row.useOther
+                            ? 'bg-amber-50 border-amber-400'
+                            : 'bg-white border-gray-200 hover:border-amber-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <div
+                            className={`w-3.5 h-3.5 rounded flex-shrink-0 flex items-center justify-center border transition ${
+                              row.useOther
+                                ? 'bg-amber-500 border-amber-500'
+                                : 'border-gray-300 bg-white'
+                            }`}
+                          >
+                            {row.useOther && (
+                              <svg className="w-2 h-2 text-white" fill="none" viewBox="0 0 10 8">
+                                <path
+                                  d="M1 4l3 3 5-6"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            )}
+                          </div>
+                          <span className="text-sm font-bold text-amber-800 leading-tight">
+                            Công việc khác
+                          </span>
+                        </div>
+                      </button>
+                      {row.useOther && (
+                        <input
+                          type="text"
+                          autoFocus
+                          value={row.otherTask}
+                          onChange={(e) => updateOtherTask(idx, e.target.value)}
+                          placeholder="VD: Vệ sinh máy lạnh"
+                          className="mt-1.5 w-full px-3 py-2 border border-amber-300 rounded-md text-brand-navy bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+                        />
+                      )}
                     </div>
                   </div>
                 </div>

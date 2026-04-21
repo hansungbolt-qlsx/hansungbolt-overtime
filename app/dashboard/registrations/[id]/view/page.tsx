@@ -64,7 +64,7 @@ export default async function PrintViewPage({
 
   const [{ data: emps }, { data: eqs }] = await Promise.all([
     supabaseAdmin.from('employees').select('id, full_name, order_no').in('id', empIds),
-    supabaseAdmin.from('equipments').select('id, code').in('id', eqIds),
+    supabaseAdmin.from('equipments').select('id, code, machine_type').in('id', eqIds),
   ]);
 
   const empMap = new Map((emps ?? []).map((e) => [e.id, e]));
@@ -80,7 +80,7 @@ export default async function PrintViewPage({
     return null;
   }
 
-  type GroupRow = { code: string; item_code: string; qty: number };
+  type GroupRow = { code: string; item_code: string; qty: number; isOther?: boolean };
   const groups = new Map<
     string,
     {
@@ -104,13 +104,19 @@ export default async function PrintViewPage({
         m3: [],
       });
     }
+    const isOther = eq.machine_type === 'OTHER';
     const row: GroupRow = {
       code: eq.code,
       item_code: it.item_code,
-      qty: it.planned_quantity,
+      qty: it.planned_quantity ?? 0,
+      isOther,
     };
-    const grp = machineGroup(eq.code);
     const slot = groups.get(emp.id)!;
+    if (isOther) {
+      slot.individual.push(row);
+      continue;
+    }
+    const grp = machineGroup(eq.code);
     if (grp === 'M4') slot.m4.push(row);
     else if (grp === 'M3') slot.m3.push(row);
     else slot.individual.push(row);
@@ -327,14 +333,27 @@ export default async function PrintViewPage({
                         <td className="ot-cell px-1 py-1" rowSpan={span}></td>
                       </>
                     )}
-                    <td className="ot-cell px-1 py-1 ot-code">{row.code}</td>
-                    <td className="ot-cell px-1 py-1 ot-code">{row.item_code}</td>
-                    <td className="ot-cell px-1 py-1 text-center whitespace-nowrap">
-                      {fmtQty(row.qty)}
-                    </td>
-                    <td className="ot-cell px-1 py-1"></td>
-                    <td className="ot-cell px-1 py-1"></td>
-                    <td className="ot-cell px-1 py-1"></td>
+                    {row.isOther ? (
+                      <>
+                        <td className="ot-cell px-1 py-1 ot-code">Công việc khác</td>
+                        <td className="ot-cell px-1 py-1 ot-code italic">{row.item_code}</td>
+                        <td className="ot-cell px-1 py-1"></td>
+                        <td className="ot-cell px-1 py-1"></td>
+                        <td className="ot-cell px-1 py-1"></td>
+                        <td className="ot-cell px-1 py-1"></td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="ot-cell px-1 py-1 ot-code">{row.code}</td>
+                        <td className="ot-cell px-1 py-1 ot-code">{row.item_code}</td>
+                        <td className="ot-cell px-1 py-1 text-center whitespace-nowrap">
+                          {fmtQty(row.qty)}
+                        </td>
+                        <td className="ot-cell px-1 py-1"></td>
+                        <td className="ot-cell px-1 py-1"></td>
+                        <td className="ot-cell px-1 py-1"></td>
+                      </>
+                    )}
                   </tr>
                 ));
               })}
