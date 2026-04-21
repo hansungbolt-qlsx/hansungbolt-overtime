@@ -61,8 +61,9 @@ function range(
 }
 
 const equipments = [
-  // HD — 8 Former + 34 Header = 42 máy
+  // HD — 43 máy (bao gồm HD-1A bổ sung)
   { code: 'HD-01', department: 'HD', spec: 'M12', machine_type: 'FORMER', rpm: 55 },
+  { code: 'HD-1A', department: 'HD', spec: 'M16', machine_type: 'FORMER', rpm: 50 },
   { code: 'HD-02', department: 'HD', spec: 'M10', machine_type: 'HEADER', rpm: 45 },
   { code: 'HD-03', department: 'HD', spec: 'M10', machine_type: 'FORMER', rpm: 90 },
   { code: 'HD-04', department: 'HD', spec: 'M10', machine_type: 'FORMER', rpm: 90 },
