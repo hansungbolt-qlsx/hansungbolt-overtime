@@ -37,6 +37,7 @@ type Equipment = {
 };
 
 type RowState = {
+  id: string | null; // null cho dòng mới chưa insert
   employee_id: string;
   equipment_id: string;
   item_code: string;
@@ -79,6 +80,7 @@ export default function EditRegistrationForm({
 
   const [rows, setRows] = useState<RowState[]>(
     items.map((it) => ({
+      id: it.id,
       employee_id: it.employee_id,
       equipment_id: it.equipment_id,
       item_code: it.item_code,
@@ -150,6 +152,7 @@ export default function EditRegistrationForm({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: rows.map((r) => ({
+            id: r.id,
             employee_id: r.employee_id,
             equipment_id: r.equipment_id,
             item_code: r.item_code.trim(),

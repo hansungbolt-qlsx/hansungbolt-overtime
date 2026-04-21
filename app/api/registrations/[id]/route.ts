@@ -5,6 +5,7 @@ import { getSession } from '@/lib/auth-server';
 export const runtime = 'nodejs';
 
 type PatchItem = {
+  id?: string | null; // có id → update existing; null/undefined → insert new
   employee_id: string;
   equipment_id: string;
   item_code: string;
@@ -113,15 +114,24 @@ export async function PATCH(
   if (updHeaderErr)
     return NextResponse.json({ error: updHeaderErr.message }, { status: 500 });
 
-  // Strategy: xóa hết items cũ + insert items mới với time per row
-  const { error: delItemsErr } = await supabaseAdmin
-    .from('overtime_items')
-    .delete()
-    .eq('registration_id', id);
-  if (delItemsErr)
-    return NextResponse.json({ error: delItemsErr.message }, { status: 500 });
+  // Strategy diff-based (an toàn hơn delete-all + insert-all):
+  //   - item có id trong submitted list → UPDATE row
+  //   - item.id existing nhưng không có trong submitted → DELETE chính item đó
+  //   - item không có id → INSERT mới
+  // Scope mọi DELETE/UPDATE theo id cụ thể, không xóa theo registration_id.
 
-  const itemRows = items.map((it) => {
+  const { data: existingItems, error: loadItemsErr } = await supabaseAdmin
+    .from('overtime_items')
+    .select('id')
+    .eq('registration_id', id);
+  if (loadItemsErr)
+    return NextResponse.json({ error: loadItemsErr.message }, { status: 500 });
+
+  const existingIds = new Set((existingItems ?? []).map((i) => i.id));
+  const submittedIds = new Set(items.map((it) => it.id).filter(Boolean) as string[]);
+  const idsToDelete = [...existingIds].filter((eid) => !submittedIds.has(eid));
+
+  const buildRow = (it: PatchItem) => {
     const eq = eqMap.get(it.equipment_id);
     const isOther = eq?.machine_type === 'OTHER';
     const d = diffHours(it.time_from, it.time_to);
@@ -137,12 +147,48 @@ export async function PATCH(
       time_to: toSqlTime(it.time_to),
       duration_hours: d,
     };
-  });
+  };
 
-  const { error: insErr } = await supabaseAdmin.from('overtime_items').insert(itemRows);
-  if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
+  // 1. UPDATE các item có id — từng row một để giữ scope chặt
+  for (const it of items) {
+    if (!it.id || !existingIds.has(it.id)) continue;
+    const row = buildRow(it);
+    const { error: updErr } = await supabaseAdmin
+      .from('overtime_items')
+      .update(row)
+      .eq('id', it.id);
+    if (updErr)
+      return NextResponse.json(
+        { error: `Update dòng lỗi: ${updErr.message}` },
+        { status: 500 },
+      );
+  }
 
-  return NextResponse.json({ ok: true, items_count: itemRows.length });
+  // 2. INSERT các item mới (không có id)
+  const newRows = items.filter((it) => !it.id).map(buildRow);
+  if (newRows.length > 0) {
+    const { error: insErr } = await supabaseAdmin.from('overtime_items').insert(newRows);
+    if (insErr)
+      return NextResponse.json(
+        { error: `Insert dòng lỗi: ${insErr.message}` },
+        { status: 500 },
+      );
+  }
+
+  // 3. DELETE các item admin đã xóa (có id nhưng không gửi lên)
+  if (idsToDelete.length > 0) {
+    const { error: delErr } = await supabaseAdmin
+      .from('overtime_items')
+      .delete()
+      .in('id', idsToDelete);
+    if (delErr)
+      return NextResponse.json(
+        { error: `Xóa dòng lỗi: ${delErr.message}` },
+        { status: 500 },
+      );
+  }
+
+  return NextResponse.json({ ok: true, items_count: items.length });
 }
 
 export async function DELETE(
