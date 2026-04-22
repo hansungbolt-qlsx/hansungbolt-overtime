@@ -1,12 +1,32 @@
 import { NextResponse } from 'next/server';
+import sharp from 'sharp';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
 import { toStorageKey, resolveDisplayName } from '@/lib/hd-employees';
 
 export const runtime = 'nodejs';
 
-// Không xử lý/crop ảnh server-side nữa — nhân viên chụp sao, lưu nguyên vậy.
-// Logic cropLabel trước đây bị loại bỏ do nhận dạng sai làm biến dạng 1 số tem.
+// Chuẩn hóa ảnh để fit ô in A4 (105×74mm = landscape):
+//   1. Áp dụng EXIF orientation rồi strip tag (phone chụp xoay nhưng flag EXIF).
+//   2. Nếu sau EXIF mà ảnh dọc (H > W) → xoay 90° CW để thành ngang.
+//   3. Giữ format gốc (jpeg/png/webp).
+// KHÔNG crop/nhận dạng vùng tem — nhân viên chụp sao lưu vậy (chỉ xoay).
+async function orientForLandscapeSlot(input: Buffer, ext: string): Promise<Buffer> {
+  // Step 1: EXIF auto-orient + strip. .rotate() không có args = tự xoay theo EXIF.
+  const oriented = await sharp(input).rotate().toBuffer();
+  const meta = await sharp(oriented).metadata();
+  const w = meta.width ?? 0;
+  const h = meta.height ?? 0;
+
+  let pipeline = sharp(oriented);
+  // Step 2: Dọc → xoay 90° CW thành ngang (fit ô in landscape).
+  if (h > w) pipeline = pipeline.rotate(90);
+
+  // Step 3: Giữ format gốc, re-encode để chắc chắn EXIF đã bị strip.
+  if (ext === 'png') return pipeline.png().toBuffer();
+  if (ext === 'webp') return pipeline.webp({ quality: 92 }).toBuffer();
+  return pipeline.jpeg({ quality: 92 }).toBuffer();
+}
 
 const BUCKET = 'material-labels';
 const MAX_FILES = 30;
@@ -71,7 +91,9 @@ export async function POST(req: Request) {
       ? `__${toStorageKey(employeeName)}`
       : '';
     const path = `${date}/${Date.now()}_${rand}${nameSuffix}.${safeExt}`;
-    const buf = Buffer.from(await file.arrayBuffer());
+    const rawBuf = Buffer.from(await file.arrayBuffer());
+    // Xoay ngang nếu ảnh dọc — fallback raw nếu sharp fail với ảnh đặc biệt.
+    const buf = await orientForLandscapeSlot(rawBuf, safeExt).catch(() => rawBuf);
 
     const { error: upErr } = await supabaseAdmin.storage
       .from(BUCKET)
