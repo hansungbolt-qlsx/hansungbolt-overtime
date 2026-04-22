@@ -44,7 +44,9 @@ export default function PrintClient({
           background: #fff;
           border: 1px solid #000;
         }
-        .cell img { width: 100%; height: 100%; object-fit: fill; display: block; }
+        /* contain — giữ tỷ lệ gốc của ảnh, không kéo giãn gây méo. */
+        /* Ảnh dọc hơn ô in sẽ để trống 2 bên; ảnh ngang để trống trên-dưới. */
+        .cell img { width: 100%; height: 100%; object-fit: contain; display: block; }
         .name-tag {
           position: absolute;
           bottom: 6px;

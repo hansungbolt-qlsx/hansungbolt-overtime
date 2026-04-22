@@ -1,155 +1,12 @@
 import { NextResponse } from 'next/server';
-import sharp from 'sharp';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
 import { toStorageKey, resolveDisplayName } from '@/lib/hd-employees';
 
 export const runtime = 'nodejs';
 
-// Tự động nhận dạng và crop vùng tem NVL — hỗ trợ nhiều màu tem khác nhau
-async function cropLabel(inputBuffer: Buffer): Promise<Buffer> {
-  const meta = await sharp(inputBuffer).metadata();
-  const origW = meta.width ?? 0;
-  const origH = meta.height ?? 0;
-  if (!origW || !origH) return inputBuffer;
-
-  const detectW = 800;
-  const detectH = Math.round(origH * (detectW / origW));
-  const total = detectW * detectH;
-
-  const { data, info } = await sharp(inputBuffer)
-    .resize(detectW, detectH)
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-
-  const ch = info.channels;
-
-  type BBox = { minX: number; maxX: number; minY: number; maxY: number; count: number };
-
-  /**
-   * Density-based scan: chỉ lấy các hàng có >=rowMin pixel khớp,
-   * và các cột có >=colMin pixel khớp. Loại bỏ hàng/cột nền có ít pixel khớp.
-   */
-  function scanDense(
-    pred: (r: number, g: number, b: number) => boolean,
-    rowMin: number,  // ngưỡng tỉ lệ pixel khớp trên mỗi hàng
-    colMin: number   // ngưỡng tỉ lệ pixel khớp trên mỗi cột
-  ): BBox {
-    const rowCounts = new Int32Array(detectH);
-    const colCounts = new Int32Array(detectW);
-    let count = 0;
-    for (let y = 0; y < detectH; y++) {
-      for (let x = 0; x < detectW; x++) {
-        const i = (y * detectW + x) * ch;
-        if (pred(data[i], data[i + 1], data[i + 2])) {
-          rowCounts[y]++;
-          colCounts[x]++;
-          count++;
-        }
-      }
-    }
-    let minY = detectH, maxY = -1;
-    for (let y = 0; y < detectH; y++) {
-      if (rowCounts[y] / detectW >= rowMin) {
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-      }
-    }
-    let minX = detectW, maxX = -1;
-    for (let x = 0; x < detectW; x++) {
-      if (colCounts[x] / detectH >= colMin) {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-      }
-    }
-    return { minX, maxX, minY, maxY, count };
-  }
-
-  function valid(b: BBox, minR: number, maxR: number): boolean {
-    if (b.maxX < b.minX || b.maxY < b.minY) return false;
-    return b.count / total >= minR && b.count / total <= maxR;
-  }
-
-  function borderRatio(pred: (r: number, g: number, b: number) => boolean): number {
-    const mg = Math.floor(Math.min(detectW, detectH) * 0.08);
-    let match = 0, tot = 0;
-    for (let y = 0; y < detectH; y++) {
-      for (let x = 0; x < detectW; x++) {
-        if (x < mg || x > detectW - mg || y < mg || y > detectH - mg) {
-          tot++;
-          const i = (y * detectW + x) * ch;
-          if (pred(data[i], data[i + 1], data[i + 2])) match++;
-        }
-      }
-    }
-    return match / tot;
-  }
-
-  // ── Màu sắc từng loại tem (calibrated từ ảnh mẫu thực tế) ────────
-  // 1. Vàng sáng — Daeho SWCH (phổ biến nhất)
-  const isYellow = (r: number, g: number, b: number) =>
-    r > 155 && g > 110 && b < 115 && r - b > 65 && g - b > 28;
-
-  // 2. Cyan/xanh dương — Daeho SCM/GSCM
-  //    G>168 phân biệt với túi nhựa kẻ sọc xanh (G thấp hơn ~155)
-  const isCyan = (r: number, g: number, b: number) =>
-    b > 185 && g > 168 && r < 158 && b - r > 60 && g - r > 40;
-
-  // 3. Nền xanh lá nhà máy
-  const isGreenBg = (r: number, g: number, b: number) =>
-    g > 90 && g > r * 1.10 && g > b * 1.02 && g < 210;
-
-  // 4. Trắng/kem — Daeho trắng, Vinh Thành, NGK, KOS
-  const isWhite = (r: number, g: number, b: number) =>
-    r > 185 && g > 185 && b > 185;
-
-  const greenBg  = borderRatio(isGreenBg);
-  const whiteBdr = borderRatio(isWhite);
-
-  let best: BBox | null = null;
-
-  // Ưu tiên 1: Tem vàng — row 20%, col 10%
-  const yellow = scanDense(isYellow, 0.20, 0.10);
-  if (valid(yellow, 0.04, 0.85)) best = yellow;
-
-  // Ưu tiên 2: Tem cyan/xanh — row 18%, col 10%
-  if (!best) {
-    const cyan = scanDense(isCyan, 0.18, 0.10);
-    if (valid(cyan, 0.04, 0.85)) best = cyan;
-  }
-
-  // Ưu tiên 3: Tem trắng/màu khác trên nền xanh lá nhà máy — row 25%, col 18%
-  if (!best && greenBg > 0.18) {
-    const notGreen = scanDense(
-      (r, g, b) => !isGreenBg(r, g, b) && Math.max(r, g, b) > 100,
-      0.25, 0.18
-    );
-    if (valid(notGreen, 0.05, 0.72)) best = notGreen;
-  }
-
-  // Ưu tiên 4: Vùng trắng đặc khi viền ảnh không trắng — row 45%, col 30%
-  if (!best && whiteBdr < 0.22) {
-    const white = scanDense(isWhite, 0.45, 0.30);
-    if (valid(white, 0.05, 0.72)) best = white;
-  }
-
-  if (!best) return inputBuffer;
-
-  const scaleX = origW / detectW;
-  const scaleY = origH / detectH;
-  const padX   = Math.floor((best.maxX - best.minX) * 0.025 * scaleX);
-  const padY   = Math.floor((best.maxY - best.minY) * 0.025 * scaleY);
-
-  const left   = Math.max(0, Math.floor(best.minX * scaleX) - padX);
-  const top    = Math.max(0, Math.floor(best.minY * scaleY) - padY);
-  const right  = Math.min(origW, Math.ceil(best.maxX * scaleX) + padX);
-  const bottom = Math.min(origH, Math.ceil(best.maxY * scaleY) + padY);
-
-  return sharp(inputBuffer)
-    .extract({ left, top, width: right - left, height: bottom - top })
-    .jpeg({ quality: 88 })
-    .toBuffer();
-}
+// Không xử lý/crop ảnh server-side nữa — nhân viên chụp sao, lưu nguyên vậy.
+// Logic cropLabel trước đây bị loại bỏ do nhận dạng sai làm biến dạng 1 số tem.
 
 const BUCKET = 'material-labels';
 const MAX_FILES = 30;
@@ -214,8 +71,7 @@ export async function POST(req: Request) {
       ? `__${toStorageKey(employeeName)}`
       : '';
     const path = `${date}/${Date.now()}_${rand}${nameSuffix}.${safeExt}`;
-    const rawBuf = Buffer.from(await file.arrayBuffer());
-    const buf = await cropLabel(rawBuf).catch(() => rawBuf);
+    const buf = Buffer.from(await file.arrayBuffer());
 
     const { error: upErr } = await supabaseAdmin.storage
       .from(BUCKET)
