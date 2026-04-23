@@ -6,6 +6,7 @@ import DashboardHeader from '@/components/DashboardHeader';
 import MaterialLabelsAdminCard from '@/components/MaterialLabelsAdminCard';
 import OvertimeSummaryCard from '@/components/OvertimeSummaryCard';
 import DeleteRegistrationButton from '@/components/DeleteRegistrationButton';
+import TodayOvertimeCard from '@/components/TodayOvertimeCard';
 import { toTitleCase } from '@/lib/format';
 
 function todayISO() {
@@ -137,6 +138,10 @@ export default async function DashboardPage({
               Đang xem phiếu ngày <strong>{selectedDate}</strong>
             </p>
           </section>
+        </div>
+
+        <div className="mb-6">
+          <TodayOvertimeCard initialDate={selectedDate} hideDatePicker />
         </div>
 
         <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden">

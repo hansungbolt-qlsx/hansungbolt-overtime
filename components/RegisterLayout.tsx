@@ -5,6 +5,7 @@ import OvertimeForm from './OvertimeForm';
 import MaterialLabelsUpload from './MaterialLabelsUpload';
 import OvertimeSummaryCard from './OvertimeSummaryCard';
 import DepartmentRegistrationsList from './DepartmentRegistrationsList';
+import TodayOvertimeCard from './TodayOvertimeCard';
 
 const todayISO = () => {
   const d = new Date();
@@ -14,7 +15,7 @@ const todayISO = () => {
   return `${y}-${m}-${day}`;
 };
 
-type Tab = 'overtime' | 'labels' | 'summary';
+type Tab = 'overtime' | 'labels' | 'summary' | 'today';
 
 function OvertimeView({ department, isLeader }: { department: string; isLeader: boolean }) {
   return (
@@ -65,24 +66,28 @@ export default function RegisterLayout({
   const isHD = department === 'HD';
   // Tab "overtime" cho leader; tab "summary" cho worker (chỉ xem)
   // Tab "labels" cho HD (cả leader + worker)
+  // Tab "today" — xem tổng hợp NV tăng ca cả HD+RL hôm nay (chỉ leader)
   const showOvertimeTab = isLeader;
   const showSummaryTab = !isLeader;
   const showLabelsTab = isHD;
+  const showTodayTab = isLeader;
   const defaultTab: Tab = showOvertimeTab ? 'overtime' : showLabelsTab ? 'labels' : 'summary';
 
   const [activeTab, setActiveTab] = useState<Tab>(defaultTab);
   const [labelsDate, setLabelsDate] = useState(todayISO());
 
-  const tabs: Array<{ key: Tab; label: string; color: 'teal' | 'navy' }> = [];
+  const tabs: Array<{ key: Tab; label: string; color: 'teal' | 'navy' | 'amber' }> = [];
   if (showOvertimeTab) tabs.push({ key: 'overtime', label: 'Đăng ký tăng ca', color: 'teal' });
   if (showSummaryTab) tabs.push({ key: 'summary', label: 'Tổng hợp tăng ca', color: 'teal' });
   if (showLabelsTab) tabs.push({ key: 'labels', label: 'Tem NVL', color: 'navy' });
+  if (showTodayTab) tabs.push({ key: 'today', label: 'Tăng ca hôm nay', color: 'amber' });
 
   // Chỉ 1 tab → bỏ tab bar, render trực tiếp
   if (tabs.length === 1) {
     if (tabs[0].key === 'overtime' || tabs[0].key === 'summary') {
       return <OvertimeView department={department} isLeader={isLeader} />;
     }
+    if (tabs[0].key === 'today') return <TodayOvertimeCard />;
     return (
       <LabelsView
         labelsDate={labelsDate}
@@ -92,20 +97,26 @@ export default function RegisterLayout({
     );
   }
 
-  const cols = tabs.length === 2 ? 'grid-cols-2' : 'grid-cols-3';
+  const cols =
+    tabs.length === 2 ? 'grid-cols-2' : tabs.length === 3 ? 'grid-cols-3' : 'grid-cols-2 sm:grid-cols-4';
 
   return (
     <>
       <div className={`grid ${cols} gap-2 mb-5`}>
         {tabs.map((t) => {
           const active = activeTab === t.key;
-          const isTeal = t.color === 'teal';
-          const activeCls = isTeal
-            ? 'bg-brand-teal text-white border-brand-teal shadow-md shadow-brand-teal/30'
-            : 'bg-brand-navy text-white border-brand-navy shadow-md shadow-brand-navy/30';
-          const inactiveCls = isTeal
-            ? 'bg-white text-brand-teal border-brand-teal/30 hover:bg-brand-teal/10'
-            : 'bg-white text-brand-navy border-brand-navy/30 hover:bg-brand-navy/10';
+          const activeCls =
+            t.color === 'teal'
+              ? 'bg-brand-teal text-white border-brand-teal shadow-md shadow-brand-teal/30'
+              : t.color === 'navy'
+                ? 'bg-brand-navy text-white border-brand-navy shadow-md shadow-brand-navy/30'
+                : 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/30';
+          const inactiveCls =
+            t.color === 'teal'
+              ? 'bg-white text-brand-teal border-brand-teal/30 hover:bg-brand-teal/10'
+              : t.color === 'navy'
+                ? 'bg-white text-brand-navy border-brand-navy/30 hover:bg-brand-navy/10'
+                : 'bg-white text-amber-700 border-amber-400/50 hover:bg-amber-50';
           return (
             <button
               key={t.key}
@@ -132,6 +143,8 @@ export default function RegisterLayout({
           currentUserFullName={currentUserFullName}
         />
       )}
+
+      {activeTab === 'today' && <TodayOvertimeCard />}
     </>
   );
 }
