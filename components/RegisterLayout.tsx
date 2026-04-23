@@ -66,21 +66,21 @@ export default function RegisterLayout({
   const isHD = department === 'HD';
   // Tab "overtime" cho leader; tab "summary" cho worker (chỉ xem)
   // Tab "labels" cho HD (cả leader + worker)
-  // Tab "today" — xem tổng hợp NV tăng ca cả HD+RL hôm nay (chỉ leader)
+  // Tab "today" — xem tổng hợp NV tăng ca cả HD+RL hôm nay (cả leader + worker)
   const showOvertimeTab = isLeader;
   const showSummaryTab = !isLeader;
   const showLabelsTab = isHD;
-  const showTodayTab = isLeader;
+  const showTodayTab = true;
   const defaultTab: Tab = showOvertimeTab ? 'overtime' : showLabelsTab ? 'labels' : 'summary';
 
   const [activeTab, setActiveTab] = useState<Tab>(defaultTab);
   const [labelsDate, setLabelsDate] = useState(todayISO());
 
-  const tabs: Array<{ key: Tab; label: string; color: 'teal' | 'navy' | 'amber' }> = [];
+  const tabs: Array<{ key: Tab; label: string; color: 'teal' | 'navy' | 'green' }> = [];
   if (showOvertimeTab) tabs.push({ key: 'overtime', label: 'Đăng ký tăng ca', color: 'teal' });
   if (showSummaryTab) tabs.push({ key: 'summary', label: 'Tổng hợp tăng ca', color: 'teal' });
   if (showLabelsTab) tabs.push({ key: 'labels', label: 'Tem NVL', color: 'navy' });
-  if (showTodayTab) tabs.push({ key: 'today', label: 'Tăng ca hôm nay', color: 'amber' });
+  if (showTodayTab) tabs.push({ key: 'today', label: 'Tăng ca hôm nay', color: 'green' });
 
   // Chỉ 1 tab → bỏ tab bar, render trực tiếp
   if (tabs.length === 1) {
@@ -110,13 +110,13 @@ export default function RegisterLayout({
               ? 'bg-brand-teal text-white border-brand-teal shadow-md shadow-brand-teal/30'
               : t.color === 'navy'
                 ? 'bg-brand-navy text-white border-brand-navy shadow-md shadow-brand-navy/30'
-                : 'bg-amber-500 text-white border-amber-500 shadow-md shadow-amber-500/30';
+                : 'bg-brand-green text-brand-navy border-brand-green shadow-md shadow-brand-green/30';
           const inactiveCls =
             t.color === 'teal'
               ? 'bg-white text-brand-teal border-brand-teal/30 hover:bg-brand-teal/10'
               : t.color === 'navy'
                 ? 'bg-white text-brand-navy border-brand-navy/30 hover:bg-brand-navy/10'
-                : 'bg-white text-amber-700 border-amber-400/50 hover:bg-amber-50';
+                : 'bg-white text-brand-navy border-brand-green/50 hover:bg-brand-green/10';
           return (
             <button
               key={t.key}
