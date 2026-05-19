@@ -272,51 +272,94 @@ export const STORIES: Story[] = [
     moral: 'Thật thà, chăm chỉ thì hiền gặp lành; gian dối phải chừa.',
     pages: [
       {
-        text: 'Anh Khoai nghèo nhưng khoẻ mạnh, thật thà, đi ở cho nhà phú ông. Phú ông ngọt nhạt: "Con cứ làm cho ta ba năm, ta sẽ gả con gái cho."',
+        text: 'Ngày xửa ngày xưa, ở một làng quê nọ, có anh nông dân nghèo tên là Khoai. Anh hiền lành, thật thà lại rất khoẻ mạnh, quanh năm đi cày thuê cuốc mướn cho nhà một phú ông giàu có.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'sun', x: 30, y: 28 },
+            { k: 'house', x: 150, y: 96, s: 1 },
+            { k: 'man', x: 95, y: 100, s: 1.4, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Phú ông có cô con gái xinh đẹp. Thấy Khoai chăm chỉ, được việc, lão nghĩ cách giữ chân, ngọt nhạt: "Con cứ ở làm cho ta thật chăm ba năm, ta sẽ gả con gái cho con."',
         scene: {
           bg: 'day',
           items: [
             { k: 'house', x: 150, y: 96, s: 1 },
-            { k: 'man', x: 70, y: 100, s: 1.4, tap: 'bounce' },
-            { k: 'oldMan', x: 110, y: 100, s: 1.4, tap: 'wobble' },
+            { k: 'oldMan', x: 70, y: 100, s: 1.4, tap: 'wobble' },
+            { k: 'man', x: 110, y: 100, s: 1.4, tap: 'bounce' },
           ],
         },
       },
       {
-        text: 'Khoai làm lụng quần quật ba năm. Nhưng phú ông nuốt lời, bảo: "Con lên rừng tìm được CÂY TRE TRĂM ĐỐT, ta mới gả con gái cho."',
+        text: 'Tin lời, Khoai làm lụng quần quật suốt ba năm trời. Trời chưa sáng đã ra đồng, tối mịt mới về. Nhờ có Khoai, nhà phú ông thóc lúa đầy bồ, trâu bò đầy chuồng.',
         scene: {
-          bg: 'forest',
+          bg: 'day',
           items: [
-            { k: 'oldMan', x: 60, y: 100, s: 1.4, tap: 'wobble' },
-            { k: 'tree', x: 150, y: 96, s: 1.2 },
-            { k: 'man', x: 105, y: 100, s: 1.4, tap: 'bounce' },
+            { k: 'sun', x: 30, y: 28 },
+            { k: 'hill', x: 150, y: 96 },
+            { k: 'man', x: 90, y: 100, s: 1.4, tap: 'bounce' },
           ],
         },
       },
       {
-        text: 'Khoai tìm khắp rừng, làm gì có cây tre nào trăm đốt! Anh ngồi bệt xuống, buồn rầu khóc một mình.',
+        text: 'Hết ba năm, Khoai mừng rỡ đến xin cưới. Nhưng phú ông tham lam đã định gả con cho nhà giàu khác. Lão nuốt lời, bịa chuyện: "Muốn cưới con gái ta, con phải lên rừng tìm cho được CÂY TRE TRĂM ĐỐT mang về đây!"',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'house', x: 150, y: 96, s: 1 },
+            { k: 'oldMan', x: 70, y: 100, s: 1.4, tap: 'wobble' },
+            { k: 'man', x: 110, y: 100, s: 1.4, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Khoai thật thà tin ngay, vác dao lên rừng. Anh tìm hết bụi tre này đến bụi tre khác, cây nào cũng chỉ vài chục đốt. Làm gì có cây tre nào tới trăm đốt! Mệt và tủi, Khoai ngồi bệt xuống mà khóc.',
         scene: {
           bg: 'forest',
           items: [
-            { k: 'bamboo', x: 50, y: 96 },
+            { k: 'bamboo', x: 45, y: 96 },
             { k: 'bamboo', x: 165, y: 96 },
             { k: 'man', x: 105, y: 100, s: 1.4, tap: 'wobble' },
           ],
         },
       },
       {
-        text: 'Bụt hiện ra, hiền từ bảo: "Con chặt đủ trăm đốt tre, rồi hô: Khắc nhập! Khắc nhập!". Lạ chưa, trăm đốt tre tự ghép thành một cây thật dài!',
+        text: 'Bỗng ông Bụt râu tóc bạc phơ hiện ra, hỏi: "Vì sao con khóc?". Khoai kể hết sự tình. Bụt mỉm cười hiền hậu: "Con hãy đi chặt cho đủ một trăm đốt tre, đem lại đây cho ta."',
         scene: {
           bg: 'forest',
           items: [
             { k: 'oldMan', x: 60, y: 100, s: 1.4, tap: 'bounce' },
-            { k: 'bamboo', x: 130, y: 96, s: 1.2 },
-            { k: 'man', x: 100, y: 100, s: 1.3, tap: 'bounce' },
+            { k: 'bamboo', x: 130, y: 96, s: 1.1 },
+            { k: 'man', x: 100, y: 100, s: 1.3, tap: 'wobble' },
           ],
         },
       },
       {
-        text: 'Về tới nơi, phú ông đang gả con gái cho nhà giàu khác. Khoai hô to: "Khắc nhập!" — phú ông dính chặt vào cây tre, kêu oai oái xin tha.',
+        text: 'Khoai chặt đủ trăm đốt tre xếp thành đống. Bụt bảo: "Con hô lên: Khắc nhập! Khắc nhập!". Vừa dứt lời, lạ chưa, trăm đốt tre tự nối liền thành một cây tre thật dài! Bụt dặn thêm câu "Khắc xuất! Khắc xuất!" để tháo rời, rồi biến mất.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'oldMan', x: 55, y: 100, s: 1.4, tap: 'bounce' },
+            { k: 'bamboo', x: 120, y: 96, s: 1.3, tap: 'wobble' },
+            { k: 'man', x: 95, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Cây tre dài quá, vác không nổi. Khoai hô "Khắc xuất!", tre rời ra thành từng đốt. Anh bó lại, gánh về làng.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'bamboo', x: 60, y: 96 },
+            { k: 'man', x: 110, y: 100, s: 1.4, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Về tới nơi, phú ông đang linh đình làm lễ cưới con gái cho nhà giàu khác! Khoai hiểu mình bị lừa. Anh xếp tre ra, hô to: "Khắc nhập!" — phú ông vừa chạy tới mắng đã bị dính chặt vào cây tre, kêu oai oái: "Ối làng nước ơi! Thả ta ra!"',
         scene: {
           bg: 'day',
           items: [
@@ -328,7 +371,7 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Phú ông hứa gả con gái thật. Khoai hô "Khắc xuất!" thả ông ra. Hai vợ chồng Khoai sống hạnh phúc. Kẻ gian dối cuối cùng phải chừa thói xấu.',
+        text: 'Mấy người nhà giàu xúm vào gỡ cũng bị dính theo cả dây. Phú ông sợ quá, vội van xin và hứa gả con gái thật. Khoai mới hô "Khắc xuất!" thả ra. Từ đó, Khoai cưới được vợ hiền, sống hạnh phúc; còn kẻ gian dối tham lam thì phải chừa thói xấu.',
         scene: {
           bg: 'day',
           items: [
@@ -347,7 +390,18 @@ export const STORIES: Story[] = [
     moral: 'Tự tay làm ra mới thật đáng quý.',
     pages: [
       {
-        text: 'Mai An Tiêm chăm chỉ, tài giỏi, được vua quý. Nhưng chàng thẳng thắn: "Của mình tự làm ra mới thật quý." Vua nghe vậy nổi giận.',
+        text: 'Ngày xửa ngày xưa, ở đời vua Hùng, có chàng trai tên là Mai An Tiêm. Chàng khoẻ mạnh, giỏi giang, được nhà vua quý mến, nhận làm con nuôi và cho sống sung túc trong cung.',
+        scene: {
+          bg: 'indoor',
+          items: [
+            { k: 'house', x: 150, y: 96, s: 0.9 },
+            { k: 'oldMan', x: 70, y: 100, s: 1.5, tap: 'wobble' },
+            { k: 'man', x: 110, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Mai An Tiêm chăm chỉ, của cải đầy nhà. Nhưng chàng thẳng thắn nói: "Của này là nhờ hai bàn tay con làm ra mà có." Có kẻ ghét chàng, bèn tâu vua rằng chàng kiêu ngạo, không biết ơn.',
         scene: {
           bg: 'indoor',
           items: [
@@ -358,47 +412,79 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Vua đày Mai An Tiêm cùng vợ con ra đảo hoang, không cho mang theo gì cả.',
+        text: 'Vua nghe, nổi giận đùng đùng: "Đã vậy, ta xem ngươi tự làm ra được gì!". Vua đày cả gia đình Mai An Tiêm ra một hòn đảo hoang giữa biển, chỉ cho mang theo ít lương thực.',
         scene: {
-          bg: 'island',
+          bg: 'indoor',
           items: [
-            { k: 'boat', x: 60, y: 100, s: 1.3 },
-            { k: 'man', x: 120, y: 102, s: 1.3, tap: 'wobble' },
+            { k: 'oldMan', x: 70, y: 100, s: 1.5, tap: 'wobble' },
+            { k: 'man', x: 115, y: 100, s: 1.3, tap: 'wobble' },
           ],
         },
       },
       {
-        text: 'Một hôm, chàng thấy đàn chim tha hạt lạ rồi đánh rơi. Chàng nhặt đem gieo, ngày ngày chăm bón.',
+        text: 'Hòn đảo chỉ toàn cát trắng và sóng biển. Vợ An Tiêm lo lắng khóc. Chàng ôn tồn động viên: "Mình đừng lo. Trời sinh voi, trời sinh cỏ. Cứ chịu khó, vợ chồng con cái ta nhất định sống được."',
         scene: {
           bg: 'island',
           items: [
-            { k: 'bird', x: 60, y: 50, s: 1.2, tap: 'bounce' },
+            { k: 'boat', x: 50, y: 100, s: 1.2 },
+            { k: 'man', x: 100, y: 102, s: 1.3, tap: 'bounce' },
+            { k: 'woman', x: 135, y: 102, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Một hôm, An Tiêm thấy đàn chim từ xa bay tới, nhả xuống mấy hạt đen đen rồi bay đi. Chàng nghĩ: "Chim ăn được thì người chắc cũng ăn được." Anh nhặt hạt đem gieo xuống cát.',
+        scene: {
+          bg: 'island',
+          items: [
+            { k: 'bird', x: 60, y: 48, s: 1.3, tap: 'bounce' },
             { k: 'man', x: 120, y: 102, s: 1.3, tap: 'bounce' },
           ],
         },
       },
       {
-        text: 'Hạt mọc thành cây, kết quả tròn to, vỏ xanh, ruột đỏ, ngọt lịm. Đó là quả dưa hấu!',
+        text: 'Ngày ngày, hai vợ chồng chăm chỉ tưới tắm, vun trồng. Ít lâu sau, hạt nảy mầm, bò lan thành dây, kết những quả tròn to, vỏ xanh thẫm.',
         scene: {
           bg: 'island',
           items: [
-            { k: 'watermelon', x: 80, y: 100, s: 1.6, tap: 'bounce' },
+            { k: 'watermelon', x: 70, y: 100, s: 1.1 },
+            { k: 'man', x: 110, y: 102, s: 1.3, tap: 'bounce' },
+            { k: 'woman', x: 140, y: 102, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'An Tiêm bổ thử một quả. Ruột đỏ tươi, hạt đen nhánh, ăn vào ngọt lịm, mát rượi cả người. Cả nhà reo lên vui sướng. Đó chính là quả dưa hấu.',
+        scene: {
+          bg: 'island',
+          items: [
+            { k: 'watermelon', x: 80, y: 100, s: 1.7, tap: 'bounce' },
             { k: 'man', x: 130, y: 102, s: 1.3, tap: 'bounce' },
           ],
         },
       },
       {
-        text: 'Chàng khắc tên mình lên quả, thả xuống biển. Dưa trôi đi muôn nơi, ai ăn cũng tấm tắc khen ngon.',
+        text: 'Dưa ra ngày càng nhiều. An Tiêm khắc tên mình lên vỏ vài quả rồi thả trôi theo dòng nước biển, mong có người biết đến.',
         scene: {
           bg: 'island',
           items: [
             { k: 'watermelon', x: 70, y: 100, s: 1.2 },
-            { k: 'boat', x: 130, y: 100, s: 1.2 },
+            { k: 'man', x: 120, y: 102, s: 1.3, tap: 'bounce' },
           ],
         },
       },
       {
-        text: 'Vua biết tin, hối hận, sai thuyền đón gia đình về. Từ đó, ai cũng nhớ: của mình tự làm ra mới thật đáng quý.',
+        text: 'Quả dưa trôi dạt vào đất liền. Ai ăn cũng tấm tắc khen ngon, lần theo tên trên vỏ tìm ra đảo, mang gạo và đồ dùng đến đổi lấy dưa. Gia đình An Tiêm dần dần đủ đầy.',
+        scene: {
+          bg: 'island',
+          items: [
+            { k: 'watermelon', x: 60, y: 100, s: 1.2 },
+            { k: 'boat', x: 130, y: 100, s: 1.3 },
+          ],
+        },
+      },
+      {
+        text: 'Tin đồn về thứ quả lạ đến tai vua. Vua nếm thử, thấy ngon lạ thường, hối hận vì đã trách lầm. Vua cho thuyền ra đón cả gia đình về, ban thưởng hậu hĩnh. Từ đó nước ta có giống dưa hấu. Tự tay làm ra mới thật đáng quý.',
         scene: {
           bg: 'day',
           items: [
@@ -418,7 +504,7 @@ export const STORIES: Story[] = [
     moral: 'Trí khôn quý hơn sức mạnh.',
     pages: [
       {
-        text: 'Bác nông dân đang cày ruộng cùng con trâu hiền lành.',
+        text: 'Ngày xửa ngày xưa, ở một làng quê có cánh đồng rộng mênh mông, có bác nông dân hiền lành. Ngày ngày bác dắt con trâu của mình ra ruộng cày bừa.',
         scene: {
           bg: 'day',
           items: [
@@ -430,7 +516,18 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Con hổ đi qua, thấy lạ liền hỏi trâu: "Mày to khoẻ thế, sao chịu làm tôi cho người bé tí?" Trâu đáp: "Vì người có TRÍ KHÔN."',
+        text: 'Trâu tuy to khoẻ nhưng rất ngoan, chăm chỉ kéo cày giúp bác. Một hôm, có con hổ vằn từ trong rừng mò ra. Nó nấp sau bụi cây, tò mò nhìn mãi.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'tree', x: 50, y: 96, s: 1.2 },
+            { k: 'tiger', x: 95, y: 100, s: 1.4, tap: 'wobble' },
+            { k: 'buffalo', x: 140, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Đợi bác nông dân nghỉ tay, hổ lò dò đến gần trâu, hỏi nhỏ: "Này anh trâu kia, anh to lớn khoẻ mạnh thế, sao lại chịu kéo cày khổ sở cho cái người bé tí kia?"',
         scene: {
           bg: 'forest',
           items: [
@@ -440,7 +537,17 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Hổ tò mò chạy tới hỏi người: "Trí khôn của ngươi đâu? Cho ta xem thử!"',
+        text: 'Trâu thong thả đáp: "Tại người tuy bé nhưng có TRÍ KHÔN, anh ạ." Hổ ngạc nhiên lắm: "Trí khôn là cái gì? Nó như thế nào, trông ra làm sao?"',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'tiger', x: 65, y: 100, s: 1.4, tap: 'bounce' },
+            { k: 'buffalo', x: 135, y: 100, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Hổ tò mò chạy tới hỏi thẳng bác nông dân: "Trí khôn của ngươi đâu? Cho ta xem một cái nào!". Bác nhìn con hổ dữ tợn, nghĩ bụng phải có mưu mới xong.',
         scene: {
           bg: 'forest',
           items: [
@@ -450,29 +557,40 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Bác nông dân nghĩ kế, nói: "Trí khôn ta để ở nhà. Để ta về lấy. Nhưng sợ ngươi ăn mất trâu, ngươi chịu cho ta trói vào gốc cây nhé." Hổ gật đầu ngay.',
+        text: 'Bác đáp: "Trí khôn ta để quên ở nhà rồi. Để ta về lấy cho ngươi xem. Nhưng ta đi, sợ ngươi ăn mất trâu của ta. Hay là… ngươi chịu cho ta trói lại một lát nhé?". Hổ muốn xem trí khôn quá, gật đầu lia lịa.',
         scene: {
           bg: 'forest',
           items: [
-            { k: 'tree', x: 60, y: 96, s: 1.2 },
+            { k: 'tree', x: 55, y: 96, s: 1.2 },
+            { k: 'tiger', x: 85, y: 100, s: 1.4, tap: 'wobble' },
+            { k: 'man', x: 130, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Bác nông dân lấy dây thừng to, trói hổ thật chặt vào một gốc cây. Trói xong xuôi đâu đấy, bác vỗ tay cười lớn: "Trí khôn của ta đây! Trí khôn của ta đây!"',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'tree', x: 70, y: 96, s: 1.2 },
             { k: 'tiger', x: 80, y: 100, s: 1.4, tap: 'wobble' },
             { k: 'man', x: 130, y: 100, s: 1.3, tap: 'bounce' },
           ],
         },
       },
       {
-        text: 'Trói thật chặt xong, bác cười lớn: "Trí khôn của ta đây!" rồi nổi lửa hù cho hổ một phen. Hổ vùng vẫy chạy thoát, lửa cháy thành những vằn đen trên mình.',
+        text: 'Rồi bác chất rơm, châm lửa, hù cho hổ một phen khiếp vía. Hổ vùng vẫy dữ dội, đứt dây chạy biến vào rừng. Lửa cháy sém, để lại trên mình hổ những vằn đen dài.',
         scene: {
           bg: 'forest',
           items: [
             { k: 'tree', x: 55, y: 96, s: 1.1 },
             { k: 'man', x: 95, y: 100, s: 1.3, tap: 'bounce' },
-            { k: 'tiger', x: 140, y: 100, s: 1.4, tap: 'spin' },
+            { k: 'tiger', x: 145, y: 100, s: 1.4, tap: 'spin' },
           ],
         },
       },
       {
-        text: 'Từ đó, loài hổ có những vằn đen trên lưng. Và ai cũng nhớ: trí khôn quý hơn sức mạnh.',
+        text: 'Từ đó, loài hổ nào trên lưng cũng có những vằn đen. Và câu chuyện này nhắc các bé rằng: trí khôn còn quý hơn cả sức mạnh.',
         scene: {
           bg: 'forest',
           items: [
