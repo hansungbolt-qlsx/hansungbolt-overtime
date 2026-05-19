@@ -26,7 +26,16 @@ export type PrimKey =
   | 'bird'
   | 'fishJump'
   | 'watermelon'
-  | 'boat';
+  | 'boat'
+  | 'mountain'
+  | 'bamboo'
+  | 'flower'
+  | 'gold'
+  | 'snake'
+  | 'tiger'
+  | 'buffalo'
+  | 'turtle'
+  | 'sword';
 
 export type Placed = {
   k: PrimKey;
@@ -225,6 +234,138 @@ function Boat() {
   );
 }
 
+function Mountain() {
+  return (
+    <g>
+      <polygon points="-42,0 0,-58 42,0" fill="#8d99a6" />
+      <polygon points="-14,-38 0,-58 14,-38" fill="#eceff1" />
+    </g>
+  );
+}
+function Bamboo() {
+  return (
+    <g>
+      <rect x="-4" y="-62" width="8" height="62" rx="3" fill="#7cb342" />
+      {[-48, -32, -16].map((y, i) => (
+        <line key={i} x1="-4" y1={y} x2="4" y2={y} stroke="#558b2f" strokeWidth="2" />
+      ))}
+      <ellipse cx="10" cy="-52" rx="10" ry="4" fill="#9ccc65" />
+      <ellipse cx="-10" cy="-38" rx="10" ry="4" fill="#9ccc65" />
+    </g>
+  );
+}
+function Flower() {
+  return (
+    <g>
+      <rect x="-2" y="-22" width="4" height="22" fill="#66bb6a" />
+      {[0, 45, 90, 135, 180, 225, 270, 315].map((d) => (
+        <ellipse
+          key={d}
+          cx="0"
+          cy="-34"
+          rx="5"
+          ry="9"
+          fill="#fff"
+          stroke="#e0e0e0"
+          transform={`rotate(${d} 0 -22)`}
+        />
+      ))}
+      <circle cx="0" cy="-22" r="6" fill="#ffca28" />
+    </g>
+  );
+}
+function Gold() {
+  return (
+    <g>
+      {[
+        [-12, -4],
+        [0, -5],
+        [12, -4],
+        [-6, -12],
+        [6, -12],
+        [0, -19],
+      ].map(([x, y], i) => (
+        <circle
+          key={i}
+          cx={x}
+          cy={y}
+          r="6"
+          fill="#ffd54f"
+          stroke="#f9a825"
+          strokeWidth="1.5"
+        />
+      ))}
+    </g>
+  );
+}
+function Snake() {
+  return (
+    <g>
+      <path
+        d="M-22 0 q8 -18 18 -9 q-10 7 0 15 q12 -5 14 -19"
+        fill="none"
+        stroke="#43a047"
+        strokeWidth="9"
+        strokeLinecap="round"
+      />
+      <circle cx="11" cy="-24" r="6" fill="#388e3c" />
+      <circle cx="13" cy="-26" r="1.6" fill="#b71c1c" />
+      <line x1="16" y1="-24" x2="24" y2="-24" stroke="#d50000" strokeWidth="2" />
+    </g>
+  );
+}
+function Tiger() {
+  return (
+    <g>
+      <ellipse cx="0" cy="-12" rx="22" ry="13" fill="#ffa726" />
+      <circle cx="-18" cy="-18" r="10" fill="#ffb74d" />
+      <path d="M-6 -12 v18 M2 -12 v18 M10 -12 v15" stroke="#5d4037" strokeWidth="2" />
+      <polygon points="-25,-26 -21,-21 -27,-21" fill="#ffa726" />
+      <circle cx="-21" cy="-20" r="1.6" fill="#222" />
+      <rect x="14" y="-7" width="11" height="4" rx="2" fill="#ffa726" />
+    </g>
+  );
+}
+function Buffalo() {
+  return (
+    <g>
+      <ellipse cx="0" cy="-12" rx="22" ry="13" fill="#616161" />
+      <circle cx="-18" cy="-15" r="9" fill="#757575" />
+      <path
+        d="M-27 -20 q-6 -9 3 -11 M-9 -20 q6 -9 -3 -11"
+        stroke="#eceff1"
+        strokeWidth="3"
+        fill="none"
+      />
+      <circle cx="-21" cy="-15" r="1.5" fill="#111" />
+      <rect x="-8" y="-2" width="4" height="6" fill="#424242" />
+      <rect x="8" y="-2" width="4" height="6" fill="#424242" />
+    </g>
+  );
+}
+function Turtle() {
+  return (
+    <g>
+      <ellipse cx="0" cy="-7" rx="20" ry="11" fill="#2e7d32" />
+      <path d="M-20 -7 a20 11 0 0 1 40 0" fill="#43a047" />
+      <circle cx="18" cy="-8" r="6" fill="#558b2f" />
+      <circle cx="20" cy="-9" r="1.4" fill="#fff" />
+      <rect x="-16" y="-1" width="5" height="6" rx="2" fill="#558b2f" />
+      <rect x="11" y="-1" width="5" height="6" rx="2" fill="#558b2f" />
+    </g>
+  );
+}
+function Sword() {
+  return (
+    <g>
+      <rect x="-2" y="-40" width="4" height="34" fill="#cfd8dc" stroke="#90a4ae" />
+      <polygon points="-2,-40 2,-40 0,-47" fill="#eceff1" />
+      <rect x="-9" y="-8" width="18" height="4" rx="2" fill="#6d4c41" />
+      <rect x="-2" y="-4" width="4" height="10" rx="2" fill="#8d6e63" />
+    </g>
+  );
+}
+
 const PRIM: Record<PrimKey, () => React.ReactElement> = {
   sun: Sun,
   moon: Moon,
@@ -244,6 +385,15 @@ const PRIM: Record<PrimKey, () => React.ReactElement> = {
   fishJump: FishJump,
   watermelon: Watermelon,
   boat: Boat,
+  mountain: Mountain,
+  bamboo: Bamboo,
+  flower: Flower,
+  gold: Gold,
+  snake: Snake,
+  tiger: Tiger,
+  buffalo: Buffalo,
+  turtle: Turtle,
+  sword: Sword,
 };
 
 function TapItem({ p }: { p: Placed }) {
