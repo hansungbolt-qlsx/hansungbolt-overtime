@@ -41,6 +41,12 @@ export default function DashboardHeader({
           </div>
         </div>
         <div className="flex flex-col gap-1.5 flex-shrink-0">
+          <Link
+            href="/games"
+            className="text-center px-3 py-1.5 rounded-md bg-brand-green text-brand-navy text-xs font-bold shadow-sm hover:brightness-95 transition active:scale-95"
+          >
+            🎈 Game cho bé
+          </Link>
           <LogoutButton />
           <ChangePasswordButton />
         </div>
