@@ -130,39 +130,41 @@ export default function CountingGame() {
     setPageNo((n) => n + 1);
   }
 
+  const liveTokens = tokens.filter((t) => !t.used);
+
   return (
     <div
-      className="fixed inset-0 overflow-hidden select-none touch-none"
+      className="fixed inset-0 flex flex-col overflow-hidden select-none touch-none"
       style={{
         background:
           'linear-gradient(160deg,#e3f2fd 0%,#fff3e0 50%,#f1f8e9 100%)',
       }}
     >
-      {/* Top bar */}
-      <div className="flex items-center justify-between px-5 py-3">
-        <div className="text-2xl font-extrabold text-[#1b3864]">
+      {/* Top bar — không đè game (flex column) */}
+      <div className="shrink-0 flex items-center justify-between gap-2 px-3 py-2 flex-wrap">
+        <div className="text-lg sm:text-2xl font-extrabold text-[#1b3864] whitespace-nowrap">
           🔢 Đếm số{' '}
-          <span className="text-base font-bold text-[#3b5788]">
+          <span className="text-sm font-bold text-[#3b5788]">
             • Trang {pageNo}
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-white/80 rounded-xl px-3 py-1.5 shadow">
-            <span className="text-2xl">⭐</span>
-            <span className="text-2xl font-extrabold text-[#f9a825]">
+          <div className="flex items-center gap-1 bg-white/80 rounded-xl px-2.5 py-1 shadow">
+            <span className="text-xl">⭐</span>
+            <span className="text-xl font-extrabold text-[#f9a825]">
               {ready ? stars : '…'}
             </span>
           </div>
           <button
             type="button"
             onClick={newPage}
-            className="px-4 py-2 rounded-xl bg-[#a3c947] text-[#1b3864] font-bold text-base shadow active:scale-95"
+            className="px-3 py-1.5 rounded-xl bg-[#a3c947] text-[#1b3864] font-bold text-sm shadow active:scale-95"
           >
             Trang mới
           </button>
           <Link
             href="/games"
-            className="px-4 py-2 rounded-xl bg-white text-[#1b3864] font-bold text-base shadow border border-[#cdd9e5] active:scale-95"
+            className="px-3 py-1.5 rounded-xl bg-white text-[#1b3864] font-bold text-sm shadow border border-[#cdd9e5] active:scale-95"
           >
             Thoát
           </Link>
@@ -170,34 +172,52 @@ export default function CountingGame() {
       </div>
 
       {/* Sân chơi: SỐ bên trái — ĐỒ VẬT bên phải */}
-      <div className="absolute inset-x-0 bottom-0 top-[60px] flex items-stretch gap-3 px-4 pb-4">
-        {/* Cột trái: số kéo được */}
-        <div className="w-[120px] sm:w-[150px] flex flex-col gap-3">
-          {tokens.map((t) => (
-            <div key={t.id} className="flex-1 flex items-center justify-center">
-              {t.used ? (
-                <div className="w-full h-full rounded-3xl border-4 border-dashed border-[#cfe0ec]" />
-              ) : (
-                <button
-                  type="button"
-                  {...dragProps({ tokenId: t.id, value: t.value })}
-                  className={`w-full h-full rounded-3xl bg-[#42a5f5] border-4 border-[#1565c0] text-white font-extrabold shadow-lg active:scale-95 touch-none ${
-                    drag?.payload.tokenId === t.id ? 'opacity-30' : ''
-                  }`}
-                  style={{ fontSize: 'clamp(2.5rem,7vh,4.5rem)' }}
-                >
-                  {t.value}
-                </button>
-              )}
-            </div>
+      <div className="flex-1 min-h-0 flex items-stretch gap-3 px-3 pb-3">
+        {/* Cột trái: chỉ số CHƯA dùng (ít dần → to dần, dễ cho bé) */}
+        <div className="w-[110px] sm:w-[150px] flex flex-col gap-3">
+          {liveTokens.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              {...dragProps({ tokenId: t.id, value: t.value })}
+              className={`flex-1 rounded-3xl bg-[#42a5f5] border-4 border-[#1565c0] text-white font-extrabold shadow-lg active:scale-95 touch-none ${
+                drag?.payload.tokenId === t.id ? 'opacity-30' : ''
+              }`}
+              style={{ fontSize: 'clamp(2.5rem,8vh,4.5rem)' }}
+            >
+              {t.value}
+            </button>
           ))}
+          {liveTokens.length === 0 && (
+            <div className="flex-1 flex items-center justify-center text-4xl">
+              🎉
+            </div>
+          )}
         </div>
 
-        {/* Cột phải: thẻ đồ vật (drop target) */}
-        <div className="flex-1 flex flex-col gap-3">
+        {/* Cột phải: thẻ đồ vật. Đúng → co thành thanh gọn. */}
+        <div className="flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
           {rows.map((r) => {
-            const objSize = r.count <= 4 ? 54 : r.count <= 7 ? 42 : 34;
             const isWrong = wrongRow === r.id;
+            if (r.matched) {
+              return (
+                <div
+                  key={r.id}
+                  ref={(el) => {
+                    if (el) cardRefs.current.set(r.id, el);
+                    else cardRefs.current.delete(r.id);
+                  }}
+                  className="shrink-0 h-[52px] rounded-2xl bg-[#e8f5e9] border-2 border-[#66bb6a] flex items-center gap-3 px-4 transition-all"
+                >
+                  <span className="text-3xl font-extrabold text-[#2e7d32]">
+                    {r.count}
+                  </span>
+                  <GameObject kind={r.kind} size={32} />
+                  <span className="text-2xl ml-auto">✅</span>
+                </div>
+              );
+            }
+            const objSize = r.count <= 4 ? 52 : r.count <= 7 ? 40 : 32;
             return (
               <div
                 key={r.id}
@@ -205,22 +225,12 @@ export default function CountingGame() {
                   if (el) cardRefs.current.set(r.id, el);
                   else cardRefs.current.delete(r.id);
                 }}
-                className={`flex-1 rounded-3xl border-4 flex items-center px-4 transition-all ${
-                  r.matched
-                    ? 'bg-[#e8f5e9] border-[#66bb6a]'
-                    : isWrong
-                      ? 'bg-[#ffebee] border-[#ef5350] animate-[wiggle_0.3s_ease-in-out_2]'
-                      : 'bg-white/80 border-[#cfe0ec]'
+                className={`flex-1 min-h-0 rounded-3xl border-4 flex items-center px-4 transition-all ${
+                  isWrong
+                    ? 'bg-[#ffebee] border-[#ef5350] animate-[wiggle_0.3s_ease-in-out_2]'
+                    : 'bg-white/80 border-[#cfe0ec]'
                 }`}
               >
-                {r.matched && (
-                  <div className="flex items-center gap-2 pr-3">
-                    <span className="text-5xl font-extrabold text-[#2e7d32]">
-                      {r.count}
-                    </span>
-                    <span className="text-4xl">✅</span>
-                  </div>
-                )}
                 <div className="flex flex-wrap gap-1.5 items-center justify-center flex-1">
                   {Array.from({ length: r.count }, (_, i) => (
                     <span
