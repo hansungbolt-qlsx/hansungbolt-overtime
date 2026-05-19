@@ -9,22 +9,16 @@ import {
   type ObjectKey,
 } from './objects';
 import { playSound, speakVi, preloadSounds } from '@/lib/game-audio';
+import { usePointerDrag, hitTestEl } from '@/lib/games/usePointerDrag';
+import { useGameProgress } from '@/lib/games/useGameProgress';
 
 const VI_NUM = [
-  '',
-  'một',
-  'hai',
-  'ba',
-  'bốn',
-  'năm',
-  'sáu',
-  'bảy',
-  'tám',
-  'chín',
-  'mười',
+  '', 'một', 'hai', 'ba', 'bốn', 'năm',
+  'sáu', 'bảy', 'tám', 'chín', 'mười',
 ];
 
 const ROWS_PER_PAGE = 4;
+const GAME_ID = 'dem-so';
 
 type Row = { id: number; kind: ObjectKey; count: number; matched: boolean };
 type Token = { id: number; value: number; used: boolean };
@@ -37,13 +31,9 @@ function shuffle<T>(arr: T[]): T[] {
   }
   return a;
 }
-
-function sample<T>(arr: T[], n: number): T[] {
-  return shuffle(arr).slice(0, n);
-}
+const sample = <T,>(arr: T[], n: number) => shuffle(arr).slice(0, n);
 
 function buildPage(): { rows: Row[]; tokens: Token[] } {
-  // 4 số khác nhau trong 1-10
   const counts = sample(
     Array.from({ length: 10 }, (_, i) => i + 1),
     ROWS_PER_PAGE,
@@ -66,26 +56,63 @@ function buildPage(): { rows: Row[]; tokens: Token[] } {
 export default function CountingGame() {
   const [{ rows, tokens }, setPage] = useState(buildPage);
   const [pageNo, setPageNo] = useState(1);
-  const [drag, setDrag] = useState<{
-    tokenId: number;
-    value: number;
-    x: number;
-    y: number;
-  } | null>(null);
   const [wrongRow, setWrongRow] = useState<number | null>(null);
   const [celebrate, setCelebrate] = useState(false);
-
   const cardRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+
+  const { stars, ready, addStar } = useGameProgress();
 
   useEffect(() => {
     preloadSounds();
   }, []);
+
+  const { drag, dragProps } = usePointerDrag<{ tokenId: number; value: number }>(
+    (p, x, y) => {
+      // Tìm thẻ gần điểm thả nhất (snap ~40px), tránh trùng thẻ kề nhau
+      let hit: Row | null = null;
+      let bestDist = Infinity;
+      for (const r of rows) {
+        const el = cardRefs.current.get(r.id);
+        if (!hitTestEl(el, x, y, 40)) continue;
+        const b = el!.getBoundingClientRect();
+        const cx = b.left + b.width / 2;
+        const cy = b.top + b.height / 2;
+        const d = (cx - x) ** 2 + (cy - y) ** 2;
+        if (d < bestDist) {
+          bestDist = d;
+          hit = r;
+        }
+      }
+      if (!hit || hit.matched) return;
+
+      if (hit.count === p.value) {
+        const mr = hit;
+        setPage((prev) => ({
+          rows: prev.rows.map((r) =>
+            r.id === mr.id ? { ...r, matched: true } : r,
+          ),
+          tokens: prev.tokens.map((t) =>
+            t.id === p.tokenId ? { ...t, used: true } : t,
+          ),
+        }));
+        playSound('correct');
+        speakVi(`${VI_NUM[mr.count]} ${OBJECT_NAMES_VI[mr.kind]}`);
+      } else {
+        const wr = hit.id;
+        setWrongRow(wr);
+        playSound('wrong');
+        speakVi('Chưa đúng, thử lại nhé');
+        setTimeout(() => setWrongRow((c) => (c === wr ? null : c)), 600);
+      }
+    },
+  );
 
   const allMatched = rows.every((r) => r.matched);
 
   useEffect(() => {
     if (allMatched && !celebrate) {
       setCelebrate(true);
+      addStar(GAME_ID);
       playSound('win');
       speakVi('Giỏi quá! Bé làm đúng hết rồi!');
       const t = setTimeout(() => {
@@ -95,66 +122,12 @@ export default function CountingGame() {
       }, 3200);
       return () => clearTimeout(t);
     }
-  }, [allMatched, celebrate]);
+  }, [allMatched, celebrate, addStar]);
 
   function newPage() {
     setCelebrate(false);
     setPage(buildPage());
     setPageNo((n) => n + 1);
-  }
-
-  function onPointerDown(e: React.PointerEvent, token: Token) {
-    if (token.used) return;
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    setDrag({ tokenId: token.id, value: token.value, x: e.clientX, y: e.clientY });
-  }
-
-  function onPointerMove(e: React.PointerEvent) {
-    if (!drag) return;
-    setDrag({ ...drag, x: e.clientX, y: e.clientY });
-  }
-
-  function onPointerUp(e: React.PointerEvent) {
-    if (!drag) return;
-    const px = e.clientX;
-    const py = e.clientY;
-    const d = drag;
-    setDrag(null);
-
-    // Hit-test: tìm card chứa điểm thả
-    let hitRow: Row | null = null;
-    for (const r of rows) {
-      const el = cardRefs.current.get(r.id);
-      if (!el) continue;
-      const b = el.getBoundingClientRect();
-      if (px >= b.left && px <= b.right && py >= b.top && py <= b.bottom) {
-        hitRow = r;
-        break;
-      }
-    }
-    if (!hitRow) return; // thả ra ngoài → không phạt, token về chỗ cũ
-
-    if (hitRow.matched) return;
-
-    if (hitRow.count === d.value) {
-      const matchedRow = hitRow;
-      setPage((prev) => ({
-        rows: prev.rows.map((r) =>
-          r.id === matchedRow.id ? { ...r, matched: true } : r,
-        ),
-        tokens: prev.tokens.map((t) =>
-          t.id === d.tokenId ? { ...t, used: true } : t,
-        ),
-      }));
-      playSound('correct');
-      speakVi(`${VI_NUM[matchedRow.count]} ${OBJECT_NAMES_VI[matchedRow.kind]}`);
-    } else {
-      const wr = hitRow.id;
-      setWrongRow(wr);
-      playSound('wrong');
-      speakVi('Chưa đúng, thử lại nhé');
-      setTimeout(() => setWrongRow((cur) => (cur === wr ? null : cur)), 600);
-    }
   }
 
   return (
@@ -168,12 +141,18 @@ export default function CountingGame() {
       {/* Top bar */}
       <div className="flex items-center justify-between px-5 py-3">
         <div className="text-2xl font-extrabold text-[#1b3864]">
-          🎈 Bé học đếm số{' '}
+          🔢 Đếm số{' '}
           <span className="text-base font-bold text-[#3b5788]">
             • Trang {pageNo}
           </span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-white/80 rounded-xl px-3 py-1.5 shadow">
+            <span className="text-2xl">⭐</span>
+            <span className="text-2xl font-extrabold text-[#f9a825]">
+              {ready ? stars : '…'}
+            </span>
+          </div>
           <button
             type="button"
             onClick={newPage}
@@ -182,7 +161,7 @@ export default function CountingGame() {
             Trang mới
           </button>
           <Link
-            href="/dashboard"
+            href="/games"
             className="px-4 py-2 rounded-xl bg-white text-[#1b3864] font-bold text-base shadow border border-[#cdd9e5] active:scale-95"
           >
             Thoát
@@ -190,9 +169,31 @@ export default function CountingGame() {
         </div>
       </div>
 
-      {/* Sân chơi */}
+      {/* Sân chơi: SỐ bên trái — ĐỒ VẬT bên phải */}
       <div className="absolute inset-x-0 bottom-0 top-[60px] flex items-stretch gap-3 px-4 pb-4">
-        {/* Cột trái: thẻ đồ vật */}
+        {/* Cột trái: số kéo được */}
+        <div className="w-[120px] sm:w-[150px] flex flex-col gap-3">
+          {tokens.map((t) => (
+            <div key={t.id} className="flex-1 flex items-center justify-center">
+              {t.used ? (
+                <div className="w-full h-full rounded-3xl border-4 border-dashed border-[#cfe0ec]" />
+              ) : (
+                <button
+                  type="button"
+                  {...dragProps({ tokenId: t.id, value: t.value })}
+                  className={`w-full h-full rounded-3xl bg-[#42a5f5] border-4 border-[#1565c0] text-white font-extrabold shadow-lg active:scale-95 touch-none ${
+                    drag?.payload.tokenId === t.id ? 'opacity-30' : ''
+                  }`}
+                  style={{ fontSize: 'clamp(2.5rem,7vh,4.5rem)' }}
+                >
+                  {t.value}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Cột phải: thẻ đồ vật (drop target) */}
         <div className="flex-1 flex flex-col gap-3">
           {rows.map((r) => {
             const objSize = r.count <= 4 ? 54 : r.count <= 7 ? 42 : 34;
@@ -212,6 +213,14 @@ export default function CountingGame() {
                       : 'bg-white/80 border-[#cfe0ec]'
                 }`}
               >
+                {r.matched && (
+                  <div className="flex items-center gap-2 pr-3">
+                    <span className="text-5xl font-extrabold text-[#2e7d32]">
+                      {r.count}
+                    </span>
+                    <span className="text-4xl">✅</span>
+                  </div>
+                )}
                 <div className="flex flex-wrap gap-1.5 items-center justify-center flex-1">
                   {Array.from({ length: r.count }, (_, i) => (
                     <span
@@ -223,45 +232,13 @@ export default function CountingGame() {
                     </span>
                   ))}
                 </div>
-                {r.matched && (
-                  <div className="flex items-center gap-2 pl-3">
-                    <span className="text-5xl font-extrabold text-[#2e7d32]">
-                      {r.count}
-                    </span>
-                    <span className="text-4xl">✅</span>
-                  </div>
-                )}
               </div>
             );
           })}
         </div>
-
-        {/* Cột phải: số kéo được */}
-        <div className="w-[120px] sm:w-[150px] flex flex-col gap-3">
-          {tokens.map((t) => (
-            <div key={t.id} className="flex-1 flex items-center justify-center">
-              {t.used ? (
-                <div className="w-full h-full rounded-3xl border-4 border-dashed border-[#cfe0ec]" />
-              ) : (
-                <button
-                  type="button"
-                  onPointerDown={(e) => onPointerDown(e, t)}
-                  onPointerMove={onPointerMove}
-                  onPointerUp={onPointerUp}
-                  className={`w-full h-full rounded-3xl bg-[#42a5f5] border-4 border-[#1565c0] text-white font-extrabold shadow-lg active:scale-95 touch-none ${
-                    drag?.tokenId === t.id ? 'opacity-30' : ''
-                  }`}
-                  style={{ fontSize: 'clamp(2.5rem,7vh,4.5rem)' }}
-                >
-                  {t.value}
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
       </div>
 
-      {/* Số đang kéo (bay theo ngón tay) */}
+      {/* Số đang kéo */}
       {drag && (
         <div
           className="fixed z-50 pointer-events-none flex items-center justify-center rounded-3xl bg-[#1e88e5] border-4 border-[#0d47a1] text-white font-extrabold shadow-2xl"
@@ -273,7 +250,7 @@ export default function CountingGame() {
             fontSize: '3.5rem',
           }}
         >
-          {drag.value}
+          {drag.payload.value}
         </div>
       )}
 
