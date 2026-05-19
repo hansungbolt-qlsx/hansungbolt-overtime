@@ -35,7 +35,12 @@ export type PrimKey =
   | 'tiger'
   | 'buffalo'
   | 'turtle'
-  | 'sword';
+  | 'sword'
+  | 'rabbit'
+  | 'wolf'
+  | 'pig'
+  | 'goat'
+  | 'sheep';
 
 export type Placed = {
   k: PrimKey;
@@ -366,6 +371,82 @@ function Sword() {
   );
 }
 
+function Rabbit() {
+  return (
+    <g>
+      <ellipse cx="0" cy="-10" rx="18" ry="12" fill="#eceff1" />
+      <circle cx="-16" cy="-16" r="9" fill="#f5f5f5" />
+      <ellipse cx="-19" cy="-30" rx="3.5" ry="10" fill="#eceff1" />
+      <ellipse cx="-12" cy="-30" rx="3.5" ry="10" fill="#eceff1" />
+      <ellipse cx="-19" cy="-30" rx="1.6" ry="6" fill="#f8bbd0" />
+      <ellipse cx="-12" cy="-30" rx="1.6" ry="6" fill="#f8bbd0" />
+      <circle cx="-19" cy="-17" r="1.5" fill="#37474f" />
+      <circle cx="16" cy="-9" r="5" fill="#fff" />
+      <rect x="-14" y="-1" width="4" height="6" rx="2" fill="#cfd8dc" />
+      <rect x="6" y="-1" width="4" height="6" rx="2" fill="#cfd8dc" />
+    </g>
+  );
+}
+function Wolf() {
+  return (
+    <g>
+      <ellipse cx="0" cy="-12" rx="22" ry="13" fill="#78909c" />
+      <circle cx="-17" cy="-17" r="10" fill="#90a4ae" />
+      <polygon points="-24,-28 -19,-20 -28,-21" fill="#607d8b" />
+      <polygon points="-12,-28 -10,-20 -16,-21" fill="#607d8b" />
+      <polygon points="-27,-15 -35,-13 -27,-10" fill="#90a4ae" />
+      <circle cx="-20" cy="-19" r="1.6" fill="#b71c1c" />
+      <polygon points="-31,-11 -29,-7 -33,-8" fill="#fff" />
+      <polygon points="20,-14 31,-22 24,-9" fill="#607d8b" />
+      <rect x="-12" y="-2" width="4" height="7" rx="2" fill="#607d8b" />
+      <rect x="8" y="-2" width="4" height="7" rx="2" fill="#607d8b" />
+    </g>
+  );
+}
+function Pig() {
+  return (
+    <g>
+      <ellipse cx="0" cy="-12" rx="21" ry="13" fill="#f8bbd0" />
+      <circle cx="-16" cy="-15" r="10" fill="#f48fb1" />
+      <ellipse cx="-25" cy="-15" rx="5" ry="4" fill="#ec407a" />
+      <circle cx="-26" cy="-15" r="1" fill="#ad1457" />
+      <circle cx="-24" cy="-15" r="1" fill="#ad1457" />
+      <polygon points="-19,-24 -14,-21 -22,-21" fill="#f48fb1" />
+      <circle cx="-19" cy="-17" r="1.4" fill="#4e342e" />
+      <path d="M20 -14 q8 -2 6 4 q-2 4 -6 1" fill="none" stroke="#ec407a" strokeWidth="2.5" />
+      <rect x="-12" y="-2" width="4" height="7" rx="2" fill="#f48fb1" />
+      <rect x="8" y="-2" width="4" height="7" rx="2" fill="#f48fb1" />
+    </g>
+  );
+}
+function Goat() {
+  return (
+    <g>
+      <ellipse cx="0" cy="-12" rx="20" ry="12" fill="#f5f5f5" />
+      <circle cx="-16" cy="-15" r="9" fill="#fafafa" />
+      <path d="M-20 -23 q-4 -8 1 -10 M-12 -23 q4 -8 -1 -10" stroke="#bdbdbd" strokeWidth="2.5" fill="none" />
+      <circle cx="-19" cy="-15" r="1.5" fill="#37474f" />
+      <path d="M-16 -7 q0 5 -3 8" stroke="#e0e0e0" strokeWidth="2" fill="none" />
+      <rect x="-12" y="-1" width="3.5" height="7" rx="1.7" fill="#e0e0e0" />
+      <rect x="8" y="-1" width="3.5" height="7" rx="1.7" fill="#e0e0e0" />
+    </g>
+  );
+}
+function Sheep() {
+  return (
+    <g>
+      <ellipse cx="0" cy="-13" rx="22" ry="14" fill="#fff" />
+      <ellipse cx="-12" cy="-23" rx="9" ry="8" fill="#fff" />
+      <ellipse cx="10" cy="-23" rx="9" ry="8" fill="#fff" />
+      <circle cx="-18" cy="-13" r="7" fill="#5d4037" />
+      <ellipse cx="-23" cy="-16" rx="2.5" ry="3.5" fill="#5d4037" />
+      <circle cx="-19" cy="-14" r="1.3" fill="#fff" />
+      <rect x="-12" y="-1" width="4" height="7" rx="2" fill="#5d4037" />
+      <rect x="8" y="-1" width="4" height="7" rx="2" fill="#5d4037" />
+    </g>
+  );
+}
+
 const PRIM: Record<PrimKey, () => React.ReactElement> = {
   sun: Sun,
   moon: Moon,
@@ -394,6 +475,11 @@ const PRIM: Record<PrimKey, () => React.ReactElement> = {
   buffalo: Buffalo,
   turtle: Turtle,
   sword: Sword,
+  rabbit: Rabbit,
+  wolf: Wolf,
+  pig: Pig,
+  goat: Goat,
+  sheep: Sheep,
 };
 
 function TapItem({ p }: { p: Placed }) {

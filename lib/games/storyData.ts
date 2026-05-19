@@ -1694,6 +1694,525 @@ export const STORIES: Story[] = [
       },
     ],
   },
+  {
+    id: 'rua-va-tho',
+    title: 'Rùa và Thỏ',
+    emoji: '🐢',
+    moral: 'Chậm mà kiên trì sẽ thắng kẻ tài giỏi mà chủ quan.',
+    pages: [
+      {
+        text: 'Ngày xửa ngày xưa, ở một khu rừng xanh tươi, có chú Thỏ chạy nhanh như gió. Thỏ rất kiêu căng, gặp ai cũng vênh mặt khoe tài chạy của mình.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'tree', x: 50, y: 96, s: 1.2 },
+            { k: 'rabbit', x: 110, y: 100, s: 1.6, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Một hôm, Thỏ gặp Rùa đang chậm rãi bò trên đường. Thỏ cười nhạo: "Ê Rùa! Bò chậm như sên thế kia thì sống làm gì cho phí!"',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'rabbit', x: 70, y: 100, s: 1.6, tap: 'wobble' },
+            { k: 'turtle', x: 130, y: 96, s: 1.6, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Rùa không hề giận, điềm tĩnh đáp: "Anh Thỏ đừng vội khinh tôi. Hay là tôi với anh thử chạy thi một trận, xem ai về đích trước nào?"',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'rabbit', x: 75, y: 100, s: 1.5, tap: 'bounce' },
+            { k: 'turtle', x: 130, y: 96, s: 1.7, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Thỏ phá lên cười khoái chí: "Ha ha! Thi với ta ư? Được thôi, để ta cho ngươi biết thế nào là nhanh!". Cả khu rừng kéo đến xem.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'tree', x: 40, y: 96, s: 1.1 },
+            { k: 'rabbit', x: 90, y: 100, s: 1.6, tap: 'bounce' },
+            { k: 'turtle', x: 140, y: 96, s: 1.5, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Hiệu lệnh vang lên. Thỏ vụt đi như tên bắn, loáng cái đã bỏ Rùa lại tít đằng sau. Còn Rùa thì cứ cặm cụi bò từng bước, từng bước một.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'rabbit', x: 60, y: 100, s: 1.6, tap: 'bounce' },
+            { k: 'turtle', x: 150, y: 96, s: 1.4, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Chạy được nửa đường, Thỏ ngoái lại chẳng thấy Rùa đâu. Nó nghĩ: "Rùa còn lâu mới tới. Ta chợp mắt một lát cho khoẻ đã." Rồi Thỏ nằm dưới gốc cây ngủ khò khò.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'tree', x: 90, y: 96, s: 1.4 },
+            { k: 'rabbit', x: 95, y: 100, s: 1.6, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Trong khi đó, Rùa vẫn không hề nghỉ. Bước chậm mà chắc, Rùa lặng lẽ bò ngang qua chỗ Thỏ đang ngủ, rồi tiến dần về phía đích.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'tree', x: 60, y: 96, s: 1.2 },
+            { k: 'turtle', x: 120, y: 96, s: 1.6, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Thỏ giật mình tỉnh dậy thì trời đã xế chiều. Nó hoảng hốt phóng như bay. Nhưng muộn mất rồi — Rùa đã chạm đích từ lúc nào, giữa tiếng reo hò của cả khu rừng.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'rabbit', x: 60, y: 100, s: 1.6, tap: 'spin' },
+            { k: 'turtle', x: 140, y: 96, s: 1.6, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Thỏ xấu hổ cúi gằm mặt. Từ đó nó không còn dám kiêu căng nữa. Câu chuyện nhắc các bé: chậm mà kiên trì, bền bỉ sẽ thắng kẻ tài giỏi mà chủ quan, lười biếng.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'sun', x: 30, y: 28 },
+            { k: 'rabbit', x: 80, y: 100, s: 1.5, tap: 'wobble' },
+            { k: 'turtle', x: 130, y: 96, s: 1.6, tap: 'bounce' },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: 'khan-do',
+    title: 'Cô bé quàng khăn đỏ',
+    emoji: '🧣',
+    moral: 'Phải vâng lời cha mẹ và cảnh giác với người lạ.',
+    pages: [
+      {
+        text: 'Ngày xửa ngày xưa, ở một ngôi làng ven rừng, có cô bé rất ngoan, lúc nào cũng đội chiếc khăn màu đỏ mẹ may cho. Vì thế mọi người gọi em là Cô bé quàng khăn đỏ.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'sun', x: 30, y: 28 },
+            { k: 'house', x: 150, y: 96, s: 0.9 },
+            { k: 'girl', x: 100, y: 100, s: 1.4, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Một hôm, mẹ dặn: "Con mang giỏ bánh sang biếu bà ngoại đang ốm nhé. Nhớ đi thẳng đường, đừng la cà, đừng nói chuyện với người lạ trong rừng." Khăn đỏ vâng dạ rồi đi.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'house', x: 150, y: 96, s: 0.9 },
+            { k: 'woman', x: 80, y: 100, s: 1.4, tap: 'wobble' },
+            { k: 'girl', x: 115, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Vào tới rừng, một con Sói to lông xám lừ lừ xuất hiện. Sói giả giọng ngọt ngào: "Chào cô bé, cô đi đâu một mình thế?". Quên mất lời mẹ dặn, Khăn đỏ thật thà kể hết.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'tree', x: 45, y: 96, s: 1.2 },
+            { k: 'wolf', x: 90, y: 100, s: 1.6, tap: 'wobble' },
+            { k: 'girl', x: 135, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Sói gian xảo nghĩ thầm rồi nói: "Ồ, đường kia có nhiều hoa đẹp lắm, cô hái mấy bông tặng bà đi." Khăn đỏ ham hái hoa nên đi chậm lại. Còn Sói chạy đường tắt tới nhà bà trước.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'flower', x: 60, y: 96, s: 1.3 },
+            { k: 'wolf', x: 130, y: 100, s: 1.6, tap: 'spin' },
+            { k: 'girl', x: 95, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Tới nơi, Sói gõ cửa giả giọng cháu. Bà ngoại mở cửa, hoảng hồn vội nấp vào trong tủ. Sói leo lên giường, trùm chăn kín mít, giả làm bà nằm chờ Khăn đỏ.',
+        scene: {
+          bg: 'indoor',
+          items: [
+            { k: 'house', x: 60, y: 96, s: 0.9 },
+            { k: 'wolf', x: 110, y: 100, s: 1.6, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Khăn đỏ tới nơi, thấy "bà" lạ quá liền hỏi: "Bà ơi, sao tai bà to thế?" — "Để bà nghe cháu rõ hơn." — "Sao mắt bà to thế?" — "Để bà nhìn cháu rõ hơn." — "Sao mồm bà to thế?". Sói nhe răng gầm lên: "Để ta ăn thịt ngươi đây!"',
+        scene: {
+          bg: 'indoor',
+          items: [
+            { k: 'wolf', x: 80, y: 100, s: 1.7, tap: 'spin' },
+            { k: 'girl', x: 130, y: 100, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Khăn đỏ hét toáng lên. Vừa lúc đó, một bác thợ săn đi ngang nghe tiếng kêu liền lao vào. Bác giương súng quát lớn. Sói sợ hãi, vắt chân lên cổ chạy thẳng một mạch vào rừng sâu, không dám quay lại.',
+        scene: {
+          bg: 'indoor',
+          items: [
+            { k: 'man', x: 70, y: 100, s: 1.4, tap: 'bounce' },
+            { k: 'wolf', x: 130, y: 100, s: 1.5, tap: 'spin' },
+            { k: 'girl', x: 105, y: 100, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Bà ngoại từ trong tủ bước ra, ôm chầm lấy cháu. Hai bà cháu cảm ơn bác thợ săn rối rít, rồi cùng nhau ngồi ăn bánh thật vui vẻ.',
+        scene: {
+          bg: 'indoor',
+          items: [
+            { k: 'house', x: 150, y: 96, s: 0.85 },
+            { k: 'oldWoman', x: 80, y: 100, s: 1.4, tap: 'bounce' },
+            { k: 'girl', x: 115, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Từ đó, Cô bé quàng khăn đỏ luôn nhớ lời mẹ dặn: đi đường phải đi cho thẳng, tuyệt đối không la cà và không tin lời người lạ.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'sun', x: 30, y: 28 },
+            { k: 'woman', x: 80, y: 100, s: 1.4, tap: 'bounce' },
+            { k: 'girl', x: 115, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: 'ba-chu-heo',
+    title: 'Ba chú heo con',
+    emoji: '🐷',
+    moral: 'Làm việc gì cũng phải chăm chỉ và cẩn thận.',
+    pages: [
+      {
+        text: 'Ngày xửa ngày xưa, ở một khu rừng nọ, có ba chú heo con sống cùng mẹ. Một hôm, heo mẹ dặn: "Các con đã lớn rồi, hãy tự xây cho mình một ngôi nhà thật chắc chắn nhé."',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'tree', x: 45, y: 96, s: 1.2 },
+            { k: 'pig', x: 90, y: 100, s: 1.4, tap: 'bounce' },
+            { k: 'pig', x: 120, y: 100, s: 1.3, tap: 'bounce' },
+            { k: 'pig', x: 150, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Chú heo thứ nhất lười nhất, quơ vội ít rơm rạ dựng đại một căn nhà rơm, xong là chạy đi chơi ngay.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'house', x: 130, y: 96, s: 0.8 },
+            { k: 'pig', x: 80, y: 100, s: 1.5, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Chú heo thứ hai nhanh nhảu hơn một chút, chặt mấy cành cây ghép thành một căn nhà gỗ tạm bợ, rồi cũng vội đi chơi.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'house', x: 130, y: 96, s: 0.85 },
+            { k: 'pig', x: 80, y: 100, s: 1.5, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Riêng chú heo thứ ba chăm chỉ và cẩn thận. Chú cặm cụi nhào đất, nung gạch, xây một ngôi nhà gạch thật vững chãi, dù mệt cũng không chịu bỏ dở.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'sun', x: 30, y: 28 },
+            { k: 'house', x: 130, y: 96, s: 1 },
+            { k: 'pig', x: 80, y: 100, s: 1.5, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Một hôm, con Sói đói bụng mò tới. Thấy nhà rơm, Sói nhe nanh: "Ta sẽ thổi bay nhà ngươi!". Sói hít một hơi thật sâu, "Phù… ù… ù…" — căn nhà rơm bay tung. Heo con hoảng hốt chạy sang nhà heo thứ hai.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'wolf', x: 70, y: 100, s: 1.7, tap: 'spin' },
+            { k: 'pig', x: 130, y: 100, s: 1.4, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Sói đuổi theo, tới nhà gỗ lại gầm lên: "Phù… ù… ù…!". Nhà gỗ rung rinh rồi đổ rầm. Hai chú heo con sợ quá, ù té chạy sang nhà gạch của heo thứ ba.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'wolf', x: 70, y: 100, s: 1.7, tap: 'spin' },
+            { k: 'pig', x: 120, y: 100, s: 1.3, tap: 'wobble' },
+            { k: 'pig', x: 148, y: 100, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Tới nhà gạch, Sói phồng má thổi mãi, thổi mãi đến đỏ cả mặt, mệt bở hơi tai mà ngôi nhà vẫn trơ trơ, không hề suy chuyển.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'house', x: 130, y: 96, s: 1 },
+            { k: 'wolf', x: 75, y: 100, s: 1.6, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Tức tối, Sói leo lên mái, chui xuống ống khói định bắt heo. Nào ngờ ba anh em heo đã nhanh trí nhóm sẵn nồi nước nóng dưới bếp. Sói tụt xuống, bị nóng giãy nảy, kêu oai oái rồi ba chân bốn cẳng bỏ chạy thẳng về rừng sâu, không dám quay lại.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'house', x: 110, y: 96, s: 1 },
+            { k: 'wolf', x: 150, y: 100, s: 1.5, tap: 'spin' },
+          ],
+        },
+      },
+      {
+        text: 'Từ đó, ba chú heo con sống bình yên trong ngôi nhà gạch chắc chắn. Hai chú heo lười thấm thía: làm việc gì cũng phải chăm chỉ, cẩn thận thì mới bền vững.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'sun', x: 30, y: 28 },
+            { k: 'house', x: 140, y: 96, s: 1 },
+            { k: 'pig', x: 70, y: 100, s: 1.3, tap: 'bounce' },
+            { k: 'pig', x: 98, y: 100, s: 1.3, tap: 'bounce' },
+            { k: 'pig', x: 124, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: 'soi-bay-de',
+    title: 'Sói và bảy chú dê con',
+    emoji: '🐐',
+    moral: 'Phải nghe lời cha mẹ và cảnh giác với kẻ lạ.',
+    pages: [
+      {
+        text: 'Ngày xửa ngày xưa, ở một ngôi nhà nhỏ ven rừng, có Dê mẹ và bảy chú dê con xinh xắn. Một hôm, Dê mẹ phải vào rừng kiếm cỏ.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'house', x: 150, y: 96, s: 0.9 },
+            { k: 'goat', x: 80, y: 100, s: 1.5, tap: 'bounce' },
+            { k: 'goat', x: 115, y: 100, s: 1.2, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Trước khi đi, Dê mẹ dặn kỹ: "Các con ở nhà đóng chặt cửa. Có con Sói hay rình mò đấy. Nó giọng thì ồ ề, chân thì đen sì. Tuyệt đối đừng mở cửa cho ai lạ, nghe chưa!". Bảy chú dê dạ ran.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'house', x: 150, y: 96, s: 0.9 },
+            { k: 'goat', x: 90, y: 100, s: 1.4, tap: 'wobble' },
+            { k: 'goat', x: 120, y: 100, s: 1.1, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Dê mẹ vừa đi khỏi, Sói đã mò tới gõ cửa, ồm ồm: "Các con ơi, mẹ về rồi, mở cửa cho mẹ!". Đàn dê nghe giọng khàn ồ ề liền đáp: "Mẹ chúng tôi giọng trong veo cơ. Ngươi là Sói, không mở đâu!"',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'house', x: 150, y: 96, s: 0.9 },
+            { k: 'wolf', x: 90, y: 100, s: 1.7, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Sói tức lắm, bèn ăn một cục phấn cho giọng thanh hơn, rồi lại gõ cửa giả giọng Dê mẹ. Lũ dê ngó qua khe cửa, thấy bàn chân đen sì liền hô: "Chân mẹ trắng tinh, còn chân ngươi đen thui. Đi đi, đồ Sói gian ác!"',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'house', x: 150, y: 96, s: 0.9 },
+            { k: 'wolf', x: 90, y: 100, s: 1.7, tap: 'spin' },
+          ],
+        },
+      },
+      {
+        text: 'Sói xảo quyệt nhúng chân vào bột mì cho thật trắng, rồi gõ cửa lần nữa. Lần này, đàn dê tưởng thật, mở toang cửa ra. Sói nhe nanh xông vào: "Ha ha! Trúng kế ta rồi!"',
+        scene: {
+          bg: 'indoor',
+          items: [
+            { k: 'wolf', x: 80, y: 100, s: 1.8, tap: 'spin' },
+            { k: 'goat', x: 130, y: 100, s: 1.2, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Bảy chú dê hốt hoảng chạy tán loạn đi trốn: con nấp gầm bàn, con chui vào tủ, con núp sau cánh cửa, chú dê út bé nhất thì nhảy tọt vào trong chiếc đồng hồ. Sói lục tung cả nhà mà chẳng bắt được con nào, mệt quá nằm vật ra gốc cây ngoài vườn ngủ.',
+        scene: {
+          bg: 'indoor',
+          items: [
+            { k: 'house', x: 60, y: 96, s: 0.9 },
+            { k: 'wolf', x: 120, y: 100, s: 1.6, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Dê mẹ về, gọi mãi không thấy con nào thưa thì hoảng hồn. Bỗng chú dê út trong đồng hồ kêu lên: "Mẹ ơi, con đây! Các anh trốn hết rồi, còn con Sói đang ngủ ngoài vườn kia kìa!"',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'house', x: 60, y: 96, s: 0.9 },
+            { k: 'goat', x: 100, y: 100, s: 1.5, tap: 'wobble' },
+            { k: 'wolf', x: 150, y: 100, s: 1.4, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Dê mẹ gọi các con ra. Mấy mẹ con bàn nhau, lén buộc một bao đá nặng lên lưng Sói khi nó còn ngủ say. Sói tỉnh dậy, thấy nặng trĩu, lảo đảo bước ra giếng thì trượt chân ngã tòm xuống, vùng vẫy mãi mới leo lên được, ướt như chuột lột rồi cong đuôi chạy thẳng vào rừng.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'tree', x: 50, y: 96, s: 1.2 },
+            { k: 'wolf', x: 120, y: 100, s: 1.5, tap: 'spin' },
+          ],
+        },
+      },
+      {
+        text: 'Từ đó, Sói không bao giờ dám bén mảng tới nữa. Mấy mẹ con dê ôm nhau mừng mừng tủi tủi. Câu chuyện nhắc các bé: phải luôn nghe lời cha mẹ và cảnh giác với kẻ lạ.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'sun', x: 30, y: 28 },
+            { k: 'house', x: 150, y: 96, s: 0.9 },
+            { k: 'goat', x: 80, y: 100, s: 1.5, tap: 'bounce' },
+            { k: 'goat', x: 115, y: 100, s: 1.2, tap: 'bounce' },
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: 'chu-be-chan-cuu',
+    title: 'Cậu bé chăn cừu',
+    emoji: '🐑',
+    moral: 'Nói dối nhiều lần thì nói thật cũng chẳng ai tin.',
+    pages: [
+      {
+        text: 'Ngày xửa ngày xưa, ở một làng quê nọ, có một cậu bé được giao việc chăn đàn cừu trên đồi cỏ xanh mỗi ngày.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'sun', x: 30, y: 28 },
+            { k: 'hill', x: 150, y: 96 },
+            { k: 'sheep', x: 70, y: 100, s: 1.4, tap: 'bounce' },
+            { k: 'boy', x: 120, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Ngồi một mình trên đồi mãi cũng buồn, cậu nghĩ ra một trò nghịch. Cậu hớt hải chạy về làng, kêu toáng lên: "Sói! Sói! Có sói ăn cừu! Bà con ơi, cứu với!"',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'house', x: 150, y: 96, s: 0.85 },
+            { k: 'boy', x: 90, y: 100, s: 1.4, tap: 'spin' },
+          ],
+        },
+      },
+      {
+        text: 'Dân làng đang làm việc, nghe vậy vội vứt hết, vác gậy chạy ào lên đồi. Nhưng lên tới nơi chỉ thấy đàn cừu gặm cỏ bình yên. Cậu bé ôm bụng cười nắc nẻ: "Ha ha, cháu nói đùa đấy!"',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'hill', x: 150, y: 96 },
+            { k: 'sheep', x: 60, y: 100, s: 1.3, tap: 'bounce' },
+            { k: 'boy', x: 100, y: 100, s: 1.4, tap: 'wobble' },
+            { k: 'man', x: 135, y: 100, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Mọi người bực mình bỏ về. Ít hôm sau, buồn chán, cậu lại giở trò cũ: "Sói! Sói thật rồi! Cứu cháu với!". Dân làng lại tất tả chạy lên, lại bị lừa. Lần này ai cũng giận lắm.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'hill', x: 150, y: 96 },
+            { k: 'boy', x: 90, y: 100, s: 1.4, tap: 'spin' },
+            { k: 'man', x: 130, y: 100, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Rồi một buổi chiều, con Sói thật từ trong rừng mò ra, lao vào đàn cừu. Cậu bé sợ hãi, gào khản cả cổ: "Sói! Sói thật! Bà con ơi, cứu cháu với!"',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'wolf', x: 70, y: 100, s: 1.7, tap: 'spin' },
+            { k: 'sheep', x: 110, y: 100, s: 1.3, tap: 'wobble' },
+            { k: 'boy', x: 145, y: 100, s: 1.3, tap: 'spin' },
+          ],
+        },
+      },
+      {
+        text: 'Nhưng lần này, chẳng một ai chạy đến cả. Ai cũng nghĩ: "Hừ, lại cái thằng bé nói dối chứ gì. Không mắc lừa nữa đâu!"',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'house', x: 150, y: 96, s: 0.85 },
+            { k: 'man', x: 90, y: 100, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Đàn cừu sợ hãi chạy tán loạn khắp đồi. Cậu bé chỉ biết đứng khóc nức nở, ân hận vô cùng vì những lần nói dối trước đây.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'sheep', x: 60, y: 100, s: 1.3, tap: 'spin' },
+            { k: 'boy', x: 120, y: 100, s: 1.4, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'May sao, đàn cừu chạy thoát hết vào chuồng, con Sói chẳng bắt được con nào, đành tiu nghỉu lủi về rừng. Nhưng cậu bé thì được một bài học nhớ đời.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'wolf', x: 110, y: 100, s: 1.5, tap: 'spin' },
+            { k: 'boy', x: 70, y: 100, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Từ đó, cậu bé không bao giờ dám nói dối nữa. Câu chuyện nhắc các bé: nói dối nhiều lần thì đến khi nói thật cũng chẳng còn ai tin mình.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'sun', x: 30, y: 28 },
+            { k: 'hill', x: 150, y: 96 },
+            { k: 'sheep', x: 70, y: 100, s: 1.3, tap: 'bounce' },
+            { k: 'boy', x: 120, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+    ],
+  },
 ];
 
 export const getStory = (id: string) => STORIES.find((s) => s.id === id);
