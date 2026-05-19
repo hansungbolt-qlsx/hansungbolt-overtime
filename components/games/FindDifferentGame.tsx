@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { playSound, speakVi, preloadSounds } from '@/lib/game-audio';
 import { useGameProgress } from '@/lib/games/useGameProgress';
-import { OBJECT_KEYS, OBJECT_NAMES_VI, GameObject } from './objects';
-import { sample, randInt } from '@/lib/games/vi';
+import { OBJECT_KEYS, GameObject } from './objects';
+import { sample, randInt, nextPraise } from '@/lib/games/vi';
 import GameShell from './GameShell';
 import Celebrate from './Celebrate';
 
@@ -45,7 +45,7 @@ export default function FindDifferentGame() {
     if (i === round.oddIndex) {
       lock.current = true;
       playSound('correct');
-      speakVi(`Đúng rồi! ${OBJECT_NAMES_VI[round.oddKind]}, giỏi quá!`);
+      speakVi(nextPraise());
       addStar(GAME_ID);
       const ns = streak + 1;
       setStreak(ns);

@@ -5,7 +5,7 @@ import { playSound, speakVi, preloadSounds } from '@/lib/game-audio';
 import { useGameProgress } from '@/lib/games/useGameProgress';
 import { OBJECT_KEYS, type ObjectKey } from './objects';
 import { GameObject } from './objects';
-import { sample, randInt } from '@/lib/games/vi';
+import { sample, randInt, nextPraise } from '@/lib/games/vi';
 import GameShell from './GameShell';
 import Celebrate from './Celebrate';
 
@@ -55,7 +55,7 @@ export default function CompareCountGame() {
     if (side === correctSide) {
       lock.current = true;
       playSound('correct');
-      speakVi('Đúng rồi, giỏi quá!');
+      speakVi(nextPraise());
       addStar(GAME_ID);
       const ns = streak + 1;
       setStreak(ns);

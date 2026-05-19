@@ -5,17 +5,12 @@ import { useEffect, useRef, useState } from 'react';
 import {
   GameObject,
   OBJECT_KEYS,
-  OBJECT_NAMES_VI,
   type ObjectKey,
 } from './objects';
 import { playSound, speakVi, preloadSounds } from '@/lib/game-audio';
 import { usePointerDrag, hitTestEl } from '@/lib/games/usePointerDrag';
 import { useGameProgress } from '@/lib/games/useGameProgress';
-
-const VI_NUM = [
-  '', 'một', 'hai', 'ba', 'bốn', 'năm',
-  'sáu', 'bảy', 'tám', 'chín', 'mười',
-];
+import { nextPraise } from '@/lib/games/vi';
 
 const ROWS_PER_PAGE = 4;
 const GAME_ID = 'dem-so';
@@ -96,7 +91,7 @@ export default function CountingGame() {
           ),
         }));
         playSound('correct');
-        speakVi(`${VI_NUM[mr.count]} ${OBJECT_NAMES_VI[mr.kind]}`);
+        speakVi(nextPraise());
       } else {
         const wr = hit.id;
         setWrongRow(wr);

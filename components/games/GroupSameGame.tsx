@@ -75,9 +75,8 @@ export default function GroupSameGame() {
               setRound(buildRound());
               lock.current = false;
             }, 2800);
-          } else {
-            speakVi('Đúng rồi!');
           }
+          // Kéo đúng từng món: chỉ tiếng vỗ tay, không nói (đỡ rườm)
           return { ...prev, items: nextItems };
         });
       } else {

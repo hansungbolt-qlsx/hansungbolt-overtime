@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { playSound, speakVi, preloadSounds } from '@/lib/game-audio';
 import { useGameProgress } from '@/lib/games/useGameProgress';
-import { VI_NUM, sample, randInt } from '@/lib/games/vi';
+import { VI_NUM, sample, randInt, nextPraise } from '@/lib/games/vi';
 import GameShell from './GameShell';
 import Celebrate from './Celebrate';
 
@@ -43,7 +43,7 @@ export default function NumberListenGame() {
     if (n === round.target) {
       lock.current = true;
       playSound('correct');
-      speakVi(`${VI_NUM[n]}, giỏi quá!`);
+      speakVi(nextPraise());
       addStar(GAME_ID);
       const ns = streak + 1;
       setStreak(ns);

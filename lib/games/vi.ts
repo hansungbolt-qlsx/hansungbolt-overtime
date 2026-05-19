@@ -29,3 +29,18 @@ export function sample<T>(arr: T[], n: number): T[] {
 export function randInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
+
+// Câu khen luân phiên — không lặp lại số/đồ vật bé vừa chọn, đỡ rườm.
+const PRAISES = [
+  'Giỏi quá!',
+  'Đúng rồi!',
+  'Hay lắm!',
+  'Tuyệt vời!',
+  'Bé giỏi ghê!',
+];
+let _praiseIdx = 0;
+export function nextPraise(): string {
+  const p = PRAISES[_praiseIdx % PRAISES.length];
+  _praiseIdx++;
+  return p;
+}
