@@ -608,18 +608,41 @@ export const STORIES: Story[] = [
     moral: 'Lòng hiếu thảo cảm động cả đất trời.',
     pages: [
       {
-        text: 'Có hai mẹ con sống nghèo nhưng thương nhau. Một hôm, người mẹ bị bệnh nặng, nằm liệt giường.',
+        text: 'Ngày xửa ngày xưa, ở một mái nhà tranh nhỏ ven rừng, có hai mẹ con nghèo sống nương tựa vào nhau. Mẹ tần tảo sớm hôm nuôi con; cô bé thì ngoan ngoãn, hiếu thảo, hết mực thương mẹ.',
         scene: {
           bg: 'day',
           items: [
+            { k: 'sun', x: 30, y: 28 },
             { k: 'house', x: 150, y: 96, s: 0.9 },
-            { k: 'oldWoman', x: 70, y: 100, s: 1.4, tap: 'wobble' },
+            { k: 'oldWoman', x: 75, y: 100, s: 1.4, tap: 'wobble' },
             { k: 'girl', x: 110, y: 100, s: 1.3, tap: 'bounce' },
           ],
         },
       },
       {
-        text: 'Cô bé chạy đi tìm thầy thuốc. Dọc đường gặp một cụ già hiền hậu, cụ bảo: "Trong rừng có bông hoa trắng. Hoa bao nhiêu cánh, mẹ con sống thêm bấy nhiêu năm."',
+        text: 'Một hôm, người mẹ bỗng lâm bệnh nặng, nằm liệt giường, người gầy rộc, mặt xanh xao. Cô bé lo lắng vô cùng, ngày đêm túc trực bên giường chăm sóc mẹ.',
+        scene: {
+          bg: 'indoor',
+          items: [
+            { k: 'house', x: 60, y: 96, s: 0.9 },
+            { k: 'oldWoman', x: 95, y: 100, s: 1.4, tap: 'wobble' },
+            { k: 'girl', x: 130, y: 100, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Bệnh mẹ mỗi ngày một nặng thêm. Cô bé quyết tâm lên đường đi tìm thầy thuốc giỏi để cứu mẹ. Em đi mãi, đi mãi, băng qua bao cánh rừng.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'tree', x: 45, y: 96, s: 1.2 },
+            { k: 'tree', x: 165, y: 96, s: 1.1 },
+            { k: 'girl', x: 105, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Dọc đường, em gặp một cụ già râu tóc bạc phơ, dáng vẻ hiền hậu. Nghe em kể chuyện, cụ bảo: "Trong rừng sâu có một bông hoa trắng. Hoa ấy có bao nhiêu cánh thì mẹ con sẽ sống thêm được bấy nhiêu năm. Con hãy đi tìm."',
         scene: {
           bg: 'forest',
           items: [
@@ -630,7 +653,18 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Cô tìm mãi mới thấy bông hoa trắng. Nhưng đếm đi đếm lại chỉ có vài cánh. Cô lo lắm: "Vậy mẹ chỉ sống được mấy năm thôi sao?"',
+        text: 'Cô bé mừng rỡ, cảm ơn cụ rồi vội vã đi sâu vào rừng. Em vạch từng lùm cây tìm kiếm. Cuối cùng, em cũng thấy một bông hoa trắng nhỏ xinh nở bên gốc cây.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'tree', x: 45, y: 96, s: 1.2 },
+            { k: 'flower', x: 95, y: 96, s: 1.5, tap: 'wobble' },
+            { k: 'girl', x: 135, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Nhưng em đếm đi đếm lại, bông hoa chỉ có vẻn vẹn vài cánh. Cô bé bật khóc nức nở: "Trời ơi, vậy mẹ con chỉ sống được mấy năm nữa thôi sao?"',
         scene: {
           bg: 'forest',
           items: [
@@ -640,17 +674,29 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Cô bé liền nhẹ nhàng xé mỗi cánh hoa thành thật nhiều cánh nhỏ li ti, để mẹ được sống thật lâu, thật lâu bên cô.',
+        text: 'Thương mẹ quá, cô bé nảy ra một cách. Em nhẹ nhàng, tỉ mỉ xé mỗi cánh hoa thành thật nhiều cánh nhỏ li ti, xé mãi cho đến khi bông hoa có không biết bao nhiêu là cánh.',
         scene: {
           bg: 'forest',
           items: [
-            { k: 'flower', x: 95, y: 96, s: 1.8, tap: 'spin' },
+            { k: 'flower', x: 95, y: 96, s: 1.9, tap: 'spin' },
+            { k: 'girl', x: 138, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Em nâng niu mang bông hoa về nhà. Kỳ lạ thay, vừa về tới nơi, mẹ em đã ngồi dậy được, bệnh tình thuyên giảm trông thấy, rồi khỏi hẳn lúc nào không hay.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'house', x: 150, y: 96, s: 0.9 },
+            { k: 'flower', x: 60, y: 96, s: 1.3 },
+            { k: 'oldWoman', x: 100, y: 100, s: 1.4, tap: 'bounce' },
             { k: 'girl', x: 135, y: 100, s: 1.3, tap: 'bounce' },
           ],
         },
       },
       {
-        text: 'Bông hoa nhiều cánh ấy chính là hoa cúc trắng. Mẹ cô khỏi bệnh, sống lâu bên con. Lòng hiếu thảo đã làm cảm động cả đất trời.',
+        text: 'Bông hoa trắng nhiều cánh ấy về sau người ta gọi là hoa cúc trắng. Nhờ tấm lòng hiếu thảo, cô bé đã giữ được mẹ sống thật lâu bên mình. Lòng hiếu thảo quả đã làm cảm động cả đất trời.',
         scene: {
           bg: 'day',
           items: [
@@ -670,7 +716,18 @@ export const STORIES: Story[] = [
     moral: 'Trí thông minh giúp ích cho mọi người.',
     pages: [
       {
-        text: 'Vua sai quan đi tìm người tài. Quan gặp hai cha con đang cày, hỏi xoáy: "Trâu của ông một ngày cày được mấy đường?"',
+        text: 'Ngày xửa ngày xưa, ở một làng quê nọ, nhà vua muốn tìm người tài giỏi giúp nước. Vua sai một viên quan đi khắp nơi, đặt ra những câu đố thật khó để thử tài mọi người.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'sun', x: 30, y: 28 },
+            { k: 'house', x: 150, y: 96, s: 0.9 },
+            { k: 'man', x: 100, y: 100, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Đi mãi chẳng tìm được ai, một hôm viên quan qua cánh đồng, thấy hai cha con đang cày ruộng. Ông hỏi xoáy: "Này, trâu của lão một ngày cày được mấy đường?"',
         scene: {
           bg: 'day',
           items: [
@@ -681,7 +738,7 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Em bé nhanh nhảu hỏi vặn lại: "Thế ngựa của ông một ngày đi được mấy bước ạ?" Quan ngẩn người, biết đã gặp người giỏi.',
+        text: 'Người cha còn lúng túng thì cậu con trai nhỏ đã nhanh nhảu hỏi vặn lại: "Thưa ông, thế ngựa của ông một ngày đi được mấy bước ạ?". Viên quan ngẩn người, biết đã gặp được người tài.',
         scene: {
           bg: 'day',
           items: [
@@ -691,7 +748,7 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Vua thử khó hơn: ban ba con trâu đực, bắt một năm phải đẻ thành chín con. Cả làng lo sốt vó.',
+        text: 'Quan về tâu vua. Vua muốn thử thêm, bèn ban cho làng em ba con trâu đực và ba thúng gạo nếp, ra lệnh: phải nuôi sao cho ba con trâu ấy đẻ thành chín con, không thì cả làng chịu tội.',
         scene: {
           bg: 'day',
           items: [
@@ -702,7 +759,18 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Em bé vào sân rồng khóc ầm: "Cha con không chịu đẻ em bé cho con!" Vua bật cười: "Cha mày là đàn ông, đẻ sao được!". Em đáp ngay: "Vậy trâu đực sao đẻ được ạ?"',
+        text: 'Cả làng lo sốt vó, chẳng ai biết tính sao. Riêng em bé tỉnh bơ, bảo cha thưa với làng cứ làm thịt hai con trâu, đồ hai thúng gạo nếp cho hai cha con ăn lấy sức, rồi lên kinh gặp vua.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'house', x: 60, y: 96, s: 0.9 },
+            { k: 'boy', x: 110, y: 100, s: 1.3, tap: 'bounce' },
+            { k: 'man', x: 145, y: 100, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Đến kinh đô, em bé lẻn vào sân rồng rồi khóc ầm ĩ. Vua hỏi vì sao khóc. Em mếu máo: "Tâu bệ hạ, mẹ con mất sớm, con muốn có em mà cha con nhất định không chịu đẻ em bé cho con!"',
         scene: {
           bg: 'indoor',
           items: [
@@ -713,7 +781,27 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Vua phục tài, ban thưởng thật hậu. Em bé thông minh dùng cái khôn của mình giúp cả làng vui vẻ.',
+        text: 'Vua bật cười lớn: "Cha mày là đàn ông, đẻ làm sao được!". Em bé liền đáp ngay: "Vậy sao bệ hạ lại bắt ba con trâu đực làng con phải đẻ thành chín con ạ?". Vua nghe vậy, biết em nói rất có lý.',
+        scene: {
+          bg: 'indoor',
+          items: [
+            { k: 'oldMan', x: 75, y: 100, s: 1.5, tap: 'bounce' },
+            { k: 'boy', x: 120, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Vua vẫn muốn thử lần nữa, đố em xâu sợi chỉ mảnh qua con ốc vặn ruột rỗng. Em bé hát một câu vè vui, rồi bày cách buộc chỉ vào con kiến, bôi tí mật một đầu cho kiến bò xuyên qua. Quả nhiên xâu được!',
+        scene: {
+          bg: 'indoor',
+          items: [
+            { k: 'oldMan', x: 75, y: 100, s: 1.5, tap: 'wobble' },
+            { k: 'boy', x: 120, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Vua hết lời khen ngợi, ban thưởng thật hậu và phong em làm trạng nguyên nhỏ tuổi. Em bé thông minh đã dùng cái khôn của mình cứu cả làng thoát tội. Trí thông minh thật đáng quý.',
         scene: {
           bg: 'day',
           items: [
@@ -732,18 +820,30 @@ export const STORIES: Story[] = [
     moral: 'Tham thì thâm; hiền lành thì gặp lành.',
     pages: [
       {
-        text: 'Có hai anh em. Người anh tham lam chiếm hết của cải, chỉ chia cho em một cây khế và túp lều.',
+        text: 'Ngày xửa ngày xưa, ở một ngôi làng nọ, có hai anh em mồ côi cha mẹ. Khi chia gia tài, người anh tham lam giành hết ruộng vườn, nhà cửa, chỉ chia cho người em một túp lều tranh và một cây khế ở góc vườn.',
         scene: {
           bg: 'day',
           items: [
             { k: 'house', x: 150, y: 96, s: 0.8 },
-            { k: 'tree', x: 60, y: 96, s: 1.2 },
-            { k: 'man', x: 100, y: 100, s: 1.3, tap: 'bounce' },
+            { k: 'tree', x: 55, y: 96, s: 1.2 },
+            { k: 'man', x: 90, y: 100, s: 1.3, tap: 'wobble' },
+            { k: 'man', x: 125, y: 100, s: 1.3, tap: 'bounce' },
           ],
         },
       },
       {
-        text: 'Cây khế của người em sai trĩu quả ngọt. Bỗng một con chim lớn bay đến ăn khế.',
+        text: 'Người em hiền lành, chẳng oán trách lấy nửa lời. Ngày ngày anh chăm chút cho cây khế. Cây lớn nhanh, ra hoa kết trái, sai trĩu những quả khế chín vàng thơm ngọt.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'sun', x: 30, y: 28 },
+            { k: 'tree', x: 80, y: 96, s: 1.4 },
+            { k: 'man', x: 130, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Một hôm, có con chim lớn lạ từ đâu bay đến, sà xuống ăn khế lia lịa. Người em buồn rầu nói: "Chim ơi, chim ăn hết khế thì vợ chồng tôi lấy gì mà sống?"',
         scene: {
           bg: 'day',
           items: [
@@ -754,42 +854,76 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Chim cất tiếng: "Ăn một quả, trả một cục vàng. May túi ba gang, mang đi mà đựng." Người em làm theo đúng lời.',
+        text: 'Chim bỗng cất tiếng người: "Ăn một quả, trả một cục vàng. May túi ba gang, mang đi mà đựng." Người em nghe lời, may một chiếc túi vừa đúng ba gang tay.',
         scene: {
           bg: 'day',
           items: [
-            { k: 'bird', x: 80, y: 60, s: 1.5, tap: 'bounce' },
+            { k: 'bird', x: 80, y: 58, s: 1.5, tap: 'bounce' },
             { k: 'man', x: 130, y: 100, s: 1.3, tap: 'bounce' },
           ],
         },
       },
       {
-        text: 'Chim chở người em ra hòn đảo đầy vàng. Anh chỉ lấy vừa đầy túi ba gang rồi về, sống no đủ, vẫn hiền lành.',
+        text: 'Sáng hôm sau, chim đến thật. Chim cõng người em bay qua biển, tới một hòn đảo lấp lánh toàn vàng bạc châu báu. Anh chỉ nhặt vừa đầy chiếc túi ba gang rồi leo lên lưng chim trở về.',
         scene: {
           bg: 'island',
           items: [
             { k: 'gold', x: 70, y: 100, s: 1.6 },
-            { k: 'man', x: 120, y: 102, s: 1.3, tap: 'bounce' },
+            { k: 'bird', x: 120, y: 50, s: 1.4, tap: 'bounce' },
+            { k: 'man', x: 150, y: 102, s: 1.3, tap: 'bounce' },
           ],
         },
       },
       {
-        text: 'Người anh tham, đòi đổi hết gia tài lấy cây khế. Chim cũng đến, hứa trả vàng y như vậy.',
+        text: 'Từ đó, vợ chồng người em sống đủ đầy nhưng vẫn hiền lành, chăm chỉ và hay giúp đỡ bà con xóm làng.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'sun', x: 30, y: 28 },
+            { k: 'house', x: 150, y: 96, s: 0.9 },
+            { k: 'man', x: 85, y: 100, s: 1.3, tap: 'bounce' },
+            { k: 'woman', x: 120, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Người anh nghe chuyện, lòng tham nổi lên. Hắn nằng nặc đòi đổi hết cả gia tài để lấy túp lều và cây khế của em. Người em thật thà bằng lòng ngay.',
         scene: {
           bg: 'day',
           items: [
             { k: 'tree', x: 70, y: 96, s: 1.2 },
+            { k: 'house', x: 150, y: 96, s: 0.8 },
+            { k: 'man', x: 100, y: 100, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Mùa khế chín, chim lại đến ăn. Người anh giả vờ than nghèo kể khổ. Chim cũng nói y như cũ: "Ăn một quả, trả một cục vàng. May túi ba gang, mang đi mà đựng."',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'tree', x: 70, y: 96, s: 1.3 },
             { k: 'bird', x: 130, y: 50, s: 1.6, tap: 'bounce' },
             { k: 'man', x: 100, y: 100, s: 1.3, tap: 'wobble' },
           ],
         },
       },
       {
-        text: 'Nhưng anh tham may túi thật to, nhét vàng đầy ự. Chim chở nặng quá, anh trượt rơi tõm xuống biển, phải bơi mãi mới vào được bờ. Tham thì thâm!',
+        text: 'Nhưng người anh tham lam may hẳn một cái túi to đến sáu, bảy gang. Ra tới đảo vàng, hắn nhét vàng đầy túi, lại còn giắt thêm khắp người cho thật nhiều.',
         scene: {
           bg: 'island',
           items: [
-            { k: 'gold', x: 60, y: 100, s: 1.4 },
+            { k: 'gold', x: 70, y: 100, s: 1.7 },
+            { k: 'man', x: 125, y: 102, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Túi vàng nặng trĩu. Chim cõng nặng quá, vỗ cánh không nổi. Ra tới giữa biển, chim chao nghiêng, người anh tham trượt tay rơi tõm xuống nước, phải vùng vẫy bơi mãi mới vào được bờ, mất sạch cả vàng. Tham thì thâm là vậy!',
+        scene: {
+          bg: 'island',
+          items: [
+            { k: 'gold', x: 60, y: 100, s: 1.3 },
             { k: 'bird', x: 110, y: 46, s: 1.5, tap: 'spin' },
             { k: 'man', x: 140, y: 102, s: 1.3, tap: 'wobble' },
           ],
