@@ -16,8 +16,8 @@ const TILES: Tile[] = [
   { id: 'nghe-so', label: 'Nghe & chọn số', emoji: '👂', href: '/games/nghe-so', color: '#26a69a' },
   { id: 'nhieu-it', label: 'Nhiều hơn / Ít hơn', emoji: '⚖️', href: '/games/nhieu-it', color: '#ab47bc' },
   { id: 'so-sanh-so', label: 'Số lớn / Số bé', emoji: '📊', href: '/games/so-sanh-so', color: '#ef5350' },
-  { id: 'tim-khac', label: 'Tìm cái khác', emoji: '🔍', color: '#ff7043' },
-  { id: 'gom-giong', label: 'Gom nhóm giống', emoji: '🧩', color: '#66bb6a' },
+  { id: 'tim-khac', label: 'Tìm cái khác', emoji: '🔍', href: '/games/tim-khac', color: '#ff7043' },
+  { id: 'gom-giong', label: 'Gom nhóm giống', emoji: '🧩', href: '/games/gom-giong', color: '#66bb6a' },
   { id: 'ke-chuyen', label: 'Kể chuyện', emoji: '📖', color: '#ffa726' },
 ];
 
