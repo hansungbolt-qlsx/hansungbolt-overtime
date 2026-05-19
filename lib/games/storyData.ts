@@ -1133,7 +1133,17 @@ export const STORIES: Story[] = [
     moral: 'Người hiền lành, dũng cảm sẽ được đền đáp xứng đáng.',
     pages: [
       {
-        text: 'Thạch Sanh mồ côi, sống dưới gốc đa, hiền lành và khoẻ mạnh. Lý Thông gian xảo giả vờ kết nghĩa anh em để lợi dụng chàng.',
+        text: 'Ngày xửa ngày xưa, ở một làng nọ dưới gốc cây đa cổ thụ, có chàng trai mồ côi tên là Thạch Sanh. Chàng sống một mình, ngày ngày lên rừng đốn củi, tính tình hiền lành mà sức khoẻ thì hơn người.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'tree', x: 80, y: 96, s: 1.6, tap: 'wobble' },
+            { k: 'man', x: 130, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Trong vùng có gã bán rượu tên Lý Thông gian xảo. Thấy Thạch Sanh khoẻ mạnh, hắn giả vờ thân tình, kết nghĩa anh em để lợi dụng sức của chàng.',
         scene: {
           bg: 'forest',
           items: [
@@ -1144,18 +1154,18 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Vùng ấy có con chằn tinh rất dữ. Lý Thông lừa Thạch Sanh đi nộp mạng thay cho mình.',
+        text: 'Bấy giờ, trong vùng có con chằn tinh hung dữ, mỗi năm bắt dân làng nộp một mạng người. Năm ấy đến lượt Lý Thông. Hắn lừa Thạch Sanh: "Em đi canh miếu thay anh một đêm nhé." Thạch Sanh thật thà nhận lời.',
         scene: {
           bg: 'night',
           items: [
             { k: 'moon', x: 40, y: 30 },
-            { k: 'snake', x: 130, y: 100, s: 1.6, tap: 'wobble' },
+            { k: 'snake', x: 130, y: 100, s: 1.5, tap: 'wobble' },
             { k: 'man', x: 80, y: 100, s: 1.3, tap: 'bounce' },
           ],
         },
       },
       {
-        text: 'Chằn tinh gầm vang: "Kẻ nào to gan dám đến đây? Ta sẽ nuốt chửng ngươi!". Thạch Sanh không hề sợ, dũng cảm chiến đấu và diệt được con quái vật.',
+        text: 'Đêm xuống, chằn tinh hiện ra, gầm vang: "Kẻ nào to gan dám đến đây? Ta sẽ nuốt chửng ngươi!". Thạch Sanh chẳng hề run sợ, dũng cảm chống trả và diệt được con quái vật, cứu cả vùng thoát nạn.',
         scene: {
           bg: 'forest',
           items: [
@@ -1166,17 +1176,38 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Lý Thông cướp công, được vua khen thưởng. Còn Thạch Sanh lại bị hắn hãm hại, nhốt sâu trong hang đá.',
+        text: 'Lý Thông gian manh cướp luôn công của Thạch Sanh, đem đầu chằn tinh về tâu vua để lĩnh thưởng, được phong làm quan to. Còn Thạch Sanh thì lủi thủi trở về gốc đa.',
         scene: {
           bg: 'forest',
           items: [
-            { k: 'mountain', x: 100, y: 96, s: 1.3 },
+            { k: 'tree', x: 90, y: 96, s: 1.5 },
+            { k: 'man', x: 130, y: 100, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Ít lâu sau, công chúa con vua đang dạo chơi thì bị một con đại bàng khổng lồ quắp đi mất. Thạch Sanh tình cờ trông thấy, liền lần theo dấu, cứu được công chúa khỏi hang sâu.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'mountain', x: 80, y: 96, s: 1.3 },
+            { k: 'bird', x: 60, y: 44, s: 1.6, tap: 'spin' },
+            { k: 'man', x: 120, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Nhưng Lý Thông một lần nữa tráo trở, lấp cửa hang nhốt Thạch Sanh lại để cướp công cứu công chúa. Thạch Sanh bị kẹt sâu trong hang tối.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'mountain', x: 100, y: 96, s: 1.4 },
             { k: 'man', x: 120, y: 100, s: 1.2, tap: 'wobble' },
           ],
         },
       },
       {
-        text: 'Trong hang, Thạch Sanh cứu được con vua Thuỷ Tề, được tặng một cây đàn thần kỳ diệu.',
+        text: 'Trong hang, Thạch Sanh cứu được con trai vua Thuỷ Tề đang bị giam. Để tạ ơn, vua Thuỷ Tề tặng chàng một cây đàn thần kỳ diệu.',
         scene: {
           bg: 'river',
           items: [
@@ -1186,7 +1217,27 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Tiếng đàn của Thạch Sanh ngân lên, giãi bày nỗi oan và vạch mặt Lý Thông. Vua hiểu rõ, gả công chúa cho chàng. Người tốt cuối cùng được hạnh phúc.',
+        text: 'Từ ngày được cứu về, công chúa buồn rầu chẳng nói năng gì. Còn Thạch Sanh lại bị Lý Thông vu oan, bắt nhốt vào ngục.',
+        scene: {
+          bg: 'night',
+          items: [
+            { k: 'moon', x: 150, y: 32 },
+            { k: 'man', x: 90, y: 100, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Trong ngục, Thạch Sanh ôm đàn thần gảy lên. Tiếng đàn vang tới hoàng cung, giãi bày hết nỗi oan ức. Công chúa nghe đàn liền vui khoẻ trở lại, xin vua cho gặp người gảy đàn.',
+        scene: {
+          bg: 'night',
+          items: [
+            { k: 'moon', x: 40, y: 30 },
+            { k: 'man', x: 95, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Sự thật sáng tỏ: Thạch Sanh được minh oan, kẻ gian Lý Thông bị trừng trị thích đáng. Vua gả công chúa cho Thạch Sanh. Người hiền lành, dũng cảm cuối cùng đã được đền đáp xứng đáng.',
         scene: {
           bg: 'day',
           items: [
@@ -1205,19 +1256,49 @@ export const STORIES: Story[] = [
     moral: 'Ở hiền gặp lành, cái ác sẽ bị trừng phạt.',
     pages: [
       {
-        text: 'Tấm hiền lành, mồ côi mẹ, ở với dì ghẻ và Cám lười biếng. Dì ghẻ bắt Tấm làm việc quần quật suốt ngày.',
+        text: 'Ngày xửa ngày xưa, ở một làng quê nọ, có cô Tấm hiền lành, xinh xắn. Tấm mồ côi mẹ từ nhỏ, cha cũng mất sớm, phải sống với dì ghẻ và cô em cùng cha khác mẹ tên là Cám.',
         scene: {
           bg: 'day',
           items: [
             { k: 'house', x: 150, y: 96, s: 0.9 },
-            { k: 'girl', x: 70, y: 100, s: 1.3, tap: 'wobble' },
+            { k: 'girl', x: 70, y: 100, s: 1.3, tap: 'bounce' },
             { k: 'woman', x: 105, y: 100, s: 1.3, tap: 'wobble' },
-            { k: 'girl', x: 135, y: 100, s: 1.2, tap: 'bounce' },
+            { k: 'girl', x: 135, y: 100, s: 1.2, tap: 'wobble' },
           ],
         },
       },
       {
-        text: 'Cám lừa trút hết giỏ tép của Tấm. Tấm ngồi khóc. Bụt hiện lên, cho Tấm con cá bống làm bạn để bầu bạn sớm hôm.',
+        text: 'Dì ghẻ rất cay nghiệt. Bà bắt Tấm làm lụng suốt ngày: mò cua bắt ốc, chăn trâu cắt cỏ, gánh nước thổi cơm. Còn Cám thì được nuông chiều, chỉ rong chơi.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'house', x: 150, y: 96, s: 0.9 },
+            { k: 'girl', x: 90, y: 100, s: 1.3, tap: 'wobble' },
+            { k: 'woman', x: 130, y: 100, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Một hôm, dì sai hai chị em đi hớt tép, hứa ai được đầy giỏ sẽ thưởng cái yếm đỏ. Tấm chăm chỉ bắt đầy giỏ. Cám mải chơi nên chẳng được con nào.',
+        scene: {
+          bg: 'river',
+          items: [
+            { k: 'girl', x: 75, y: 92, s: 1.3, tap: 'bounce' },
+            { k: 'girl', x: 120, y: 92, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Cám bèn lừa: "Chị Tấm ơi, đầu chị lấm bùn kìa, chị hụp xuống ao gội cho sạch kẻo về mẹ mắng." Tấm tin lời lội xuống ao. Lúc lên, giỏ tép đã bị Cám trút sạch mang về lĩnh thưởng. Tấm ngồi bên bờ ao mà khóc.',
+        scene: {
+          bg: 'river',
+          items: [
+            { k: 'girl', x: 90, y: 92, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Bụt hiện ra hỏi: "Vì sao con khóc?". Tấm kể hết. Bụt bảo nhìn trong giỏ xem còn gì. Còn đúng một con cá bống. Bụt dặn: "Con đem bống về thả xuống giếng, mỗi bữa bớt cơm cho bống ăn, gọi: Bống bống bang bang…"',
         scene: {
           bg: 'river',
           items: [
@@ -1228,7 +1309,7 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Mẹ con Cám rình bắt cá bống ăn mất. Tấm lại khóc. Bụt dặn: "Con nhặt xương cá chôn xuống đất, sau này sẽ có điều kỳ diệu."',
+        text: 'Tấm nuôi bống làm bạn, sớm hôm có tiếng nói thủ thỉ cho đỡ buồn. Nhưng mẹ con Cám rình biết, lừa bắt mất cá bống. Tấm lại khóc. Bụt bảo nhặt xương bống bỏ vào bốn cái lọ, chôn dưới chân giường.',
         scene: {
           bg: 'river',
           items: [
@@ -1238,7 +1319,18 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Đến ngày hội, Bụt giúp Tấm có quần áo đẹp, hài xinh đi xem hội. Vội về, Tấm đánh rơi một chiếc hài bên đường.',
+        text: 'Ít lâu sau, nhà vua mở hội lớn. Dì ghẻ trộn một đấu thóc lẫn một đấu gạo, bắt Tấm nhặt riêng ra xong mới được đi. Tấm tủi thân khóc. Đàn chim sẻ của Bụt liền sà xuống nhặt giúp, loáng cái là xong.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'house', x: 150, y: 96, s: 0.85 },
+            { k: 'bird', x: 70, y: 48, s: 1.2, tap: 'bounce' },
+            { k: 'girl', x: 110, y: 100, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Tấm đào mấy cái lọ lên thì thấy có quần áo đẹp, đôi hài thêu xinh xắn và cả một con ngựa. Tấm mừng rỡ thay đồ, cưỡi ngựa đi trẩy hội.',
         scene: {
           bg: 'day',
           items: [
@@ -1249,7 +1341,17 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Nhà vua nhặt được chiếc hài, truyền lệnh ai đi vừa sẽ làm hoàng hậu. Chân Tấm đi vừa như in. Tấm được vua đón vào cung.',
+        text: 'Khi phóng ngựa qua cầu, Tấm vô ý đánh rơi một chiếc hài xuống nước. Đoàn voi của nhà vua đi qua cứ đứng lại không chịu bước. Vua sai vớt lên thì được chiếc hài xinh xắn.',
+        scene: {
+          bg: 'river',
+          items: [
+            { k: 'boat', x: 70, y: 100, s: 1.2 },
+            { k: 'man', x: 120, y: 96, s: 1.2, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Vua truyền: "Hễ ai đi vừa chiếc hài này, ta sẽ cưới làm hoàng hậu." Ai ướm cũng không vừa. Đến lượt Tấm, chân đi vừa khít như in. Vua mừng rỡ rước Tấm về cung. Mẹ con Cám tức tối lắm.',
         scene: {
           bg: 'indoor',
           items: [
@@ -1260,7 +1362,18 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Mẹ con Cám ghen ghét tìm cách hại Tấm. Nhưng Tấm cứ hoá thân trở về. Cuối cùng cái ác bị trừng phạt, mẹ con Cám xấu hổ phải bỏ đi. Ở hiền thì gặp lành.',
+        text: 'Mẹ con Cám lập mưu hãm hại Tấm hết lần này đến lần khác. Nhưng Tấm hiền lành nên luôn được Bụt che chở: khi thì hoá thành chim vàng anh hót cho vua nghe, khi thì hoá thành cây xoan đào toả bóng mát, rồi nương trong quả thị thơm về ở với một bà cụ hiền.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'tree', x: 60, y: 96, s: 1.4 },
+            { k: 'bird', x: 120, y: 48, s: 1.4, tap: 'bounce' },
+            { k: 'oldWoman', x: 150, y: 100, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Một hôm vua đi qua, ghé hàng nước của bà cụ, nhận ra miếng trầu têm cánh phượng quen thuộc của Tấm. Vua tìm được Tấm, vui mừng đón nàng trở lại cung. Mẹ con Cám gian ác thì xấu hổ ê chề, lặng lẽ bỏ làng đi biệt. Ở hiền thì gặp lành, ở ác sẽ gặp ác.',
         scene: {
           bg: 'day',
           items: [
