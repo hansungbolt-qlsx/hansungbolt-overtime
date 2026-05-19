@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useGameProgress } from '@/lib/games/useGameProgress';
+import SettingsButton from './SettingsButton';
 
 type Tile = {
   id: string;
@@ -22,7 +23,7 @@ const TILES: Tile[] = [
 ];
 
 export default function GameHub() {
-  const { stars, ready } = useGameProgress();
+  const { stars, ready, reset } = useGameProgress();
 
   return (
     <div
@@ -44,6 +45,7 @@ export default function GameHub() {
               {ready ? stars : '…'}
             </span>
           </div>
+          <SettingsButton onResetStars={reset} />
           <Link
             href="/dashboard"
             className="px-4 py-2 rounded-2xl bg-white text-[#1b3864] font-bold shadow border border-[#cdd9e5] active:scale-95"

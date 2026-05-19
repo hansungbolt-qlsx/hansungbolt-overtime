@@ -1,6 +1,8 @@
 // Âm thanh game: ưu tiên file mp3 trong /public/sounds, fallback Web Audio
 // tổng hợp nếu file chưa có / lỗi (đảm bảo game luôn có tiếng).
 
+import { getSettings } from '@/lib/games/settings';
+
 type Kind = 'correct' | 'wrong' | 'win';
 
 const FILES: Record<Kind, string> = {
@@ -20,13 +22,14 @@ function synth(kind: Kind) {
         .webkitAudioContext;
     const ctx = new AC();
     const now = ctx.currentTime;
+    const vmul = getSettings().volume;
     const beep = (freq: number, start: number, dur: number, vol = 0.25) => {
       const o = ctx.createOscillator();
       const g = ctx.createGain();
       o.type = 'sine';
       o.frequency.value = freq;
       g.gain.setValueAtTime(0, now + start);
-      g.gain.linearRampToValueAtTime(vol, now + start + 0.02);
+      g.gain.linearRampToValueAtTime(vol * vmul, now + start + 0.02);
       g.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
       o.connect(g).connect(ctx.destination);
       o.start(now + start);
@@ -48,6 +51,8 @@ function synth(kind: Kind) {
 
 export function playSound(kind: Kind) {
   if (typeof window === 'undefined') return;
+  const vol = getSettings().volume;
+  if (vol <= 0) return;
   if (fileBroken[kind]) {
     synth(kind);
     return;
@@ -59,6 +64,7 @@ export function playSound(kind: Kind) {
       a.preload = 'auto';
       cache[kind] = a;
     }
+    a.volume = vol;
     a.currentTime = 0;
     const p = a.play();
     if (p && typeof p.catch === 'function') {
@@ -76,6 +82,7 @@ export function playSound(kind: Kind) {
 // Đọc tiếng Việt qua Web Speech API (vi-VN). Nếu không có voice → bỏ qua.
 export function speakVi(text: string) {
   if (typeof window === 'undefined' || !window.speechSynthesis) return;
+  if (!getSettings().tts) return; // bố mẹ tắt giọng đọc
   try {
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
