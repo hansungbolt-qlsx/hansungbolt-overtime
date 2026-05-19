@@ -938,18 +938,28 @@ export const STORIES: Story[] = [
     moral: 'Lòng hiếu thảo và sự sáng tạo thật đáng quý.',
     pages: [
       {
-        text: 'Vua Hùng đã già, muốn chọn người nối ngôi. Vua phán: "Ai dâng được món ngon ý nghĩa nhất, ta sẽ truyền ngôi cho."',
+        text: 'Ngày xửa ngày xưa, ở đời vua Hùng, nhà vua tuổi đã cao, muốn chọn trong số các con một người tài đức để truyền ngôi báu. Vua có tới hơn hai mươi người con trai.',
         scene: {
           bg: 'indoor',
           items: [
             { k: 'house', x: 150, y: 96, s: 0.9 },
-            { k: 'oldMan', x: 80, y: 100, s: 1.5, tap: 'wobble' },
-            { k: 'man', x: 120, y: 100, s: 1.3, tap: 'bounce' },
+            { k: 'oldMan', x: 90, y: 100, s: 1.5, tap: 'wobble' },
           ],
         },
       },
       {
-        text: 'Các hoàng tử đua nhau lên rừng xuống biển tìm của ngon vật lạ.',
+        text: 'Vua cho gọi tất cả hoàng tử lại và phán: "Năm nay, nhân ngày lễ lớn, ai dâng được lễ vật vừa ngon vừa ý nghĩa nhất để cúng Trời Đất, tổ tiên, ta sẽ truyền ngôi cho người ấy."',
+        scene: {
+          bg: 'indoor',
+          items: [
+            { k: 'house', x: 150, y: 96, s: 0.9 },
+            { k: 'oldMan', x: 75, y: 100, s: 1.5, tap: 'bounce' },
+            { k: 'man', x: 120, y: 100, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Các hoàng tử thi nhau cho người lên rừng săn thú lạ, xuống biển tìm hải sản quý, mong có món thật sang trọng để dâng vua cha.',
         scene: {
           bg: 'river',
           items: [
@@ -960,7 +970,17 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Riêng hoàng tử Lang Liêu nghèo, chỉ có lúa gạo. Đêm nằm ngủ, chàng mơ thấy thần mách: "Hãy lấy gạo mà làm bánh."',
+        text: 'Riêng hoàng tử thứ mười tám tên Lang Liêu thì nghèo, mẹ mất sớm, quanh nhà chỉ có lúa, gạo, đỗ xanh. Chàng buồn rầu vì chẳng biết lấy gì làm lễ vật cho phải.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'house', x: 150, y: 96, s: 0.9 },
+            { k: 'man', x: 95, y: 100, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Một đêm, Lang Liêu nằm mơ thấy một vị thần hiện ra mách bảo: "Trong trời đất, không gì quý bằng hạt gạo nuôi sống con người. Con hãy lấy gạo nếp mà làm bánh dâng vua."',
         scene: {
           bg: 'night',
           items: [
@@ -971,7 +991,7 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Lang Liêu gói bánh chưng vuông tượng hình Đất, giã bánh dày tròn tượng hình Trời, gói trọn lòng biết ơn cha mẹ, đất trời.',
+        text: 'Tỉnh dậy, Lang Liêu mừng lắm. Chàng chọn thứ gạo nếp ngon nhất, lấy đỗ xanh và thịt làm nhân, gói trong lá dong thành thứ bánh hình vuông, rồi đem luộc thật lâu.',
         scene: {
           bg: 'indoor',
           items: [
@@ -981,7 +1001,27 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Vua nếm thử, gật gù khen bánh vừa ngon vừa ý nghĩa nhất, liền truyền ngôi cho Lang Liêu. Từ đó dân ta có bánh chưng, bánh dày ngày Tết.',
+        text: 'Chàng lại đồ xôi, giã thật nhuyễn, nặn thành thứ bánh hình tròn trắng mịn. Bánh vuông tượng cho Đất, bánh tròn tượng cho Trời, gói trọn lòng biết ơn cha mẹ và đất trời.',
+        scene: {
+          bg: 'indoor',
+          items: [
+            { k: 'house', x: 60, y: 96, s: 0.85 },
+            { k: 'man', x: 110, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Ngày dâng lễ, mâm cao cỗ đầy của các hoàng tử bày la liệt. Đến lượt Lang Liêu, chàng chỉ có hai thứ bánh giản dị. Vua nếm thử, gật gù khen ngon, rồi nghe Lang Liêu thưa rõ ý nghĩa.',
+        scene: {
+          bg: 'indoor',
+          items: [
+            { k: 'oldMan', x: 75, y: 100, s: 1.5, tap: 'bounce' },
+            { k: 'man', x: 120, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Vua vô cùng hài lòng, quyết định truyền ngôi cho Lang Liêu. Từ đó, dân ta có tục gói bánh chưng, giã bánh dày mỗi dịp Tết. Lòng hiếu thảo và sự sáng tạo thật đáng quý.',
         scene: {
           bg: 'day',
           items: [
@@ -1000,55 +1040,87 @@ export const STORIES: Story[] = [
     moral: 'Lời dặn dò cần phải nhớ kỹ và làm theo.',
     pages: [
       {
-        text: 'Chú Cuội tình cờ tìm được một cây đa thần. Lá cây chữa được bách bệnh, Cuội cứu sống biết bao nhiêu người.',
+        text: 'Ngày xửa ngày xưa, ở một khu rừng nọ, có chàng tiều phu nghèo tên là Cuội, ngày ngày vác rìu vào rừng đốn củi đem bán nuôi thân.',
         scene: {
           bg: 'forest',
           items: [
-            { k: 'tree', x: 90, y: 96, s: 1.6, tap: 'wobble' },
+            { k: 'tree', x: 50, y: 96, s: 1.3 },
+            { k: 'tree', x: 160, y: 96, s: 1.1 },
+            { k: 'man', x: 105, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Một hôm, Cuội tình cờ bắt gặp một cây đa lạ. Lá cây có phép màu: đắp lên người ốm là khỏi bệnh, cứu được cả người vừa tắt thở. Từ đó, Cuội mang lá đa đi cứu sống biết bao nhiêu người.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'tree', x: 90, y: 96, s: 1.7, tap: 'wobble' },
             { k: 'man', x: 140, y: 100, s: 1.3, tap: 'bounce' },
           ],
         },
       },
       {
-        text: 'Cuội dặn vợ thật kỹ: "Cây quý lắm, nhớ tưới nước sạch thôi nhé. Tuyệt đối đừng tưới nước bẩn."',
+        text: 'Cuội đem cây đa thần về trồng ở góc vườn. Chàng dặn vợ thật kỹ: "Cây quý lắm đấy. Nhớ chỉ tưới bằng nước sạch thôi. Tuyệt đối đừng bao giờ tưới nước bẩn vào gốc, nghe chưa!"',
         scene: {
           bg: 'day',
           items: [
             { k: 'house', x: 150, y: 96, s: 0.9 },
-            { k: 'tree', x: 60, y: 96, s: 1.3 },
+            { k: 'tree', x: 55, y: 96, s: 1.3 },
             { k: 'man', x: 95, y: 100, s: 1.3, tap: 'bounce' },
             { k: 'woman', x: 125, y: 100, s: 1.3, tap: 'wobble' },
           ],
         },
       },
       {
-        text: 'Một hôm, vợ Cuội quên lời dặn, lỡ tưới nhầm nước bẩn. Cây đa bỗng rung chuyển, từ từ bật gốc bay lên trời!',
+        text: 'Người vợ vâng dạ. Nhưng ít lâu sau, một hôm mải việc, chị quên bẵng lời chồng dặn, vô ý hắt nhầm cả chậu nước bẩn vào gốc cây đa.',
         scene: {
           bg: 'day',
           items: [
-            { k: 'tree', x: 90, y: 70, s: 1.4, tap: 'wobble' },
-            { k: 'woman', x: 130, y: 100, s: 1.3, tap: 'wobble' },
+            { k: 'house', x: 150, y: 96, s: 0.9 },
+            { k: 'tree', x: 70, y: 96, s: 1.3 },
+            { k: 'woman', x: 115, y: 100, s: 1.3, tap: 'wobble' },
           ],
         },
       },
       {
-        text: 'Cuội về tới, hốt hoảng nắm chặt rễ cây kéo lại. Nhưng cây cứ bay lên, mang theo cả chú Cuội lên tận cung trăng.',
+        text: 'Lạ thay, cây đa bỗng rung chuyển dữ dội, rễ bật khỏi mặt đất, rồi từ từ nhấc bổng lên, bay lên trời cao!',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'tree', x: 90, y: 70, s: 1.4, tap: 'wobble' },
+            { k: 'woman', x: 135, y: 100, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Vừa lúc đó, Cuội gánh củi về tới. Thấy cây đa thần đang bay lên, chàng hốt hoảng vứt vội gánh củi, chạy tới nắm chặt lấy rễ cây mà ra sức kéo lại.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'tree', x: 90, y: 64, s: 1.3, tap: 'wobble' },
+            { k: 'man', x: 95, y: 100, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Nhưng cây đa cứ bay lên mãi, kéo theo cả chú Cuội đang bám trên rễ, đưa chàng lên tận cung trăng xa tít.',
         scene: {
           bg: 'night',
           items: [
             { k: 'moon', x: 150, y: 32 },
-            { k: 'tree', x: 90, y: 60, s: 1.3, tap: 'wobble' },
+            { k: 'tree', x: 90, y: 60, s: 1.2, tap: 'wobble' },
             { k: 'man', x: 95, y: 100, s: 1.2, tap: 'wobble' },
           ],
         },
       },
       {
-        text: 'Từ đó, mỗi đêm rằm ngước nhìn ông trăng, ta thấy bóng chú Cuội ngồi bên gốc đa. Lời dặn dò, ai cũng cần nhớ kỹ.',
+        text: 'Từ đó, mỗi đêm rằm trăng sáng, ngước nhìn lên ông trăng, ta sẽ thấy một bóng người ngồi dưới gốc cây — đó chính là chú Cuội nhớ nhà. Câu chuyện nhắc ta: lời dặn dò cần phải nhớ kỹ và làm theo.',
         scene: {
           bg: 'night',
           items: [
-            { k: 'moon', x: 100, y: 40, s: 1.6, tap: 'wobble' },
-            { k: 'tree', x: 60, y: 96, s: 1 },
+            { k: 'moon', x: 100, y: 42, s: 1.7, tap: 'wobble' },
+            { k: 'tree', x: 55, y: 96, s: 1 },
           ],
         },
       },
@@ -1348,17 +1420,38 @@ export const STORIES: Story[] = [
     moral: 'Đừng đánh giá người khác qua vẻ bề ngoài.',
     pages: [
       {
-        text: 'Có người mẹ hiền sinh ra một đứa con tròn lông lốc như quả dừa, không tay không chân, bà đặt tên là Sọ Dừa.',
+        text: 'Ngày xửa ngày xưa, ở một làng quê nọ, có hai vợ chồng nghèo hiền lành nhưng hiếm muộn, đã già mà vẫn chưa có con. Một hôm, người vợ uống nước đựng trong cái sọ dừa rồi mang thai.',
         scene: {
           bg: 'day',
           items: [
+            { k: 'sun', x: 30, y: 28 },
             { k: 'house', x: 150, y: 96, s: 0.9 },
-            { k: 'oldWoman', x: 95, y: 100, s: 1.4, tap: 'wobble' },
+            { k: 'oldWoman', x: 100, y: 100, s: 1.4, tap: 'wobble' },
           ],
         },
       },
       {
-        text: 'Sọ Dừa xin đi chăn bò cho nhà phú ông. Ai cũng coi thường, vậy mà cậu chăn rất giỏi, con bò nào cũng béo tròn.',
+        text: 'Đến ngày sinh, bà sinh ra một đứa bé tròn lông lốc như quả dừa, không có chân tay. Bà buồn, định bỏ đi. Đứa bé liền cất tiếng: "Mẹ ơi, con là người đấy. Mẹ đừng bỏ con tội nghiệp!". Bà thương quá, giữ lại nuôi, đặt tên là Sọ Dừa.',
+        scene: {
+          bg: 'indoor',
+          items: [
+            { k: 'house', x: 60, y: 96, s: 0.9 },
+            { k: 'oldWoman', x: 110, y: 100, s: 1.4, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Sọ Dừa lớn lên nhưng vẫn cứ tròn xoe, lăn lông lốc. Nhà nghèo, cậu xin mẹ cho đi chăn bò thuê cho nhà phú ông.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'house', x: 150, y: 96, s: 0.9 },
+            { k: 'oldWoman', x: 90, y: 100, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Ai cũng coi thường, nghĩ cậu chẳng làm được trò trống gì. Vậy mà lạ thay, đàn bò cậu chăn con nào con nấy béo tròn, no căng. Phú ông mừng lắm.',
         scene: {
           bg: 'day',
           items: [
@@ -1369,19 +1462,30 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Cô út con phú ông hiền lành, đối xử tử tế với Sọ Dừa. Còn hai cô chị thì hắt hủi, chê bai cậu đủ điều.',
+        text: 'Phú ông có ba cô con gái. Hai cô chị kiêu kỳ, hắt hủi, chê bai Sọ Dừa đủ điều. Chỉ riêng cô út hiền lành, hay mang cơm và đối xử tử tế với cậu.',
         scene: {
           bg: 'day',
           items: [
             { k: 'house', x: 150, y: 96, s: 0.85 },
-            { k: 'girl', x: 70, y: 100, s: 1.3, tap: 'bounce' },
-            { k: 'woman', x: 105, y: 100, s: 1.3, tap: 'wobble' },
-            { k: 'woman', x: 135, y: 100, s: 1.3, tap: 'wobble' },
+            { k: 'girl', x: 65, y: 100, s: 1.3, tap: 'bounce' },
+            { k: 'woman', x: 100, y: 100, s: 1.3, tap: 'wobble' },
+            { k: 'woman', x: 132, y: 100, s: 1.3, tap: 'wobble' },
           ],
         },
       },
       {
-        text: 'Sọ Dừa nhờ mẹ mang sính lễ đến hỏi cưới cô út. Đến ngày cưới, Sọ Dừa bỗng hiện nguyên hình một chàng trai khôi ngô tuấn tú.',
+        text: 'Cô út tình cờ biết Sọ Dừa thật ra là một chàng trai tuấn tú, chỉ khoác lớp vỏ xấu xí bên ngoài. Sọ Dừa bèn nhờ mẹ mang sính lễ đến hỏi cưới cô út.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'house', x: 150, y: 96, s: 0.85 },
+            { k: 'oldWoman', x: 80, y: 100, s: 1.3, tap: 'bounce' },
+            { k: 'girl', x: 120, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Hai cô chị bĩu môi cười chê. Nhưng đến ngày cưới, trước sự ngỡ ngàng của mọi người, Sọ Dừa bỗng trút bỏ lớp vỏ, hiện nguyên hình một chàng trai khôi ngô, khoẻ mạnh.',
         scene: {
           bg: 'day',
           items: [
@@ -1393,13 +1497,24 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Sọ Dừa chăm chỉ học hành, thi đỗ Trạng nguyên. Hai cô chị xấu hổ vì đã coi thường cậu. Đừng bao giờ nhìn vẻ ngoài mà đánh giá một người.',
+        text: 'Sọ Dừa chăm chỉ dùi mài kinh sử, đi thi và đỗ Trạng nguyên, được vua trọng dụng. Hai vợ chồng chàng sống bên nhau hạnh phúc.',
         scene: {
           bg: 'day',
           items: [
             { k: 'sun', x: 30, y: 28 },
             { k: 'man', x: 90, y: 100, s: 1.4, tap: 'bounce' },
             { k: 'girl', x: 125, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Hai cô chị thấy vậy vừa ghen tị vừa xấu hổ vì trước kia đã coi thường cậu. Câu chuyện nhắc các bé: đừng bao giờ nhìn vẻ bề ngoài mà vội đánh giá một con người.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'sun', x: 30, y: 28 },
+            { k: 'man', x: 85, y: 100, s: 1.3, tap: 'bounce' },
+            { k: 'girl', x: 120, y: 100, s: 1.3, tap: 'bounce' },
           ],
         },
       },
