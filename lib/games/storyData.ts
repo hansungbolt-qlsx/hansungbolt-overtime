@@ -1392,7 +1392,7 @@ export const STORIES: Story[] = [
     moral: 'Kiên cường thì sẽ vượt qua mọi thử thách.',
     pages: [
       {
-        text: 'Vua Hùng có nàng công chúa Mỵ Nương xinh đẹp, nết na. Vua muốn kén cho con một người chồng thật tài giỏi.',
+        text: 'Ngày xửa ngày xưa, ở đời vua Hùng thứ mười tám, nhà vua có một nàng công chúa tên là Mỵ Nương, người đẹp như hoa, tính nết hiền dịu. Vua rất mực thương yêu, muốn kén cho con một người chồng thật xứng đáng.',
         scene: {
           bg: 'indoor',
           items: [
@@ -1403,7 +1403,7 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Sơn Tinh — thần Núi, và Thủy Tinh — thần Nước, cùng đến cầu hôn. Ai cũng phép thuật cao cường, khó phân thắng bại.',
+        text: 'Tin loan ra, có hai chàng trai cùng đến cầu hôn. Một người là Sơn Tinh — thần Núi, vẫy tay là rừng núi mọc lên. Người kia là Thủy Tinh — thần Nước, hô một tiếng là mưa gió ào ào. Cả hai đều tài giỏi ngang nhau.',
         scene: {
           bg: 'river',
           items: [
@@ -1414,7 +1414,7 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Vua ra điều kiện: "Sáng mai, ai mang lễ vật tới trước, ta sẽ gả Mỵ Nương cho người đó."',
+        text: 'Vua phân vân không biết chọn ai, bèn ra điều kiện: "Ngày mai, ai mang lễ vật tới trước thì ta gả Mỵ Nương cho. Lễ vật gồm voi chín ngà, gà chín cựa, ngựa chín hồng mao."',
         scene: {
           bg: 'indoor',
           items: [
@@ -1424,7 +1424,7 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Sơn Tinh tới trước, rước Mỵ Nương về núi cao. Thủy Tinh tới sau, không lấy được vợ, tức giận đùng đùng.',
+        text: 'Mới tờ mờ sáng, Sơn Tinh đã đem đầy đủ lễ vật đến trước. Vua giữ lời, gả Mỵ Nương cho Sơn Tinh. Chàng vui mừng rước nàng về núi cao.',
         scene: {
           bg: 'river',
           items: [
@@ -1435,17 +1435,47 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Thủy Tinh hô mưa gọi gió, dâng nước cuồn cuộn đánh Sơn Tinh. Sơn Tinh bình tĩnh dời từng quả núi, nâng đồi cao lên chặn dòng nước.',
+        text: 'Thủy Tinh đến sau, không cưới được Mỵ Nương thì tức giận đùng đùng. Thần thét lên: "Sơn Tinh! Ngươi hãy trả vợ lại cho ta!"',
         scene: {
           bg: 'river',
           items: [
-            { k: 'mountain', x: 70, y: 96, s: 1.4, tap: 'wobble' },
-            { k: 'man', x: 120, y: 96, s: 1.3, tap: 'wobble' },
+            { k: 'man', x: 90, y: 100, s: 1.4, tap: 'wobble' },
+            { k: 'mountain', x: 140, y: 96, s: 1.2 },
           ],
         },
       },
       {
-        text: 'Nước dâng cao bao nhiêu, núi lại cao lên bấy nhiêu. Thủy Tinh đành chịu thua. Hằng năm vẫn dâng nước trả thù — đó là mùa lũ. Cứ kiên cường thì sẽ vượt qua.',
+        text: 'Thủy Tinh hô mưa gọi gió, dâng nước cuồn cuộn lên đánh Sơn Tinh. Nước ngập đồng ruộng, làng mạc, dâng lên tận lưng đồi.',
+        scene: {
+          bg: 'river',
+          items: [
+            { k: 'man', x: 90, y: 96, s: 1.3, tap: 'wobble' },
+            { k: 'mountain', x: 140, y: 96, s: 1.2 },
+          ],
+        },
+      },
+      {
+        text: 'Sơn Tinh không hề nao núng. Thần bốc từng quả đồi, dời từng dãy núi, dựng thành luỹ cao ngăn chặn dòng nước lũ.',
+        scene: {
+          bg: 'river',
+          items: [
+            { k: 'mountain', x: 70, y: 96, s: 1.5, tap: 'wobble' },
+            { k: 'man', x: 120, y: 96, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Hai bên đánh nhau ròng rã. Nước dâng cao bao nhiêu, núi lại vươn cao lên bấy nhiêu. Cuối cùng Thủy Tinh kiệt sức, đành rút quân chịu thua.',
+        scene: {
+          bg: 'river',
+          items: [
+            { k: 'mountain', x: 80, y: 96, s: 1.5, tap: 'wobble' },
+            { k: 'man', x: 130, y: 96, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Nhưng năm nào Thủy Tinh cũng nhớ thù, lại dâng nước lên đánh Sơn Tinh một lần — đó chính là lý do nước ta hằng năm có mùa mưa lũ. Cứ kiên cường, vững vàng thì sẽ vượt qua tất cả.',
         scene: {
           bg: 'day',
           items: [
@@ -1463,7 +1493,7 @@ export const STORIES: Story[] = [
     moral: 'Được giúp đỡ thì phải biết ơn và trả lại.',
     pages: [
       {
-        text: 'Giặc ngoại xâm tới quấy phá, dân ta khổ sở. Lê Lợi dựng cờ khởi nghĩa, nhưng buổi đầu lực lượng còn yếu.',
+        text: 'Ngày xửa ngày xưa, ở vùng đất Thăng Long, giặc ngoại xâm tràn sang quấy phá, dân ta vô cùng khổ sở. Ông Lê Lợi nổi lên dựng cờ khởi nghĩa, nhưng buổi đầu quân ít thế yếu, đánh trận nào cũng khó.',
         scene: {
           bg: 'day',
           items: [
@@ -1473,7 +1503,16 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Một người dân chài kéo lưới được một lưỡi gươm sáng loáng, đem dâng cho Lê Lợi. Sau đó, ông lại nhặt được chuôi gươm nạm ngọc trong rừng.',
+        text: 'Thấy vậy, Đức Long Quân ở dưới nước quyết định cho nghĩa quân mượn một thanh gươm thần để đánh đuổi giặc, cứu dân cứu nước.',
+        scene: {
+          bg: 'river',
+          items: [
+            { k: 'sword', x: 95, y: 92, s: 1.6, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Có người dân chài tên Lê Thận, đêm đêm đi kéo lưới. Ba lần buông lưới, ba lần kéo lên đều chỉ thấy một thanh sắt. Nhìn kỹ, hoá ra là một lưỡi gươm sáng loáng! Ông liền đem dâng cho Lê Lợi.',
         scene: {
           bg: 'river',
           items: [
@@ -1484,38 +1523,60 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Lắp lưỡi vào chuôi, gươm thần vừa khít. Có gươm thần trong tay, nghĩa quân đánh đâu thắng đó, đuổi sạch giặc ra khỏi bờ cõi.',
+        text: 'Ít lâu sau, Lê Lợi chạy giặc qua một khu rừng, chợt thấy ánh sáng lạ trên ngọn cây. Trèo lên xem, ông nhặt được một cái chuôi gươm nạm ngọc lấp lánh.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'tree', x: 90, y: 96, s: 1.5 },
+            { k: 'sword', x: 95, y: 60, s: 1.1, tap: 'wobble' },
+            { k: 'man', x: 140, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Đem lưỡi gươm tra vào chuôi, vừa khít như đo sẵn. Trên lưỡi gươm còn khắc hai chữ "Thuận Thiên" — ý trời trao gươm báu để giúp dân giúp nước.',
         scene: {
           bg: 'day',
           items: [
+            { k: 'sword', x: 95, y: 96, s: 1.7, tap: 'bounce' },
+            { k: 'man', x: 140, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Từ ngày có gươm thần, nhuệ khí nghĩa quân tăng vọt. Lê Lợi cầm gươm xông trận, đánh đâu thắng đó, đuổi sạch quân giặc ra khỏi bờ cõi. Đất nước trở lại thanh bình.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'sun', x: 30, y: 28 },
             { k: 'sword', x: 80, y: 96, s: 1.6, tap: 'bounce' },
             { k: 'man', x: 125, y: 100, s: 1.3, tap: 'bounce' },
           ],
         },
       },
       {
-        text: 'Đất nước thanh bình. Một hôm, vua Lê Lợi cưỡi thuyền dạo chơi trên hồ xanh biếc.',
+        text: 'Một năm sau ngày thắng giặc, vua Lê Lợi cưỡi thuyền rồng dạo chơi trên hồ Tả Vọng xanh biếc giữa kinh thành.',
         scene: {
           bg: 'river',
           items: [
-            { k: 'boat', x: 100, y: 100, s: 1.5, tap: 'wobble' },
+            { k: 'boat', x: 100, y: 100, s: 1.6, tap: 'wobble' },
             { k: 'man', x: 100, y: 96, s: 1.1, tap: 'bounce' },
           ],
         },
       },
       {
-        text: 'Bỗng Rùa Vàng nổi lên, cất tiếng: "Xin bệ hạ trả lại gươm thần cho Đức Long Quân." Vua hai tay dâng gươm. Rùa ngậm gươm rồi lặn sâu xuống nước.',
+        text: 'Bỗng một con Rùa Vàng to lớn nổi lên mặt nước, cất tiếng: "Xin bệ hạ hoàn lại gươm thần cho Đức Long Quân." Vua hiểu ý, hai tay nâng gươm trả. Rùa Vàng ngậm lấy gươm rồi từ từ lặn sâu xuống đáy hồ.',
         scene: {
           bg: 'river',
           items: [
-            { k: 'turtle', x: 80, y: 92, s: 1.7, tap: 'bounce' },
-            { k: 'boat', x: 130, y: 100, s: 1.2 },
-            { k: 'man', x: 130, y: 96, s: 1, tap: 'bounce' },
+            { k: 'turtle', x: 80, y: 92, s: 1.8, tap: 'bounce' },
+            { k: 'boat', x: 135, y: 100, s: 1.2 },
+            { k: 'man', x: 135, y: 96, s: 1, tap: 'bounce' },
           ],
         },
       },
       {
-        text: 'Từ đó, hồ ấy mang tên Hồ Gươm — Hồ Hoàn Kiếm. Được ai giúp thì phải biết ơn và trả lại.',
+        text: 'Để nhớ chuyện trả gươm, từ đó hồ ấy được gọi là Hồ Gươm, hay Hồ Hoàn Kiếm, vẫn còn ở giữa thủ đô đến tận ngày nay. Được ai giúp đỡ thì phải biết ơn và biết trả lại.',
         scene: {
           bg: 'river',
           items: [
