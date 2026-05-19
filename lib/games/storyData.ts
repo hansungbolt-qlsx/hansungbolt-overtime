@@ -20,52 +20,107 @@ export const STORIES: Story[] = [
     moral: 'Anh em đoàn kết thì không ai thắng được.',
     pages: [
       {
-        text: 'Ngày xưa, có một ông cụ sống cùng các con trai. Nhưng mấy anh em suốt ngày cãi nhau. Người này hét: "Tại anh!", người kia cãi: "Tại em!". Ông cụ nghe mà buồn lắm.',
+        text: 'Ngày xửa ngày xưa, ở một làng quê yên bình bên dòng sông nhỏ, có một ông cụ sống cùng các con trai đã lớn. Nhà tuy không giàu nhưng ruộng vườn cũng đủ ăn, đủ mặc.',
         scene: {
-          bg: 'indoor',
+          bg: 'day',
           items: [
-            { k: 'house', x: 100, y: 96, s: 0.7 },
-            { k: 'oldMan', x: 60, y: 100, s: 1.5, tap: 'wobble' },
-            { k: 'man', x: 120, y: 100, s: 1.3, tap: 'bounce' },
-            { k: 'man', x: 155, y: 100, s: 1.3, tap: 'bounce' },
+            { k: 'sun', x: 30, y: 28 },
+            { k: 'tree', x: 40, y: 96, s: 1.1 },
+            { k: 'house', x: 130, y: 96, s: 1 },
+            { k: 'oldMan', x: 95, y: 100, s: 1.5, tap: 'wobble' },
           ],
         },
       },
       {
-        text: 'Một hôm, ông gọi các con lại, đưa ra một bó đũa thật to và nói nhẹ nhàng: "Con nào bẻ gãy được cả bó đũa này, cha sẽ thưởng quà thật lớn."',
+        text: 'Chỉ tiếc một điều: mấy anh em chẳng bao giờ thuận hoà. Suốt ngày họ tị nạnh, cãi cọ. Người anh càu nhàu: "Tại em làm hỏng việc!". Người em vùng vằng: "Không, tại anh lười mới đúng!".',
         scene: {
           bg: 'indoor',
           items: [
-            { k: 'oldMan', x: 55, y: 100, s: 1.5, tap: 'wobble' },
+            { k: 'house', x: 100, y: 96, s: 0.7 },
+            { k: 'man', x: 70, y: 100, s: 1.4, tap: 'wobble' },
+            { k: 'man', x: 110, y: 100, s: 1.3, tap: 'bounce' },
+            { k: 'man', x: 150, y: 100, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Ông cụ nghe mà lòng buồn rười rượi, ăn không ngon, ngủ chẳng yên. Ông tuổi đã cao, thầm lo: "Mai này ta khuất núi, anh em nó cứ chia rẽ thế này thì tan cửa nát nhà mất thôi…". Ông nghĩ mãi, rồi nghĩ ra một cách.',
+        scene: {
+          bg: 'night',
+          items: [
+            { k: 'moon', x: 150, y: 30 },
+            { k: 'house', x: 60, y: 96, s: 0.9 },
+            { k: 'oldMan', x: 110, y: 100, s: 1.5, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Sáng hôm sau, ông gọi tất cả các con lại. Ông đặt trước mặt một bó đũa thật to, buộc dây thật chặt, rồi nói nhẹ nhàng: "Các con nghe này. Con nào bẻ gãy được cả bó đũa này, cha sẽ thưởng cho một túi tiền thật lớn."',
+        scene: {
+          bg: 'indoor',
+          items: [
+            { k: 'oldMan', x: 55, y: 100, s: 1.5, tap: 'bounce' },
             { k: 'bundle', x: 100, y: 100, s: 2, tap: 'wobble' },
             { k: 'man', x: 150, y: 100, s: 1.3, tap: 'bounce' },
           ],
         },
       },
       {
-        text: 'Các con hí hửng thay nhau bẻ. Họ gồng mình: "Hự!... Hự!...", mặt đỏ tía tai. Vậy mà bó đũa vẫn trơ trơ, chẳng gãy chiếc nào. Ai cũng lắc đầu chịu thua.',
+        text: 'Nghe có thưởng, các con hớn hở. Người con cả xắn tay áo: "Để con!". Anh ôm bó đũa, gồng hết sức: "Hự!... Hự!...". Mặt đỏ tía tai mà bó đũa vẫn nằm im, chẳng hề suy chuyển.',
         scene: {
           bg: 'indoor',
           items: [
-            { k: 'man', x: 70, y: 100, s: 1.4, tap: 'wobble' },
-            { k: 'bundle', x: 105, y: 100, s: 2, tap: 'wobble' },
+            { k: 'man', x: 80, y: 100, s: 1.5, tap: 'wobble' },
+            { k: 'bundle', x: 120, y: 100, s: 2, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Đến lượt người thứ hai, rồi người thứ ba. Ai cũng nghiến răng, vận hết sức bình sinh. Nhưng bó đũa cứ trơ trơ, dẻo dai chẳng gãy nổi một chiếc. Cuối cùng, tất cả đành thở dài, lắc đầu chịu thua.',
+        scene: {
+          bg: 'indoor',
+          items: [
+            { k: 'man', x: 60, y: 100, s: 1.4, tap: 'wobble' },
+            { k: 'bundle', x: 100, y: 100, s: 2, tap: 'wobble' },
             { k: 'man', x: 145, y: 100, s: 1.4, tap: 'wobble' },
           ],
         },
       },
       {
-        text: 'Ông cụ mỉm cười, cởi bó đũa ra, đưa từng chiếc một. Tách! Tách! Lần này chiếc nào cũng gãy ngon ơ, dễ như bẻ que kẹo.',
+        text: 'Ông cụ chỉ mỉm cười hiền hậu. Ông thong thả cởi sợi dây, tháo bó đũa ra, rồi đưa cho mỗi người một chiếc. "Bây giờ, các con thử bẻ từng chiếc xem nào."',
         scene: {
           bg: 'indoor',
           items: [
             { k: 'oldMan', x: 60, y: 100, s: 1.5, tap: 'bounce' },
-            { k: 'man', x: 120, y: 100, s: 1.3, tap: 'bounce' },
-            { k: 'man', x: 155, y: 100, s: 1.3, tap: 'bounce' },
+            { k: 'man', x: 110, y: 100, s: 1.3, tap: 'bounce' },
+            { k: 'man', x: 150, y: 100, s: 1.3, tap: 'bounce' },
           ],
         },
       },
       {
-        text: 'Ông ôm các con vào lòng, dịu dàng dạy: "Các con thấy chưa? Tách lẻ thì yếu, nhưng anh em thương yêu, đoàn kết thì mạnh như cả bó đũa, không ai thắng nổi." Từ đó, mấy anh em không còn cãi nhau nữa.',
+        text: 'Tách! Tách! Tách! Lần này, chiếc đũa nào cũng gãy gọn, dễ như bẻ một que kẹo. Các con ngơ ngác nhìn nhau, chưa hiểu vì sao bó đũa thì không bẻ nổi mà từng chiếc lại gãy dễ đến thế.',
+        scene: {
+          bg: 'indoor',
+          items: [
+            { k: 'man', x: 70, y: 100, s: 1.3, tap: 'bounce' },
+            { k: 'man', x: 110, y: 100, s: 1.3, tap: 'bounce' },
+            { k: 'man', x: 150, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Ông cụ ôn tồn dạy: "Các con thấy chưa? Một chiếc đũa lẻ loi thì yếu ớt, bẻ cái là gãy. Nhưng cả bó đũa chụm lại thì chẳng ai bẻ nổi. Anh em trong nhà cũng vậy: chia rẽ thì yếu, mà thương yêu, đoàn kết thì mạnh vô cùng."',
+        scene: {
+          bg: 'indoor',
+          items: [
+            { k: 'oldMan', x: 70, y: 100, s: 1.5, tap: 'bounce' },
+            { k: 'man', x: 115, y: 100, s: 1.3, tap: 'bounce' },
+            { k: 'man', x: 150, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Các con cúi đầu, thấm thía lời cha. Từ đó, mấy anh em bảo ban nhau, thuận hoà yêu thương, không còn cãi cọ nữa. Gia đình ngày càng êm ấm, làm ăn mỗi lúc một khấm khá. Ông cụ nhìn các con mà lòng vui khôn xiết.',
         scene: {
           bg: 'day',
           items: [
@@ -86,7 +141,19 @@ export const STORIES: Story[] = [
     moral: 'Hãy yêu thương và quan tâm người thân khi còn bên nhau.',
     pages: [
       {
-        text: 'Tích Chu ở với bà. Bà thương Tích Chu lắm, miếng gì ngon cũng để dành cho cậu, còn mình chỉ ăn cơm với rau.',
+        text: 'Ngày xửa ngày xưa, ở một xóm nhỏ nằm nép bên khu rừng xanh, có cậu bé tên là Tích Chu. Cha mẹ mất sớm, Tích Chu sống với bà trong một mái nhà tranh đơn sơ.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'tree', x: 35, y: 96, s: 1.2 },
+            { k: 'house', x: 130, y: 96, s: 1 },
+            { k: 'oldWoman', x: 90, y: 100, s: 1.4, tap: 'wobble' },
+            { k: 'boy', x: 120, y: 100, s: 1.2, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Bà thương Tích Chu lắm. Nhà nghèo, có miếng gì ngon bà cũng nhường hết cho cháu, còn mình chỉ ăn cơm với rau. Ngày ngày bà làm lụng vất vả để nuôi Tích Chu khôn lớn.',
         scene: {
           bg: 'day',
           items: [
@@ -98,42 +165,84 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Nhưng Tích Chu chỉ mải rong chơi. Một hôm bà ốm, nằm trên giường, khẽ gọi: "Tích Chu ơi… bà khát nước quá, lấy cho bà ngụm nước con nhé…". Gọi mãi mà chẳng thấy Tích Chu đâu.',
+        text: 'Nhưng Tích Chu mải chơi lắm. Suốt ngày cậu rong ruổi cùng đám bạn, hết trèo cây hái quả lại ra đồng bắt dế, chẳng mấy khi chịu ở nhà với bà.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'tree', x: 60, y: 96, s: 1.3 },
+            { k: 'tree', x: 165, y: 96, s: 1.1 },
+            { k: 'boy', x: 110, y: 100, s: 1.3, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Một hôm, bà bị ốm nặng. Bà nằm trên giường, người nóng ran, miệng khát khô. Bà yếu ớt gọi: "Tích Chu ơi… bà khát nước quá… con lấy cho bà ngụm nước, con nhé…".',
+        scene: {
+          bg: 'indoor',
+          items: [
+            { k: 'house', x: 60, y: 96, s: 0.9 },
+            { k: 'oldWoman', x: 100, y: 100, s: 1.5, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Bà gọi một lần, hai lần, ba lần. Nhưng Tích Chu còn mải chơi tận đẩu tận đâu, chẳng nghe thấy gì. Không có ai cho uống nước, bà mệt lả đi.',
         scene: {
           bg: 'day',
           items: [
             { k: 'cloud', x: 40, y: 26 },
             { k: 'house', x: 60, y: 96, s: 0.9 },
-            { k: 'oldWoman', x: 55, y: 100, s: 1.4, tap: 'wobble' },
-            { k: 'boy', x: 160, y: 100, s: 1.3, tap: 'bounce' },
+            { k: 'oldWoman', x: 95, y: 100, s: 1.4, tap: 'wobble' },
+            { k: 'boy', x: 165, y: 100, s: 1.2, tap: 'bounce' },
           ],
         },
       },
       {
-        text: 'Không có ai cho uống nước, bà hoá thành một con chim, vỗ cánh bay đi. Tích Chu chơi chán chạy về, thấy chim liền hốt hoảng: "Bà ơi! Bà đừng bỏ con!".',
+        text: 'Lạ thay, bà bỗng hoá thành một con chim nhỏ. Chim vỗ cánh, bay vụt qua cửa sổ, lên trời cao đi tìm nước uống.',
+        scene: {
+          bg: 'day',
+          items: [
+            { k: 'house', x: 60, y: 96, s: 0.9 },
+            { k: 'bird', x: 130, y: 46, s: 1.6, tap: 'bounce' },
+          ],
+        },
+      },
+      {
+        text: 'Tích Chu chơi chán, bụng đói, chạy về gọi: "Bà ơi, cho con ăn cơm!". Nhưng nhà vắng tanh. Cậu chỉ thấy một con chim đậu trên cành cây trước sân. Cậu hốt hoảng kêu lên: "Bà ơi! Bà đừng bỏ con!".',
         scene: {
           bg: 'forest',
           items: [
             { k: 'tree', x: 40, y: 96, s: 1.3 },
-            { k: 'bird', x: 130, y: 50, s: 1.6, tap: 'bounce' },
+            { k: 'bird', x: 130, y: 50, s: 1.5, tap: 'bounce' },
             { k: 'boy', x: 80, y: 100, s: 1.3, tap: 'wobble' },
           ],
         },
       },
       {
-        text: 'Chim buồn bã đáp: "Cúc cu… Bà đi tìm nước đây. Tích Chu ở lại ngoan nhé.". Rồi chim bay xa dần. Tích Chu oà khóc nức nở, ân hận vô cùng.',
+        text: 'Chim buồn bã đáp: "Cúc cu… Bà khát quá nên phải đi tìm nước. Tích Chu ở lại ngoan nhé.". Nói rồi chim vỗ cánh bay xa dần. Tích Chu oà lên khóc nức nở, ân hận vô cùng vì đã không nghe lời bà.',
         scene: {
           bg: 'forest',
           items: [
             { k: 'tree', x: 35, y: 96, s: 1.2 },
             { k: 'tree', x: 170, y: 96, s: 1.2 },
-            { k: 'bird', x: 150, y: 44, s: 1.3, tap: 'bounce' },
+            { k: 'bird', x: 150, y: 42, s: 1.3, tap: 'bounce' },
             { k: 'boy', x: 95, y: 100, s: 1.4, tap: 'wobble' },
           ],
         },
       },
       {
-        text: 'Bỗng một bà Tiên hiện ra, dịu dàng bảo: "Nếu cháu muốn bà trở lại, hãy đi thật xa, lấy nước ở suối Tiên mang về cho bà uống.". Tích Chu lau nước mắt, đi ngay.',
+        text: 'Cậu chạy theo, băng qua rừng, lội qua suối, vừa đi vừa gọi bà. Đến khi mỏi nhừ chân, cậu ngồi bệt xuống gốc cây mà khóc nức nở.',
+        scene: {
+          bg: 'forest',
+          items: [
+            { k: 'tree', x: 50, y: 96, s: 1.3 },
+            { k: 'tree', x: 165, y: 96, s: 1.1 },
+            { k: 'boy', x: 105, y: 100, s: 1.3, tap: 'wobble' },
+          ],
+        },
+      },
+      {
+        text: 'Bỗng một bà Tiên hiền hậu hiện ra, dịu dàng bảo: "Nếu cháu muốn bà trở lại thành người, cháu phải đi thật xa, lấy cho được nước ở suối Tiên trên núi cao. Đường gian nan lắm, cháu có đi nổi không?". Tích Chu lau nước mắt, quả quyết: "Dạ, cháu đi ngay ạ!".',
         scene: {
           bg: 'river',
           items: [
@@ -143,7 +252,7 @@ export const STORIES: Story[] = [
         },
       },
       {
-        text: 'Vượt núi vượt rừng, cuối cùng Tích Chu cũng lấy được nước. Bà uống xong liền trở lại thành người. Từ đó, Tích Chu luôn ở bên, yêu thương và chăm sóc bà.',
+        text: 'Tích Chu trèo đèo, lội suối, vượt bao gian khó. Cuối cùng cậu cũng lấy được bình nước suối Tiên mát lành mang về cho bà uống. Vừa uống xong, chim liền trở lại thành người bà hiền từ. Từ đó, Tích Chu luôn ở bên, hết lòng yêu thương và chăm sóc bà.',
         scene: {
           bg: 'day',
           items: [
