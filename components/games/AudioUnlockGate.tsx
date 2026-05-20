@@ -31,13 +31,20 @@ export default function AudioUnlockGate({ children }: { children: ReactNode }) {
           className="fixed inset-0 z-[60] flex items-center justify-center cursor-pointer"
           style={{ background: 'rgba(0,0,0,0.6)' }}
         >
-          <div className="bg-white rounded-3xl px-10 py-8 text-center shadow-2xl max-w-md mx-4 pointer-events-none">
-            <div className="text-7xl mb-3">🔊</div>
+          <div className="bg-white rounded-3xl px-8 py-7 text-center shadow-2xl max-w-md mx-4 pointer-events-none">
+            <div className="text-6xl mb-3">🔊</div>
             <h2 className="text-2xl font-extrabold text-[#1b3864] mb-2">
               Chạm để bắt đầu
             </h2>
-            <p className="text-sm text-[#3b5788]">
+            <p className="text-sm text-[#3b5788] mb-3">
               Bố mẹ chạm 1 cái lên màn hình để bé nghe được giọng nói và âm thanh trong game.
+            </p>
+            <p className="text-xs text-[#607d8b] leading-relaxed border-t border-[#eceff1] pt-3">
+              <strong>Trên máy tính bảng Android</strong>: nên dùng trình duyệt
+              <strong> Chrome</strong>. Nếu không nghe được giọng tiếng Việt,
+              vào <em>Cài đặt → Quản lý chung → Ngôn ngữ → Chuyển văn bản
+              thành lời nói</em>, cài <strong>Google TTS</strong> + tải gói
+              <strong> Tiếng Việt</strong>.
             </p>
           </div>
         </button>

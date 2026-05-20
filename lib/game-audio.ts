@@ -79,19 +79,47 @@ export function playSound(kind: Kind) {
   }
 }
 
-// Đọc tiếng Việt qua Web Speech API (vi-VN). Nếu không có voice → bỏ qua.
+// Đọc tiếng Việt qua Web Speech API (vi-VN). Robust với Android:
+//   - getVoices() trên Chrome trả [] lần đầu → listen voiceschanged
+//   - Nếu máy không có giọng vi-VN (vd Samsung tablet chưa cài Google TTS
+//     + gói tiếng Việt) → vẫn speak với lang vi-VN, browser dùng default
+//     (có thể đọc giọng lạ nhưng còn hơn im lặng).
+let _voices: SpeechSynthesisVoice[] = [];
+let _voicesBound = false;
+function ensureVoices() {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return;
+  const sync = () => {
+    try {
+      _voices = window.speechSynthesis.getVoices();
+    } catch {
+      /* ignore */
+    }
+  };
+  sync();
+  if (!_voicesBound) {
+    try {
+      window.speechSynthesis.addEventListener?.('voiceschanged', sync);
+      _voicesBound = true;
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 export function speakVi(text: string) {
   if (typeof window === 'undefined' || !window.speechSynthesis) return;
   if (!getSettings().tts) return; // bố mẹ tắt giọng đọc
   try {
+    ensureVoices();
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'vi-VN';
     u.rate = 0.85;
     u.pitch = 1.1;
-    const voices = window.speechSynthesis.getVoices();
-    const vi = voices.find((v) => v.lang?.toLowerCase().startsWith('vi'));
+    const list = _voices.length ? _voices : window.speechSynthesis.getVoices();
+    const vi = list.find((v) => v.lang?.toLowerCase().startsWith('vi'));
     if (vi) u.voice = vi;
+    // Nếu không tìm thấy giọng vi → để browser tự chọn default cho lang vi-VN
     window.speechSynthesis.speak(u);
   } catch {
     /* bỏ qua nếu lỗi */

@@ -87,6 +87,15 @@ export default function SettingsButton({
               />
             </div>
 
+            <div className="py-3 border-b border-gray-100">
+              <p className="text-xs text-[#607d8b] leading-relaxed">
+                <strong>Trên máy tính bảng Android</strong>: nên dùng Chrome.
+                Nếu không nghe được giọng tiếng Việt, vào <em>Cài đặt →
+                Quản lý chung → Ngôn ngữ → Chuyển văn bản thành lời nói</em>,
+                cài <strong>Google TTS</strong> + tải gói <strong>Tiếng Việt</strong>.
+              </p>
+            </div>
+
             <div className="py-4">
               <button
                 type="button"
