@@ -110,3 +110,32 @@ export function preloadSounds() {
   // Kích hoạt voice list (Chrome load async)
   if (window.speechSynthesis) window.speechSynthesis.getVoices();
 }
+
+// Gọi trong user gesture (tap đầu phiên) — mở khoá HTMLAudio trên
+// iOS Safari: play muted rồi pause để các lần play sau không bị chặn.
+export function primeAudio() {
+  if (typeof window === 'undefined') return;
+  (Object.keys(FILES) as Kind[]).forEach((k) => {
+    let a = cache[k];
+    if (!a) {
+      a = new Audio(FILES[k]);
+      a.preload = 'auto';
+      cache[k] = a;
+    }
+    const el = a;
+    const orig = el.volume;
+    el.volume = 0;
+    const p = el.play();
+    if (p && typeof p.then === 'function') {
+      p.then(() => {
+        el.pause();
+        el.currentTime = 0;
+        el.volume = orig;
+      }).catch(() => {
+        el.volume = orig;
+      });
+    } else {
+      el.volume = orig;
+    }
+  });
+}
