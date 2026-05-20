@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth-server';
 import CompareNumberGame from '@/components/games/CompareNumberGame';
 
-export const metadata = { title: 'Số lớn / Số bé — Bé Học' };
+export const metadata = { title: 'Số lớn / Số nhỏ — Bé Học' };
 
 export default async function SoSanhSoPage() {
   const session = await getSession();

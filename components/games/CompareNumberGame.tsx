@@ -25,7 +25,7 @@ export default function CompareNumberGame() {
   const [celebrate, setCelebrate] = useState(false);
   const lock = useRef(false);
 
-  const prompt = round.askBigger ? 'Số nào LỚN hơn?' : 'Số nào BÉ hơn?';
+  const prompt = round.askBigger ? 'Số nào LỚN hơn?' : 'Số nào NHỎ hơn?';
   const speak = () => speakVi(prompt);
 
   useEffect(() => {
@@ -72,7 +72,7 @@ export default function CompareNumberGame() {
   return (
     <>
       <GameShell
-        title="📊 Số lớn / Số bé"
+        title="📊 Số lớn / Số nhỏ"
         stars={stars}
         starsReady={ready}
         instruction={prompt}
