@@ -152,7 +152,19 @@ Full list 25 user: `docs/sql/04-multi-user.sql` và `scripts/seed-reference-data
 
 ## 11. Setup máy mới
 
-### Cách A — copy toàn bộ thư mục (khuyến nghị)
+### 11.0. Trước khi mở dự án — cài/đăng nhập các thứ sau trên máy mới
+**Cần cài (nếu chưa có):**
+- **Node.js** (cùng major với máy cũ — Node 20 LTS trở lên cho Next.js 16). Check máy cũ bằng `node -v` rồi cài bản tương ứng.
+- **Git** (Git for Windows). VS Code thường dùng git này luôn.
+- **VS Code** (user đã có).
+- **Extension Claude Code** trong VS Code.
+
+**Cần đăng nhập (auth KHÔNG transfer theo thư mục):**
+- **Claude Code**: login Anthropic account trên VS Code máy mới (auth là per-device).
+- **GitHub**: để `git push` chạy được. Cách dễ nhất: trong VS Code mở terminal, lần đầu `git push` sẽ bật pop-up auth. Hoặc cài `gh` CLI rồi `gh auth login`.
+- **Browser** (khi cần dùng Dashboard): login lại Supabase Dashboard, Vercel Dashboard, GitHub web UI.
+
+### 11.1. Cách A — copy toàn bộ thư mục (khuyến nghị)
 1. Trên máy cũ: **xóa** `node_modules/` và `.next/` để giảm dung lượng.
 2. Copy toàn bộ thư mục `c:\hansungbolt-overtime\` (gồm cả file ẩn: `.env.local`, `.git/`, `.claude/`, `PROJECT_CONTEXT.md` này).
 3. Trên máy mới:
@@ -163,15 +175,34 @@ Full list 25 user: `docs/sql/04-multi-user.sql` và `scripts/seed-reference-data
    ```
 4. Git remote đã trỏ về GitHub — `git push origin main` vẫn deploy được lên Vercel cũ.
 
-### Cách B — git clone fresh
+### 11.2. Cách B — git clone fresh
 1. `git clone https://github.com/hansungbolt-qlsx/hansungbolt-overtime.git`
 2. **Tạo lại `.env.local`** (file gitignored, không có trong repo):
    - Lấy `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` từ Supabase Dashboard → Project Settings → API.
    - `JWT_SECRET` phải **giống máy cũ** (nếu khác, mọi user phải đăng nhập lại; không vấn đề lớn). Sinh mới bằng `openssl rand -base64 32` nếu muốn.
 3. `npm install` rồi `npm run dev`.
 
-### Lưu ý: memory của Claude trên máy cũ KHÔNG transfer
-Claude máy cũ lưu memory tại `~/.claude/projects/c--hansungbolt-overtime/memory/` — nằm ngoài thư mục dự án. Khi sang máy mới, Claude mới không có những memory đó. **File `PROJECT_CONTEXT.md` này thay thế chức năng đó** — chứa toàn bộ context durable mà Claude mới cần.
+### 11.3. Memory của Claude trên máy cũ
+Claude máy cũ lưu memory tại `~/.claude/projects/c--hansungbolt-overtime/memory/` (Windows: `C:\Users\<username>\.claude\projects\c--hansungbolt-overtime\memory\`) — nằm NGOÀI thư mục dự án, KHÔNG đi theo khi copy.
+
+- File `PROJECT_CONTEXT.md` này đã tóm tắt mọi context durable Claude cần → không bắt buộc copy memory.
+- Nếu muốn giữ nguyên auto-memory: copy thủ công thư mục `memory/` sang đúng đường dẫn tương ứng trên máy mới (`C:\Users\<user-mới>\.claude\projects\c--hansungbolt-overtime\memory\`).
+
+### 11.4. TUYỆT ĐỐI KHÔNG làm các việc sau trên máy mới
+- KHÔNG chạy lại `scripts/seed-reference-data.ts` → sẽ trùng/lỗi unique constraint (data đã seed lên Supabase từ lâu).
+- KHÔNG chạy lại các migration trong `docs/sql/` lên Supabase (đã chạy hết — chỉ chạy migration MỚI nếu sau này có).
+- KHÔNG `git push --force` lên `main`.
+- KHÔNG sửa `JWT_SECRET` trong `.env.local` (nếu khác máy cũ thì cookie session cũ vô hiệu, user phải đăng nhập lại — không nguy hiểm nhưng phiền).
+- KHÔNG commit file `.env.local` vào git (đã `.gitignore` rồi, nhưng nhắc cẩn thận).
+
+### 11.5. Sau khi setup xong, test theo thứ tự
+1. `npm install` không lỗi.
+2. `npm run dev` chạy được, mở `http://localhost:3000` thấy trang login.
+3. `npx tsc --noEmit` pass (TypeScript check).
+4. `npx next build` pass (production build).
+5. `git status` clean, `git remote -v` trỏ về `github.com/hansungbolt-qlsx/hansungbolt-overtime`.
+6. Sửa nhẹ 1 file vô hại (vd thêm 1 dòng comment), commit + push → quan sát Vercel Dashboard auto-build → deploy success → URL prod vẫn hoạt động.
+7. Mở Claude Code trong VS Code, gõ vài câu — kiểm tra Claude đã đọc `PROJECT_CONTEXT.md` (hỏi "bạn còn nhớ dự án không" → nếu trả lời nắm context là OK).
 
 ## 12. Trạng thái khi handoff (cuối session 2026-05-19)
 
