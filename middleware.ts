@@ -26,12 +26,6 @@ export async function middleware(req: NextRequest) {
 
   try {
     const session = await verifySession(token);
-    // /games — chỉ admin qlsx (game cho bé, ẩn hoàn toàn với role khác)
-    if (pathname.startsWith('/games') && session.username !== 'qlsx') {
-      return NextResponse.redirect(
-        new URL(session.role === 'admin' ? '/dashboard' : '/register', req.url),
-      );
-    }
     if (
       pathname.startsWith('/dashboard') &&
       !pathname.startsWith('/dashboard/registrations/') &&
