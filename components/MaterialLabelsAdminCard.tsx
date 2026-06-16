@@ -50,6 +50,7 @@ export default function MaterialLabelsAdminCard({ date }: { date: string }) {
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<Tab>('view');
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [rotation, setRotation] = useState(0);
   const [deletingAll, setDeletingAll] = useState(false);
 
   // 3 ngày đang được giữ (khớp cron cleanup: hôm nay + 2 ngày trước).
@@ -79,6 +80,16 @@ export default function MaterialLabelsAdminCard({ date }: { date: string }) {
       setDeletingAll(false);
     }
   }
+
+  // Nhấn ESC để đóng ảnh phóng to.
+  useEffect(() => {
+    if (!lightbox) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setLightbox(null);
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [lightbox]);
 
   useEffect(() => {
     let cancelled = false;
@@ -154,7 +165,7 @@ export default function MaterialLabelsAdminCard({ date }: { date: string }) {
                     <button
                       key={p.id}
                       type="button"
-                      onClick={() => p.url && setLightbox(p.url)}
+                      onClick={() => { if (p.url) { setLightbox(p.url); setRotation(0); } }}
                       className="relative aspect-square bg-white rounded-lg overflow-hidden shadow-sm hover:ring-2 hover:ring-[#063882] transition"
                     >
                       {p.url && (
@@ -188,11 +199,36 @@ export default function MaterialLabelsAdminCard({ date }: { date: string }) {
                     className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 cursor-zoom-out"
                     onClick={() => setLightbox(null)}
                   >
+                    {/* Thanh điều khiển — chặn click lan ra backdrop */}
+                    <div
+                      className="absolute top-4 right-4 flex gap-2 cursor-default"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setRotation((r) => (r + 90) % 360)}
+                        className="bg-white/95 hover:bg-white text-[#063882] font-bold text-sm py-2 px-4 rounded-lg shadow active:scale-95 transition"
+                      >
+                        ↻ Xoay 90°
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLightbox(null)}
+                        className="bg-white/95 hover:bg-white text-[#c01f2a] font-bold text-sm py-2 px-4 rounded-lg shadow active:scale-95 transition"
+                      >
+                        ✕ Đóng
+                      </button>
+                    </div>
                     <img
                       src={lightbox}
                       alt="Tem NVL zoom"
-                      className="max-w-full max-h-full object-contain"
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ transform: `rotate(${rotation}deg)` }}
+                      className="max-w-full max-h-full object-contain transition-transform duration-200 cursor-default"
                     />
+                    <span className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/80 text-xs">
+                      Nhấn ESC để đóng · ↻ để xoay đúng chiều
+                    </span>
                   </div>
                 )}
               </>
