@@ -1,9 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type Photo = { id: string; url: string | null; uploaded_at: string; employee_name: string | null };
 type Tab = 'view' | 'download' | 'print';
+
+// Ngày local (giờ máy = giờ VN) dạng YYYY-MM-DD, lùi `offsetDays` ngày.
+function ymdLocal(offsetDays: number) {
+  const d = new Date();
+  d.setDate(d.getDate() - offsetDays);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 const TABS: {
   id: Tab;
@@ -42,11 +52,23 @@ export default function MaterialLabelsAdminCard({ date }: { date: string }) {
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [deletingAll, setDeletingAll] = useState(false);
 
+  // 3 ngày đang được giữ (khớp cron cleanup: hôm nay + 2 ngày trước).
+  const dayOptions = useMemo(
+    () => [
+      { label: 'Hôm nay', value: ymdLocal(0) },
+      { label: 'Hôm qua', value: ymdLocal(1) },
+      { label: 'Hôm kia', value: ymdLocal(2) },
+    ],
+    [],
+  );
+  // Ngày đang xem trong card (riêng, không động tới bộ lọc phiếu phía trên).
+  const [day, setDay] = useState(date);
+
   async function handleDeleteAll() {
-    if (!confirm(`Xóa toàn bộ ${photos.length} ảnh ngày ${date}?`)) return;
+    if (!confirm(`Xóa toàn bộ ${photos.length} ảnh ngày ${day}?`)) return;
     setDeletingAll(true);
     try {
-      const res = await fetch(`/api/labels?date=${date}`, { method: 'DELETE' });
+      const res = await fetch(`/api/labels?date=${day}`, { method: 'DELETE' });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         alert(`Xóa thất bại: ${d.error ?? res.statusText}`);
@@ -61,13 +83,13 @@ export default function MaterialLabelsAdminCard({ date }: { date: string }) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetch(`/api/labels?date=${date}`)
+    fetch(`/api/labels?date=${day}`)
       .then((r) => r.json())
       .then((d) => { if (!cancelled) setPhotos(d.photos ?? []); })
       .catch(() => { if (!cancelled) setPhotos([]); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [date]);
+  }, [day]);
 
   const sheetsNeeded = Math.ceil(photos.length / 8) || 0;
   const activeCfg = TABS.find((t) => t.id === tab)!;
@@ -76,8 +98,27 @@ export default function MaterialLabelsAdminCard({ date }: { date: string }) {
     <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden">
       <div className="px-5 py-4 border-b border-brand-surface-alt">
         <h2 className="text-base font-bold text-[#063882] leading-tight">Tem NVL</h2>
-        <div className="text-sm font-semibold text-[#063882] mt-0.5">Ngày {date}</div>
-        <p className="text-xs text-brand-navy-soft mt-1">
+        <div className="text-sm font-semibold text-[#063882] mt-0.5">Ngày {day}</div>
+
+        {/* Chọn nhanh 1 trong 3 ngày đang được giữ */}
+        <div className="flex gap-2 mt-2">
+          {dayOptions.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setDay(opt.value)}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition active:scale-95 ${
+                day === opt.value
+                  ? 'bg-[#063882] text-white shadow'
+                  : 'bg-[#dce8fa] text-[#063882] hover:bg-[#c4d8f5]'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        <p className="text-xs text-brand-navy-soft mt-2">
           {loading
             ? 'Đang tải...'
             : photos.length === 0
@@ -163,7 +204,7 @@ export default function MaterialLabelsAdminCard({ date }: { date: string }) {
                   {photos.length} ảnh — {sheetsNeeded} trang Excel, mỗi trang 2×4 ảnh khổ A4
                 </p>
                 <a
-                  href={`/api/labels/export?date=${date}`}
+                  href={`/api/labels/export?date=${day}`}
                   className="bg-[#2db5a1] hover:bg-[#0f9080] active:scale-95 text-white font-bold py-3 px-8 rounded-xl shadow-md transition text-sm"
                 >
                   Tải Excel (.xlsx)
@@ -178,7 +219,7 @@ export default function MaterialLabelsAdminCard({ date }: { date: string }) {
                 </p>
                 <button
                   type="button"
-                  onClick={() => window.open(`/print/labels?date=${date}`, '_blank')}
+                  onClick={() => window.open(`/print/labels?date=${day}`, '_blank')}
                   className="bg-[#e32531] hover:bg-[#c01f2a] active:scale-95 text-white font-bold py-3 px-8 rounded-xl shadow-md transition text-sm"
                 >
                   Mở trang in
