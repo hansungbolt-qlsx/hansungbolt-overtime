@@ -147,12 +147,27 @@ export default async function PrintViewPage({
     else slot.individual.push(row);
   }
 
-  // Gộp M4/M3 thành 1 dòng "{DEPT}-M{x} (NEA)" với mã hàng "M{x}", số lượng = tổng
+  // Gộp M4/M3 thành 1 dòng "{DEPT}-M{x} (NEA)" với mã hàng "M{x}", số lượng = tổng.
+  // Sort NV:
+  //   - NV chỉ có "Công việc khác" (toàn bộ items đều OTHER) -> xếp cuối phiếu.
+  //   - Còn lại theo order_no trong bảng employees.
+  // Trong cùng NV: dòng CVK luôn nằm sau máy thường.
   const groupPrefix = reg.department;
+  const hasNonOther = (g: { individual: GroupRow[]; m4: GroupRow[]; m3: GroupRow[] }) =>
+    g.individual.some((r) => !r.isOther) || g.m4.length > 0 || g.m3.length > 0;
   const sortedGroups = [...groups.values()]
-    .sort((a, b) => a.order_no - b.order_no)
+    .sort((a, b) => {
+      const aHas = hasNonOther(a);
+      const bHas = hasNonOther(b);
+      if (aHas !== bHas) return aHas ? -1 : 1;
+      return a.order_no - b.order_no;
+    })
     .map((g) => {
-      const rows: GroupRow[] = [...g.individual];
+      const individualSorted = [...g.individual].sort((a, b) => {
+        if (a.isOther === b.isOther) return 0;
+        return a.isOther ? 1 : -1;
+      });
+      const rows: GroupRow[] = [...individualSorted];
       if (g.m4.length > 0) {
         rows.push({
           code: `${groupPrefix}-M4 (${g.m4.length}EA)`,
@@ -167,6 +182,11 @@ export default async function PrintViewPage({
           qty: g.m3.reduce((s, r) => s + r.qty, 0),
         });
       }
+      // Đảm bảo CVK xếp sau M3/M4 (CVK isOther → cuối list rows)
+      rows.sort((a, b) => {
+        if (Boolean(a.isOther) === Boolean(b.isOther)) return 0;
+        return a.isOther ? 1 : -1;
+      });
       return {
         full_name: g.full_name,
         time_from: g.time_from,
