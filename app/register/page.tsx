@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth-server';
 import LogoutButton from '@/components/LogoutButton';
@@ -18,7 +19,11 @@ export default async function RegisterPage() {
       <div className="max-w-lg mx-auto">
         <header className="flex justify-between items-center mb-5 gap-3">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className="relative h-11 w-12 overflow-hidden flex-shrink-0">
+            <Link
+              href="/register"
+              aria-label="Về trang chủ"
+              className="relative h-11 w-12 overflow-hidden flex-shrink-0 active:scale-95 transition"
+            >
               <Image
                 src="/logo.png"
                 alt="Hansungbolt"
@@ -29,7 +34,7 @@ export default async function RegisterPage() {
                 className="absolute max-w-none"
                 style={{ width: '160px', height: 'auto', left: '-56px', top: '0' }}
               />
-            </div>
+            </Link>
             <div className="min-w-0">
               <h1 className="text-lg font-bold text-brand-navy leading-tight whitespace-nowrap">
                 Bộ phận {session.department}

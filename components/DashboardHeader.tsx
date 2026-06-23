@@ -22,15 +22,17 @@ export default function DashboardHeader({
     <header className="mb-6">
       <div className="flex justify-between items-center gap-4 mb-4">
         <div className="flex items-center gap-3 min-w-0">
-          <Image
-            src="/logo.png"
-            alt="Hansungbolt"
-            width={890}
-            height={405}
-            priority
-            unoptimized
-            className="h-10 w-auto flex-shrink-0"
-          />
+          <Link href="/dashboard" aria-label="Về trang chủ" className="flex-shrink-0 active:scale-95 transition">
+            <Image
+              src="/logo.png"
+              alt="Hansungbolt"
+              width={890}
+              height={405}
+              priority
+              unoptimized
+              className="h-10 w-auto"
+            />
+          </Link>
           <div className="min-w-0">
             <h1 className="text-xl md:text-2xl font-bold text-brand-navy leading-tight">
               Dashboard Admin
