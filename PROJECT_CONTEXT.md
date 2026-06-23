@@ -47,11 +47,15 @@
 - HD: lấy mã hàng từ `daily_plans` (admin upload Excel Q401-02 hàng ngày).
 - RL: nhập mã hàng **tay** (không có plan upload). Số lượng tự tính theo RPM.
 - "Công việc khác" (nút cam cuối danh sách máy): nhập mô tả tự do, không tính SL. Tạo equipment row `CVK-<dept>` lần đầu submit (auto-ensure).
-- **Admin Sửa phiếu** (`/dashboard/registrations/[id]/edit`): per-row giờ Từ/Đến, đổi NV/máy/mã hàng/xóa dòng. **Diff-based update** (KHÔNG xóa-rồi-insert toàn bộ — bài học từ sự cố mất data).
+- **Mặc định ẩn form NV** cho đến khi user click chọn loại ngày (giảm diện tích trang). Lưới máy giới hạn `max-h-[220px]` (hiện ~8 ô), scroll trong panel để xem thêm.
+- **Màu chữ mã máy theo prefix** để dễ phân biệt: HD navy, RL xanh lá, SM tím, CT đỏ.
+- **Leader sửa phiếu** (`/dashboard/registrations/[id]/edit` cho leader cùng dept) — dùng `LeaderEditForm` mobile-friendly (UI giống lúc đăng ký mới). PATCH endpoint accept payload đơn giản (không cần per-row time).
+- **Admin Sửa phiếu** — dùng `EditRegistrationForm` (giữ chức năng sửa giờ thực tế per-row cho lương). **Diff-based update** (KHÔNG xóa-rồi-insert toàn bộ — bài học từ sự cố mất data).
 - **Phiếu in A4 dọc** — **RÀNG BUỘC CỨNG: phải fit đúng 1 trang**. Font Arial. Math các mm đã ghi trong comment file `app/dashboard/registrations/[id]/view/page.tsx`. Gộp máy theo nhóm:
   - HD-15..31 → `HD-M4 (NEA)`; HD-50..55 → `HD-M3 (NEA)`.
   - RL-09..23 → `RL-M4` (RL-24 KHÔNG gộp); RL-40..42 → `RL-M3`.
-- **Tổng hợp giờ tháng** → in A4 ngang (font Arial). Tính theo `duration_hours` thực tế (admin có thể sửa per-row), không hardcode 3h/8h.
+- **Người yêu cầu trong phiếu in** = tên user đã `registered_by` (không hardcode). NV chỉ có CVK → xếp cuối phiếu in.
+- **Tổng hợp giờ tháng** → admin có 2 tab HD/RL + nút Xem (preview web) cạnh nút In/Xuất. In A4 ngang, font Arial. Tính theo `duration_hours` thực tế.
 
 ### 4.2. Tem NVL (HD)
 - HD leader + worker upload ảnh tem từ điện thoại.
@@ -60,16 +64,25 @@
 - **Cron 01:00 VN** tự xóa tem có `label_date < today` (giữ lại ngày hiện tại).
 
 ### 4.3. Tăng ca hôm nay
-- Tab/card cross-department cho leader + worker + admin. Hiển thị NV + mã máy gọn theo quy tắc gộp M4/M3.
+- Card cho leader + worker (chỉ thấy dept mình) + admin (thấy cả HD/RL). Hiển thị list NV với chi tiết từng máy (KHÔNG gộp M4/M3 — gộp chỉ áp dụng cho phiếu in).
+- **Nút Chia sẻ** chụp card thành PNG (`html-to-image`, off-screen "share view" 480px inline-styles để render ổn định) → Web Share API gửi lên Zalo/Messenger với ảnh đẹp như app. Fallback: tải PNG xuống máy.
 - Component: `components/TodayOvertimeCard.tsx`. API: `/api/registrations/today-summary`.
 
 ### 4.4. Quản lý tài khoản (admin)
-- `/dashboard/users` — admin thêm/reset password/xóa tài khoản.
-- Thêm NV mới: nhập họ tên + username + bộ phận (HD/RL) + role (worker/leader). Password mặc định `hd123`. Cùng lúc insert vào `users` + `employees` (NV xuất hiện luôn trong danh sách chọn khi đăng ký tăng ca).
+- `/dashboard/users` — admin thêm tài khoản / reset password / soft-delete (Đã nghỉ).
+- **Thêm NV mới**: họ tên + username + bộ phận (HD/RL) + role (worker/leader). Password mặc định `hd123`. Insert cùng lúc `users` + `employees` (reactivate nếu đã có employee inactive cùng tên).
+- **Đã nghỉ** (toggle, không hard-delete): set `users.active=false` + `employees.active=false` + `deactivated_at=now()`. NV không login được + không hiện trong dropdown đăng ký tăng ca. Trong list, NV đã nghỉ mờ đi + xếp cuối + hiển thị ngày nghỉ. Nút "Khôi phục" để undo. Phiếu cũ vẫn join được với NV đã nghỉ (FK an toàn).
+- **Click logo** ở bất kỳ trang nào → về trang chủ (admin → `/dashboard`, leader/worker → `/register`).
+
+### 4.5. Tăng ca QLSX (admin)
+- Tab `/dashboard/qlsx` riêng cho khối quản lý sản xuất (5 NV cố định: Hoàng Chính Hữu, Lê Đức Minh, Phạm Văn Cường, Nguyễn Thị Giang, Nguyễn Âu Thu Nguyệt).
+- Form giống HD/RL **nhưng không có máy** — mỗi NV chỉ chọn tên + textarea **"Lý do tăng ca"**.
+- Người yêu cầu mặc định = admin đăng nhập.
+- Backend: POST `/api/registrations/qlsx`, auto-create equipment `CVK-QLSX` lần đầu, lưu lý do vào `item_code`.
 
 ## 5. DB schema & migrations
 
-Migrations đã chạy (tất cả thuần additive — `IF NOT EXISTS`):
+Migrations đã chạy (tất cả thuần additive — `IF NOT EXISTS` hoặc DROP + ADD CONSTRAINT):
 1. `01-schema.sql` — gốc (users, employees, equipments, daily_plans, overtime_registrations, overtime_items)
 2. `02-material-labels.sql` — material_label_photos
 3. `03-employee-name.sql`
@@ -77,6 +90,8 @@ Migrations đã chạy (tất cả thuần additive — `IF NOT EXISTS`):
 5. `05-simple-password.sql` — password_plain, reset password = `hd123`
 6. `06-per-item-times.sql` — time_from/to/duration per item (cho admin sửa per-row)
 7. `07-game-progress.sql` — (Bé Học cũ — đã gỡ khỏi code, bảng `game_progress` vẫn còn trên Supabase để tham khảo lịch sử, không dùng đến)
+8. `08-employee-active.sql` — soft delete: `active boolean default true` + `deactivated_at timestamptz` cho cả `users` lẫn `employees`. Toggle "Đã nghỉ" trong /dashboard/users.
+9. `09-qlsx-department.sql` — mở rộng CHECK constraint của 4 bảng để chấp nhận `QLSX`, seed 5 NV QLSX vào employees.
 
 Bảng `equipments` hiện ~84 rows (42 HD + 38 RL + RL-24 + HD-1A + có thể có CVK-HD/CVK-RL từ Công việc khác).
 
@@ -192,11 +207,27 @@ Claude máy cũ lưu memory tại `~/.claude/projects/c--hansungbolt-overtime/me
 6. Sửa nhẹ 1 file vô hại (vd thêm 1 dòng comment), commit + push → quan sát Vercel Dashboard auto-build → deploy success → URL prod vẫn hoạt động.
 7. Mở Claude Code trong VS Code, gõ vài câu — kiểm tra Claude đã đọc `PROJECT_CONTEXT.md` (hỏi "bạn còn nhớ dự án không" → nếu trả lời nắm context là OK).
 
-## 12. Trạng thái hiện tại (2026-06-03)
+## 12. Trạng thái hiện tại (2026-06-23)
 
-- Đã gỡ toàn bộ module Bé Học khỏi code (folder `app/games`, `app/api/games`, `components/games`, `lib/games`, `lib/game-audio.ts`). Bảng `game_progress` trên Supabase vẫn còn nhưng không còn code đụng tới.
-- Vừa thêm chức năng "Thêm nhân viên" trong `/dashboard/users` (insert cùng lúc vào `users` + `employees`).
-- Toàn bộ feature đăng ký tăng ca + tem NVL + tổng hợp giờ đang chạy ổn định production.
+Session lớn — push ~17 commits. Đã thêm/sửa:
+- Gỡ Bé Học khỏi code (bảng `game_progress` vẫn còn trên Supabase, ko code dùng).
+- **Quản lý tài khoản** trong `/dashboard/users`: thêm NV mới (insert đồng bộ users + employees), toggle "Đã nghỉ" thay vì xóa cứng (migration 08, soft delete với `active` + `deactivated_at`). NV đã nghỉ không login + không hiện dropdown đăng ký + xếp cuối list + hiển thị ngày nghỉ.
+- Khôi phục `tranxuandat` (HD, order_no=12) đã lỡ xóa hôm 31/05/2026.
+- **Tổng hợp giờ**: tabs HD/RL + nút Xem (preview) bên cạnh nút In/Xuất.
+- **Phiếu in**: "Người yêu cầu" lấy đúng tên `registered_by` (bỏ hardcode "Hoàng Chính Hữu"). NV chỉ có CVK xếp cuối phiếu.
+- **Tăng ca hôm nay**: list đơn giản (NV + máy chi tiết, không gộp M4/M3 cho dễ chụp), non-admin chỉ thấy dept mình. Nút **Chia sẻ** chụp card thành PNG 480px (off-screen render với inline styles → ổn định) gửi Zalo qua Web Share API.
+- **Mở quyền sửa phiếu cho leader** HD+RL: `LeaderEditForm` mobile-friendly (UI giống đăng ký mới, đỡ table desktop khó tap). PATCH endpoint mở rộng support payload đơn giản (không cần per-row time) + auto-create CVK equipment. Admin vẫn dùng `EditRegistrationForm` cho per-row time edit.
+- **OvertimeForm**: ẩn form NV cho đến khi click chọn loại ngày. Lưới máy `max-h-[220px]` (~8 ô) thay vì 360. Mã máy fill màu theo prefix: HD navy, RL xanh lá, SM tím, CT đỏ.
+- **Logo click về trang chủ** ở mọi role (DashboardHeader → `/dashboard`, /register page → `/register`, view phiếu in → tùy role).
+- **Bộ phận QLSX** (mới): tab `/dashboard/qlsx`, 5 NV cố định, form không có máy chỉ chọn NV + textarea "Lý do tăng ca". POST `/api/registrations/qlsx`, auto-create equipment `CVK-QLSX`. Migration 09 đã chạy.
+
+**Việc chưa hoàn thành** (đợi user phản hồi sau khi test):
+- Phiếu in QLSX có thể hiển thị cột thiết bị/SL lệch (layout cũ thiết kế cho HD/RL). Cần test thử rồi tính việc làm layout riêng cho QLSX nếu cần.
+- Tổng hợp giờ tháng chưa có tab QLSX (hiện code tabs hardcode HD/RL). Bổ sung nếu user yêu cầu.
+
+**Lưu ý cho phiên sau:**
+- Quy tắc data safety đã củng cố: code phụ thuộc migration phải forward-compat (`SELECT *` thay vì select cột mới trực tiếp) để khi migration chưa chạy, app không crash. Đã rút kinh nghiệm từ commit 9440f0b → hotfix 7919ca6.
+- Khi cần chạy migration: viết file `docs/sql/NN-...sql`, gửi nội dung SQL cho user paste vào Supabase Dashboard SQL Editor (nhắc rõ **New Query tab MỚI TRỐNG**). Verify lại bằng script Node trước khi báo "đã xong".
 
 ---
 
