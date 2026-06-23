@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toTitleCase } from '@/lib/format';
 
 type Machine = { code: string; isOther: boolean; otherText?: string };
@@ -24,9 +24,6 @@ function todayISO() {
   return `${y}-${m}-${day}`;
 }
 
-// Format danh sách máy theo dạng chi tiết, KHÔNG gộp M3/M4 (gộp chỉ dùng cho phiếu in).
-// VD: [HD-9A, HD-9B, HD-10] → "HD-9A, HD-9B, HD-10"
-// CVK hiển thị "Công việc khác: <mô tả>" và xếp cuối.
 function formatMachinesDetailed(machines: Machine[]): string {
   const codes: string[] = [];
   const others: string[] = [];
@@ -40,45 +37,6 @@ function formatMachinesDetailed(machines: Machine[]): string {
   return [...codes, ...others].join(', ');
 }
 
-// Build text plain để chia sẻ qua Web Share API (Zalo, Messenger, SMS...)
-function buildShareText(
-  date: string,
-  showHD: boolean,
-  showRL: boolean,
-  hd: EmpRow[],
-  rl: EmpRow[],
-): string {
-  const [y, m, d] = date.split('-');
-  const lines: string[] = [];
-  lines.push(`Tăng ca hôm nay ${d}/${m}/${y}`);
-  lines.push('');
-
-  const renderDept = (title: string, employees: EmpRow[]) => {
-    if (employees.length === 0) return;
-    const totalMachines = employees.reduce((s, e) => s + e.machines.length, 0);
-    lines.push(`${title} - ${employees.length} người, ${totalMachines} máy`);
-    employees.forEach((emp, i) => {
-      lines.push(`${i + 1}. ${titleCase(emp.employee_name)}`);
-      lines.push(`   ${formatMachinesDetailed(emp.machines)}`);
-    });
-    lines.push('');
-  };
-
-  if (showHD) renderDept('HD', hd);
-  if (showRL) renderDept('RL', rl);
-
-  return lines.join('\n').trim();
-}
-
-// Bản gọn của toTitleCase để dùng trong text plain (không cần JSX)
-function titleCase(s: string): string {
-  return s
-    .toLowerCase()
-    .split(' ')
-    .map((w) => (w ? w[0].toLocaleUpperCase('vi') + w.slice(1) : w))
-    .join(' ');
-}
-
 export default function TodayOvertimeCard({
   initialDate,
   hideDatePicker = false,
@@ -89,6 +47,9 @@ export default function TodayOvertimeCard({
   const [date, setDate] = useState(initialDate ?? todayISO());
   const [data, setData] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(false);
+  const [sharing, setSharing] = useState(false);
+
+  const shareRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -115,46 +76,85 @@ export default function TodayOvertimeCard({
   const rlMachines = rl.reduce((s, e) => s + e.machines.length, 0);
   const hasData = hd.length > 0 || rl.length > 0;
 
-  const [shareStatus, setShareStatus] = useState<'idle' | 'copied'>('idle');
+  const [yy, mm, dd] = date.split('-');
+  const dateLabel = `${dd}/${mm}/${yy}`;
 
   async function handleShare() {
-    if (!hasData) return;
-    const text = buildShareText(date, showHD, showRL, hd, rl);
-    const [yy, mm, dd] = date.split('-');
-    const title = `Tăng ca hôm nay ${dd}/${mm}/${yy}`;
-
-    // Web Share API: trên iOS/Android tự bật share sheet (có Zalo nếu cài app)
-    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-      try {
-        await navigator.share({ title, text });
-        return;
-      } catch (e) {
-        // User cancel hoặc lỗi → fallback clipboard
-        const err = e as { name?: string };
-        if (err?.name === 'AbortError') return;
-      }
-    }
-
-    // Fallback: copy clipboard (desktop / trình duyệt không hỗ trợ share)
+    if (!hasData || !shareRef.current || sharing) return;
+    setSharing(true);
     try {
-      await navigator.clipboard.writeText(text);
-      setShareStatus('copied');
-      setTimeout(() => setShareStatus('idle'), 2500);
-    } catch {
-      alert('Trình duyệt không hỗ trợ chia sẻ. Vui lòng chụp màn hình hoặc copy thủ công.');
+      const filename = `tang-ca-${date}.png`;
+      const title = `Tăng ca hôm nay ${dateLabel}`;
+
+      // Dynamic import — lib ~10KB gzipped, chỉ tải khi user tap Chia sẻ
+      const { toBlob } = await import('html-to-image');
+      const blob = await toBlob(shareRef.current, {
+        pixelRatio: 2,
+        backgroundColor: '#ffffff',
+        cacheBust: true,
+        filter: (node) => {
+          if (node instanceof HTMLElement && node.dataset.noShareCapture === 'true') {
+            return false;
+          }
+          return true;
+        },
+      });
+
+      if (!blob) {
+        alert('Không tạo được ảnh để chia sẻ.');
+        return;
+      }
+
+      const file = new File([blob], filename, { type: 'image/png' });
+
+      // Web Share API Level 2 (file share) — iOS 15+, Android Chrome 75+
+      if (
+        typeof navigator !== 'undefined' &&
+        typeof navigator.share === 'function' &&
+        typeof navigator.canShare === 'function' &&
+        navigator.canShare({ files: [file] })
+      ) {
+        try {
+          await navigator.share({ title, files: [file] });
+          return;
+        } catch (e) {
+          const err = e as { name?: string };
+          if (err?.name === 'AbortError') return;
+        }
+      }
+
+      // Fallback: tải ảnh xuống máy, user mở Zalo gửi thủ công
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      alert('Đã tải ảnh xuống máy. Mở Zalo, gửi ảnh vào nhóm là xong.');
+    } catch (e) {
+      console.error('Share error:', e);
+      alert('Lỗi khi tạo ảnh. Vui lòng thử lại.');
+    } finally {
+      setSharing(false);
     }
   }
 
   return (
-    <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden">
+    <section
+      ref={shareRef}
+      className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden"
+    >
       <div className="px-5 py-4 border-b border-brand-surface-alt flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-brand-navy">Tăng ca hôm nay</h2>
           <p className="text-xs text-brand-navy-soft mt-0.5">
-            Danh sách NV đăng ký theo bộ phận, ngày {date}
+            Ngày {dateLabel}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        {/* Vùng buttons — loại khỏi ảnh chia sẻ */}
+        <div data-no-share-capture="true" className="flex items-center gap-2">
           {!hideDatePicker && (
             <input
               type="date"
@@ -167,10 +167,11 @@ export default function TodayOvertimeCard({
             <button
               type="button"
               onClick={handleShare}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-brand-teal hover:bg-brand-teal-dark active:scale-95 text-white text-sm font-semibold shadow-sm transition"
+              disabled={sharing}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-brand-teal hover:bg-brand-teal-dark active:scale-95 disabled:opacity-60 disabled:cursor-wait text-white text-sm font-semibold shadow-sm transition"
             >
-              <ShareIcon />
-              {shareStatus === 'copied' ? 'Đã sao chép' : 'Chia sẻ'}
+              {sharing ? <SpinnerIcon /> : <ShareIcon />}
+              {sharing ? 'Đang tạo ảnh...' : 'Chia sẻ'}
             </button>
           )}
         </div>
@@ -232,6 +233,20 @@ function ShareIcon() {
   );
 }
 
+function SpinnerIcon() {
+  return (
+    <svg
+      className="w-4 h-4 animate-spin"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
+      <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function DeptSection({
   title,
   accent,
@@ -272,10 +287,7 @@ function DeptSection({
       </div>
       <ol className="space-y-2.5">
         {employees.map((emp, idx) => (
-          <li
-            key={emp.employee_id}
-            className="text-sm leading-snug"
-          >
+          <li key={emp.employee_id} className="text-sm leading-snug">
             <div className="flex items-baseline gap-1.5">
               <span className="text-brand-navy-soft tabular-nums flex-shrink-0">
                 {idx + 1}.
