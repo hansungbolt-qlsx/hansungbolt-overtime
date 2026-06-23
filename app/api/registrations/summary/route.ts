@@ -87,17 +87,19 @@ export async function GET(req: Request) {
   const empIds = Array.from(empMap.keys());
   const { data: emps } = await supabaseAdmin
     .from('employees')
-    .select('id, full_name, order_no')
+    .select('id, full_name, department, order_no')
     .in('id', empIds)
     .order('order_no', { ascending: true });
 
   const nameMap = new Map((emps ?? []).map((e) => [e.id, e.full_name]));
+  const deptMap = new Map((emps ?? []).map((e) => [e.id, e.department]));
   const orderMap = new Map((emps ?? []).map((e) => [e.id, e.order_no ?? 9999]));
 
   const summary = Array.from(empMap.entries())
     .map(([id, b]) => ({
       employee_id: id,
       employee_name: nameMap.get(id) ?? id,
+      employee_department: deptMap.get(id) ?? null,
       weekday_count: b.weekdayDays.size,
       sunday_count: b.sundayDays.size,
       total_hours: Number(b.totalHours.toFixed(2)),

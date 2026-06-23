@@ -11,13 +11,14 @@ function currentMonthISO() {
 export default async function PrintOvertimeSummaryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string }>;
+  searchParams: Promise<{ month?: string; dept?: string; preview?: string }>;
 }) {
   const session = await getSession();
   if (!session) redirect('/login');
 
   const sp = await searchParams;
   const month = sp.month ?? currentMonthISO();
+  const previewMode = sp.preview === '1';
 
   if (!/^\d{4}-\d{2}$/.test(month)) redirect('/dashboard');
 
@@ -25,7 +26,13 @@ export default async function PrintOvertimeSummaryPage({
   const startDate = `${month}-01`;
   const endDate = new Date(y, m, 0).toISOString().slice(0, 10);
 
-  const filterDept = session.role !== 'admin' && session.department ? session.department : null;
+  // Filter dept: admin có thể truyền ?dept=HD/RL để xem riêng từng bộ phận;
+  // non-admin luôn force theo dept của mình.
+  const requestedDept = sp.dept === 'HD' || sp.dept === 'RL' ? sp.dept : null;
+  const filterDept =
+    session.role !== 'admin' && session.department
+      ? session.department
+      : requestedDept;
   let regQuery = supabaseAdmin
     .from('overtime_registrations')
     .select('id, overtime_date, day_type, duration_hours')
@@ -102,5 +109,13 @@ export default async function PrintOvertimeSummaryPage({
     byDate: Object.fromEntries(empDateMap.get(e.id) ?? new Map<string, number>()),
   }));
 
-  return <PrintClient month={month} overtimeDates={overtimeDates} employees={employees} />;
+  return (
+    <PrintClient
+      month={month}
+      overtimeDates={overtimeDates}
+      employees={employees}
+      dept={filterDept}
+      preview={previewMode}
+    />
+  );
 }

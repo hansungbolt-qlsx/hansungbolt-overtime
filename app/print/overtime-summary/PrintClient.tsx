@@ -10,17 +10,23 @@ export default function PrintClient({
   month,
   overtimeDates,
   employees,
+  dept,
+  preview,
 }: {
   month: string;
   overtimeDates: DateEntry[];
   employees: EmpRow[];
+  dept: string | null;
+  preview: boolean;
 }) {
   useEffect(() => {
-    window.print();
-  }, []);
+    // Preview mode: KHÔNG tự bật print dialog, chỉ hiển thị để xem.
+    if (!preview) window.print();
+  }, [preview]);
 
   const [y, m] = month.split('-');
-  const title = `TỔNG HỢP GIỜ TĂNG CA THÁNG ${parseInt(m)}/${y}`;
+  const deptLabel = dept ? ` — BỘ PHẬN ${dept}` : '';
+  const title = `TỔNG HỢP GIỜ TĂNG CA THÁNG ${parseInt(m)}/${y}${deptLabel}`;
 
   const grandTotal = employees.reduce((s, e) => {
     return s + Object.values(e.byDate).reduce((a, b) => a + b, 0);
@@ -118,8 +124,8 @@ export default function PrintClient({
       `}</style>
 
       <div className="no-print">
-        <span>{title}</span>
-        <button onClick={() => window.print()}>In ngay</button>
+        <span>{preview ? `XEM BÁO CÁO: ${title}` : title}</span>
+        <button onClick={() => window.print()}>{preview ? 'In trang này' : 'In ngay'}</button>
         <button className="btn-close" onClick={() => window.close()}>✕</button>
       </div>
 
