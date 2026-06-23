@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth-server';
 import { supabaseAdmin } from '@/lib/supabase';
@@ -230,15 +231,21 @@ export default async function PrintViewPage({
         <article className="ot-form bg-white p-6 md:p-10 shadow-sm print:shadow-none print:p-0 text-[13px] text-black">
           <div className="flex justify-between items-start mb-2">
             <div>
-              <Image
-                src="/logo.png"
-                alt="Hansungbolt Vina"
-                width={890}
-                height={405}
-                priority
-                unoptimized
-                className="h-16 w-auto"
-              />
+              <Link
+                href={session.role === 'admin' ? '/dashboard' : '/register'}
+                aria-label="Về trang chủ"
+                className="inline-block active:scale-95 transition print:pointer-events-none"
+              >
+                <Image
+                  src="/logo.png"
+                  alt="Hansungbolt Vina"
+                  width={890}
+                  height={405}
+                  priority
+                  unoptimized
+                  className="h-16 w-auto"
+                />
+              </Link>
               <div className="mt-2 text-sm">
                 Số:
                 <span className="inline-block border-b border-black w-24 ml-1 align-bottom">&nbsp;</span>
