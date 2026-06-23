@@ -10,6 +10,8 @@ type User = {
   role: 'admin' | 'leader' | 'worker';
   department: 'HD' | 'RL' | null;
   password_plain: string | null;
+  active: boolean;
+  deactivated_at: string | null;
   created_at: string;
 };
 
@@ -24,6 +26,15 @@ const ROLE_BADGE: Record<User['role'], string> = {
   leader: 'bg-[#2db5a1] text-white',
   worker: 'bg-[#dce8fa] text-[#063882]',
 };
+
+const ROLE_ORDER: Record<User['role'], number> = { leader: 0, worker: 1, admin: 2 };
+
+function formatDateVN(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+}
 
 export default function UserManagementCard() {
   const [users, setUsers] = useState<User[]>([]);
@@ -61,32 +72,53 @@ export default function UserManagementCard() {
     }
   }
 
-  async function handleDelete(u: User) {
-    if (!confirm(`XÓA tài khoản ${toTitleCase(u.full_name)} (${u.username})?\nThao tác này không thể hoàn tác.`)) return;
+  async function handleToggleActive(u: User) {
+    const turnOff = u.active;
+    const msg = turnOff
+      ? `Đánh dấu ${toTitleCase(u.full_name)} là ĐÃ NGHỈ?\n\nSau khi xác nhận:\n• Không đăng nhập app được nữa.\n• Không xuất hiện trong danh sách chọn khi đăng ký tăng ca.\n• Có thể bấm "Đang làm" để khôi phục bất cứ lúc nào.`
+      : `Khôi phục ${toTitleCase(u.full_name)} về trạng thái ĐANG LÀM?`;
+    if (!confirm(msg)) return;
     setBusyId(u.id);
     try {
-      const res = await fetch(`/api/users/${u.id}`, { method: 'DELETE' });
+      const endpoint = turnOff ? 'deactivate' : 'reactivate';
+      const res = await fetch(`/api/users/${u.id}/${endpoint}`, { method: 'POST' });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert(`Xóa thất bại: ${d.error ?? res.statusText}`);
+        alert(`Lỗi: ${d.error ?? res.statusText}`);
         return;
       }
+      if (d.warning) alert(d.warning);
       await load();
     } finally {
       setBusyId(null);
     }
   }
 
-  // Group by department
+  // Group theo dept (admin riêng); trong mỗi group: active trước (role -> tên), inactive sau (deactivated_at desc)
   const grouped: Record<string, User[]> = {};
   for (const u of users) {
     const key = u.role === 'admin' ? 'Admin' : (u.department ?? 'Khác');
     (grouped[key] ??= []).push(u);
   }
+  for (const k of Object.keys(grouped)) {
+    grouped[k].sort((a, b) => {
+      if (a.active !== b.active) return a.active ? -1 : 1;
+      if (!a.active && !b.active) {
+        return (b.deactivated_at ?? '').localeCompare(a.deactivated_at ?? '');
+      }
+      const ra = ROLE_ORDER[a.role] ?? 9;
+      const rb = ROLE_ORDER[b.role] ?? 9;
+      if (ra !== rb) return ra - rb;
+      return a.full_name.localeCompare(b.full_name, 'vi');
+    });
+  }
   const order = ['Admin', 'HD', 'RL'];
   const sortedKeys = Object.keys(grouped).sort(
     (a, b) => (order.indexOf(a) === -1 ? 99 : order.indexOf(a)) - (order.indexOf(b) === -1 ? 99 : order.indexOf(b)),
   );
+
+  const activeCount = users.filter((u) => u.active).length;
+  const inactiveCount = users.length - activeCount;
 
   return (
     <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden">
@@ -94,12 +126,13 @@ export default function UserManagementCard() {
         <div className="min-w-0">
           <h2 className="text-lg font-semibold text-brand-navy">Quản lý tài khoản</h2>
           <p className="text-xs text-brand-navy-soft mt-0.5">
-            Thêm nhân viên mới, reset mật khẩu (về &quot;hd123&quot;) hoặc xóa user khi nhân viên nghỉ việc
+            Thêm nhân viên, reset mật khẩu (về &quot;hd123&quot;), hoặc đánh dấu nghỉ việc (NV nghỉ sẽ bị chặn login và ẩn khỏi danh sách đăng ký tăng ca).
           </p>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
           <span className="text-xs font-semibold text-brand-navy-soft hidden sm:inline">
-            {users.length} tài khoản
+            {activeCount} đang làm
+            {inactiveCount > 0 && <span className="text-[#c01f2a]"> · {inactiveCount} đã nghỉ</span>}
           </span>
           <button
             type="button"
@@ -128,50 +161,76 @@ export default function UserManagementCard() {
                     <th className="text-left px-4 py-2 font-semibold">Username</th>
                     <th className="text-left px-4 py-2 font-semibold">Mật khẩu</th>
                     <th className="text-left px-4 py-2 font-semibold">Vai trò</th>
+                    <th className="text-left px-4 py-2 font-semibold">Trạng thái</th>
                     <th className="text-right px-4 py-2 font-semibold">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-brand-surface-alt">
-                  {grouped[key].map((u) => (
-                    <tr key={u.id} className="hover:bg-[#f0f5ff]/50">
-                      <td className="px-4 py-2.5 font-semibold text-brand-navy">
-                        {toTitleCase(u.full_name)}
-                      </td>
-                      <td className="px-4 py-2.5 text-brand-navy-soft font-mono">
-                        {u.username}
-                      </td>
-                      <td className="px-4 py-2.5 text-brand-navy font-mono">
-                        {u.password_plain ?? <span className="italic text-brand-navy-soft text-xs">(không rõ)</span>}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <span className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded ${ROLE_BADGE[u.role]}`}>
-                          {ROLE_LABEL[u.role]}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-right">
-                        <div className="inline-flex gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleResetPassword(u)}
-                            disabled={busyId === u.id}
-                            className="text-xs px-2.5 py-1 bg-[#dce8fa] hover:bg-[#c4d8f5] disabled:opacity-60 text-[#063882] font-semibold rounded transition"
-                          >
-                            Reset MK
-                          </button>
-                          {u.role !== 'admin' && (
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(u)}
-                              disabled={busyId === u.id}
-                              className="text-xs px-2.5 py-1 bg-[#fde8e9] hover:bg-[#fcd0d2] disabled:opacity-60 text-[#c01f2a] font-semibold rounded transition"
-                            >
-                              Xóa
-                            </button>
+                  {grouped[key].map((u) => {
+                    const inactive = !u.active;
+                    return (
+                      <tr
+                        key={u.id}
+                        className={`hover:bg-[#f0f5ff]/50 ${inactive ? 'bg-[#fafafa] opacity-60' : ''}`}
+                      >
+                        <td className="px-4 py-2.5 font-semibold text-brand-navy">
+                          {toTitleCase(u.full_name)}
+                        </td>
+                        <td className="px-4 py-2.5 text-brand-navy-soft font-mono">
+                          {u.username}
+                        </td>
+                        <td className="px-4 py-2.5 text-brand-navy font-mono">
+                          {u.password_plain ?? <span className="italic text-brand-navy-soft text-xs">(không rõ)</span>}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded ${ROLE_BADGE[u.role]}`}>
+                            {ROLE_LABEL[u.role]}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          {inactive ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#c01f2a]">
+                              <span className="w-2 h-2 rounded-full bg-[#c01f2a]" />
+                              Đã nghỉ{u.deactivated_at && ` (${formatDateVN(u.deactivated_at)})`}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#2db5a1]">
+                              <span className="w-2 h-2 rounded-full bg-[#2db5a1]" />
+                              Đang làm
+                            </span>
                           )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-4 py-2.5 text-right">
+                          <div className="inline-flex gap-1.5">
+                            {(u.role === 'admin' || u.active) && (
+                              <button
+                                type="button"
+                                onClick={() => handleResetPassword(u)}
+                                disabled={busyId === u.id}
+                                className="text-xs px-2.5 py-1 bg-[#dce8fa] hover:bg-[#c4d8f5] disabled:opacity-60 text-[#063882] font-semibold rounded transition"
+                              >
+                                Reset MK
+                              </button>
+                            )}
+                            {u.role !== 'admin' && (
+                              <button
+                                type="button"
+                                onClick={() => handleToggleActive(u)}
+                                disabled={busyId === u.id}
+                                className={`text-xs px-2.5 py-1 disabled:opacity-60 font-semibold rounded transition ${
+                                  u.active
+                                    ? 'bg-[#fde8e9] hover:bg-[#fcd0d2] text-[#c01f2a]'
+                                    : 'bg-[#dcf5e8] hover:bg-[#c2ebd4] text-[#0c6c3d]'
+                                }`}
+                              >
+                                {u.active ? 'Đã nghỉ' : 'Khôi phục'}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

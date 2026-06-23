@@ -16,8 +16,9 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from('users')
-    .select('id, username, full_name, role, department, password_plain, created_at')
-    .order('role', { ascending: false }) // admin → leader → worker (desc theo alphabet)
+    .select('id, username, full_name, role, department, password_plain, active, deactivated_at, created_at')
+    .order('active', { ascending: false }) // active trước, đã nghỉ sau
+    .order('role', { ascending: false })
     .order('department', { ascending: true })
     .order('full_name', { ascending: true });
 
@@ -88,7 +89,7 @@ export async function POST(req: Request) {
       password_hash,
       password_plain: DEFAULT_PASSWORD,
     })
-    .select('id, username, full_name, role, department, password_plain, created_at')
+    .select('id, username, full_name, role, department, password_plain, active, deactivated_at, created_at')
     .single();
 
   if (userErr || !newUser) {
@@ -98,32 +99,45 @@ export async function POST(req: Request) {
     );
   }
 
-  // 2. Insert vào employees với order_no = max + 1 theo bộ phận
-  const { data: lastEmp } = await supabaseAdmin
+  // 2. Nếu đã có employee cùng tên + dept và đang inactive → reactivate
+  //    Nếu chưa có → tạo mới với order_no = max + 1
+  const { data: existingEmp } = await supabaseAdmin
     .from('employees')
-    .select('order_no')
+    .select('id, active')
     .eq('department', department)
-    .order('order_no', { ascending: false })
-    .limit(1)
+    .eq('full_name', fullNameStored)
     .maybeSingle();
 
-  const nextOrderNo = (lastEmp?.order_no ?? 0) + 1;
-
-  const { error: empErr } = await supabaseAdmin.from('employees').insert({
-    full_name: fullNameStored,
-    department,
-    order_no: nextOrderNo,
-  });
-
-  if (empErr) {
-    // User đã tạo nhưng employee fail → trả về cảnh báo, không rollback (đỡ rắc rối)
-    return NextResponse.json(
-      {
-        user: newUser,
-        warning: `Tạo user thành công nhưng không thêm được vào danh sách nhân viên: ${empErr.message}`,
-      },
-      { status: 207 },
-    );
+  if (existingEmp) {
+    if (!existingEmp.active) {
+      await supabaseAdmin
+        .from('employees')
+        .update({ active: true, deactivated_at: null })
+        .eq('id', existingEmp.id);
+    }
+  } else {
+    const { data: lastEmp } = await supabaseAdmin
+      .from('employees')
+      .select('order_no')
+      .eq('department', department)
+      .order('order_no', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const nextOrderNo = (lastEmp?.order_no ?? 0) + 1;
+    const { error: empErr } = await supabaseAdmin.from('employees').insert({
+      full_name: fullNameStored,
+      department,
+      order_no: nextOrderNo,
+    });
+    if (empErr) {
+      return NextResponse.json(
+        {
+          user: newUser,
+          warning: `Tạo user thành công nhưng không thêm được vào danh sách nhân viên: ${empErr.message}`,
+        },
+        { status: 207 },
+      );
+    }
   }
 
   return NextResponse.json({ user: newUser });

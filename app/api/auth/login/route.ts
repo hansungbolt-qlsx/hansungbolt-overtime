@@ -22,7 +22,7 @@ export async function POST(req: Request) {
 
   const { data: user } = await supabaseAdmin
     .from('users')
-    .select('id, username, full_name, role, department, password_hash')
+    .select('id, username, full_name, role, department, password_hash, active')
     .eq('username', username)
     .maybeSingle();
 
@@ -38,6 +38,13 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { error: 'Sai tên đăng nhập hoặc mật khẩu' },
       { status: 401 },
+    );
+  }
+
+  if (user.active === false) {
+    return NextResponse.json(
+      { error: 'Tài khoản đã ngừng hoạt động. Vui lòng liên hệ admin.' },
+      { status: 403 },
     );
   }
 

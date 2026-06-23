@@ -20,6 +20,7 @@ export async function GET(req: Request) {
     .from('employees')
     .select('id, full_name, order_no')
     .eq('department', session.department)
+    .eq('active', true)
     .order('order_no', { ascending: true });
   if (empErr) return NextResponse.json({ error: empErr.message }, { status: 500 });
 
