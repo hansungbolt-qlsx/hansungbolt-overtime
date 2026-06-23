@@ -225,7 +225,7 @@ export default function TodayOvertimeCard({
         <div
           ref={shareViewRef}
           style={{
-            width: 640,
+            width: 480,
             background: '#ffffff',
             color: '#1b3864',
             fontFamily: SHARE_FONT,
@@ -279,18 +279,6 @@ export default function TodayOvertimeCard({
               totalMachines={rlMachines}
             />
           )}
-
-          <div
-            style={{
-              padding: '10px 24px',
-              borderTop: '1px solid #e8f0fb',
-              fontSize: 11,
-              color: '#7a8aa3',
-              textAlign: 'right',
-            }}
-          >
-            Hansungbolt Vina · App đăng ký tăng ca
-          </div>
         </div>
       </div>
     </>
