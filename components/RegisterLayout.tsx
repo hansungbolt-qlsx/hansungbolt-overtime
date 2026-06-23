@@ -21,7 +21,7 @@ function OvertimeView({ department, isLeader }: { department: string; isLeader: 
   return (
     <div className="space-y-6">
       {isLeader && <OvertimeForm department={department} />}
-      <DepartmentRegistrationsList />
+      <DepartmentRegistrationsList canEdit={isLeader} />
       <OvertimeSummaryCard />
     </div>
   );

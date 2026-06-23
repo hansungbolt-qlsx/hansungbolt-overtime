@@ -10,7 +10,9 @@ export default async function EditRegistrationPage({
 }) {
   const session = await getSession();
   if (!session) redirect('/login');
-  if (session.role !== 'admin') redirect('/register');
+
+  // Admin xem mọi phiếu; leader chỉ xem phiếu bộ phận mình; worker không cho.
+  if (session.role === 'worker') redirect('/register');
 
   const { id } = await params;
 
@@ -27,6 +29,18 @@ export default async function EditRegistrationPage({
       </main>
     );
   }
+
+  const isAdmin = session.role === 'admin';
+  const isOwnDeptLeader =
+    session.role === 'leader' && session.department === reg.department;
+  if (!isAdmin && !isOwnDeptLeader) {
+    redirect('/register');
+  }
+
+  // Sau khi save, leader về tab Đăng ký tăng ca (/register), admin về Dashboard.
+  const backHref = isAdmin
+    ? `/dashboard?date=${reg.overtime_date}`
+    : '/register';
 
   const [{ data: items }, { data: employees }, { data: equipments }] = await Promise.all([
     supabaseAdmin
@@ -55,6 +69,7 @@ export default async function EditRegistrationPage({
           items={items ?? []}
           employees={employees ?? []}
           equipments={equipments ?? []}
+          backHref={backHref}
         />
       </div>
     </main>

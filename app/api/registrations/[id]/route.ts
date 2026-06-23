@@ -36,8 +36,12 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const session = await getSession();
-  if (!session || session.role !== 'admin') {
-    return NextResponse.json({ error: 'Chỉ admin được sửa phiếu' }, { status: 403 });
+  if (!session) {
+    return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
+  }
+  // Admin và leader đều có thể sửa; worker thì không.
+  if (session.role !== 'admin' && session.role !== 'leader') {
+    return NextResponse.json({ error: 'Không có quyền sửa phiếu' }, { status: 403 });
   }
 
   const { id } = await params;
@@ -61,6 +65,14 @@ export async function PATCH(
     .maybeSingle();
   if (regErr) return NextResponse.json({ error: regErr.message }, { status: 500 });
   if (!reg) return NextResponse.json({ error: 'Không tìm thấy phiếu' }, { status: 404 });
+
+  // Leader chỉ sửa được phiếu của bộ phận mình
+  if (session.role === 'leader' && session.department !== reg.department) {
+    return NextResponse.json(
+      { error: 'Chỉ sửa được phiếu của bộ phận mình' },
+      { status: 403 },
+    );
+  }
 
   // Validate items có đủ dữ liệu
   for (let i = 0; i < items.length; i++) {

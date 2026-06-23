@@ -39,7 +39,11 @@ function formatDateTime(iso: string) {
   return `${hh}:${mm} ${dd}/${mo}`;
 }
 
-export default function DepartmentRegistrationsList() {
+export default function DepartmentRegistrationsList({
+  canEdit = false,
+}: {
+  canEdit?: boolean;
+} = {}) {
   const [date, setDate] = useState(todayISO());
   const [regs, setRegs] = useState<Reg[]>([]);
   const [loading, setLoading] = useState(false);
@@ -105,6 +109,14 @@ export default function DepartmentRegistrationsList() {
                   </td>
                   <td className="px-3 py-2.5 text-right">
                     <div className="inline-flex gap-1.5">
+                      {canEdit && (
+                        <Link
+                          href={`/dashboard/registrations/${r.id}/edit`}
+                          className="bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-semibold py-1.5 px-3 rounded-md transition"
+                        >
+                          Sửa
+                        </Link>
+                      )}
                       <Link
                         href={`/dashboard/registrations/${r.id}/view?autoprint=1`}
                         className="bg-brand-teal hover:bg-brand-teal-dark text-white text-xs font-semibold py-1.5 px-3 rounded-md shadow-sm shadow-brand-teal/30 transition"

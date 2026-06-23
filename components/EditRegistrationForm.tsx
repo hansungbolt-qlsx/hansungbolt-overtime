@@ -68,11 +68,13 @@ export default function EditRegistrationForm({
   items,
   employees,
   equipments,
+  backHref,
 }: {
   reg: Reg;
   items: Item[];
   employees: Employee[];
   equipments: Equipment[];
+  backHref: string;
 }) {
   const router = useRouter();
   const headerFrom = toHM(reg.time_from);
@@ -166,7 +168,7 @@ export default function EditRegistrationForm({
         setError(data.error || 'Không lưu được phiếu');
         return;
       }
-      router.push(`/dashboard?date=${reg.overtime_date}`);
+      router.push(backHref);
       router.refresh();
     } finally {
       setSaving(false);
@@ -184,7 +186,7 @@ export default function EditRegistrationForm({
           </p>
         </div>
         <Link
-          href={`/dashboard?date=${reg.overtime_date}`}
+          href={backHref}
           className="text-sm text-brand-navy-soft hover:text-brand-navy"
         >
           ← Quay lại
@@ -340,7 +342,7 @@ export default function EditRegistrationForm({
           {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
         </button>
         <Link
-          href={`/dashboard?date=${reg.overtime_date}`}
+          href={backHref}
           className="px-6 py-3 border border-gray-300 text-brand-navy hover:bg-gray-50 rounded-md font-semibold transition"
         >
           Hủy
