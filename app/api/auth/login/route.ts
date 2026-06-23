@@ -22,7 +22,7 @@ export async function POST(req: Request) {
 
   const { data: user } = await supabaseAdmin
     .from('users')
-    .select('id, username, full_name, role, department, password_hash, active')
+    .select('*')
     .eq('username', username)
     .maybeSingle();
 
@@ -41,6 +41,7 @@ export async function POST(req: Request) {
     );
   }
 
+  // Sau khi migration 08 chạy, cột `active` sẽ tồn tại; trước đó undefined.
   if (user.active === false) {
     return NextResponse.json(
       { error: 'Tài khoản đã ngừng hoạt động. Vui lòng liên hệ admin.' },

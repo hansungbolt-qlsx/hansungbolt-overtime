@@ -10,8 +10,9 @@ type User = {
   role: 'admin' | 'leader' | 'worker';
   department: 'HD' | 'RL' | null;
   password_plain: string | null;
-  active: boolean;
-  deactivated_at: string | null;
+  // active/deactivated_at: optional vì có thể chưa chạy migration 08 trên DB.
+  active?: boolean;
+  deactivated_at?: string | null;
   created_at: string;
 };
 
@@ -94,6 +95,11 @@ export default function UserManagementCard() {
     }
   }
 
+  // Feature flag: bật cột Trạng thái + nút toggle khi backend đã trả về field active
+  // (= migration 08 đã chạy). Nếu chưa → fallback giao diện cũ.
+  const hasActiveFeature = users.some((u) => u.active !== undefined);
+  const isActive = (u: User) => u.active !== false;
+
   // Group theo dept (admin riêng); trong mỗi group: active trước (role -> tên), inactive sau (deactivated_at desc)
   const grouped: Record<string, User[]> = {};
   for (const u of users) {
@@ -102,8 +108,10 @@ export default function UserManagementCard() {
   }
   for (const k of Object.keys(grouped)) {
     grouped[k].sort((a, b) => {
-      if (a.active !== b.active) return a.active ? -1 : 1;
-      if (!a.active && !b.active) {
+      const aA = isActive(a);
+      const bA = isActive(b);
+      if (aA !== bA) return aA ? -1 : 1;
+      if (!aA && !bA) {
         return (b.deactivated_at ?? '').localeCompare(a.deactivated_at ?? '');
       }
       const ra = ROLE_ORDER[a.role] ?? 9;
@@ -117,7 +125,7 @@ export default function UserManagementCard() {
     (a, b) => (order.indexOf(a) === -1 ? 99 : order.indexOf(a)) - (order.indexOf(b) === -1 ? 99 : order.indexOf(b)),
   );
 
-  const activeCount = users.filter((u) => u.active).length;
+  const activeCount = users.filter(isActive).length;
   const inactiveCount = users.length - activeCount;
 
   return (
@@ -131,8 +139,14 @@ export default function UserManagementCard() {
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
           <span className="text-xs font-semibold text-brand-navy-soft hidden sm:inline">
-            {activeCount} đang làm
-            {inactiveCount > 0 && <span className="text-[#c01f2a]"> · {inactiveCount} đã nghỉ</span>}
+            {hasActiveFeature ? (
+              <>
+                {activeCount} đang làm
+                {inactiveCount > 0 && <span className="text-[#c01f2a]"> · {inactiveCount} đã nghỉ</span>}
+              </>
+            ) : (
+              <>{users.length} tài khoản</>
+            )}
           </span>
           <button
             type="button"
@@ -161,13 +175,15 @@ export default function UserManagementCard() {
                     <th className="text-left px-4 py-2 font-semibold">Username</th>
                     <th className="text-left px-4 py-2 font-semibold">Mật khẩu</th>
                     <th className="text-left px-4 py-2 font-semibold">Vai trò</th>
-                    <th className="text-left px-4 py-2 font-semibold">Trạng thái</th>
+                    {hasActiveFeature && (
+                      <th className="text-left px-4 py-2 font-semibold">Trạng thái</th>
+                    )}
                     <th className="text-right px-4 py-2 font-semibold">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-brand-surface-alt">
                   {grouped[key].map((u) => {
-                    const inactive = !u.active;
+                    const inactive = u.active === false;
                     return (
                       <tr
                         key={u.id}
@@ -187,22 +203,24 @@ export default function UserManagementCard() {
                             {ROLE_LABEL[u.role]}
                           </span>
                         </td>
-                        <td className="px-4 py-2.5">
-                          {inactive ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#c01f2a]">
-                              <span className="w-2 h-2 rounded-full bg-[#c01f2a]" />
-                              Đã nghỉ{u.deactivated_at && ` (${formatDateVN(u.deactivated_at)})`}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#2db5a1]">
-                              <span className="w-2 h-2 rounded-full bg-[#2db5a1]" />
-                              Đang làm
-                            </span>
-                          )}
-                        </td>
+                        {hasActiveFeature && (
+                          <td className="px-4 py-2.5">
+                            {inactive ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#c01f2a]">
+                                <span className="w-2 h-2 rounded-full bg-[#c01f2a]" />
+                                Đã nghỉ{u.deactivated_at && ` (${formatDateVN(u.deactivated_at)})`}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#2db5a1]">
+                                <span className="w-2 h-2 rounded-full bg-[#2db5a1]" />
+                                Đang làm
+                              </span>
+                            )}
+                          </td>
+                        )}
                         <td className="px-4 py-2.5 text-right">
                           <div className="inline-flex gap-1.5">
-                            {(u.role === 'admin' || u.active) && (
+                            {(u.role === 'admin' || !inactive) && (
                               <button
                                 type="button"
                                 onClick={() => handleResetPassword(u)}
@@ -212,18 +230,18 @@ export default function UserManagementCard() {
                                 Reset MK
                               </button>
                             )}
-                            {u.role !== 'admin' && (
+                            {u.role !== 'admin' && hasActiveFeature && (
                               <button
                                 type="button"
                                 onClick={() => handleToggleActive(u)}
                                 disabled={busyId === u.id}
                                 className={`text-xs px-2.5 py-1 disabled:opacity-60 font-semibold rounded transition ${
-                                  u.active
+                                  !inactive
                                     ? 'bg-[#fde8e9] hover:bg-[#fcd0d2] text-[#c01f2a]'
                                     : 'bg-[#dcf5e8] hover:bg-[#c2ebd4] text-[#0c6c3d]'
                                 }`}
                               >
-                                {u.active ? 'Đã nghỉ' : 'Khôi phục'}
+                                {!inactive ? 'Đã nghỉ' : 'Khôi phục'}
                               </button>
                             )}
                           </div>

@@ -14,17 +14,24 @@ export async function GET() {
     return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   }
 
+  // SELECT * để forward-compat với DB chưa có cột `active`/`deactivated_at`
+  // (trước migration 08). Bỏ password_hash trước khi trả về client.
   const { data, error } = await supabaseAdmin
     .from('users')
-    .select('id, username, full_name, role, department, password_plain, active, deactivated_at, created_at')
-    .order('active', { ascending: false }) // active trước, đã nghỉ sau
+    .select('*')
     .order('role', { ascending: false })
     .order('department', { ascending: true })
     .order('full_name', { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ users: data ?? [] });
+  const users = (data ?? []).map((u) => {
+    const { password_hash: _ph, ...rest } = u as Record<string, unknown> & { password_hash?: string };
+    void _ph;
+    return rest;
+  });
+
+  return NextResponse.json({ users });
 }
 
 // POST /api/users — tạo user mới (admin only)
@@ -89,7 +96,7 @@ export async function POST(req: Request) {
       password_hash,
       password_plain: DEFAULT_PASSWORD,
     })
-    .select('id, username, full_name, role, department, password_plain, active, deactivated_at, created_at')
+    .select('id, username, full_name, role, department, password_plain, created_at')
     .single();
 
   if (userErr || !newUser) {
@@ -101,15 +108,17 @@ export async function POST(req: Request) {
 
   // 2. Nếu đã có employee cùng tên + dept và đang inactive → reactivate
   //    Nếu chưa có → tạo mới với order_no = max + 1
+  // SELECT * để forward-compat với DB chưa có cột `active` (trước migration 08).
   const { data: existingEmp } = await supabaseAdmin
     .from('employees')
-    .select('id, active')
+    .select('*')
     .eq('department', department)
     .eq('full_name', fullNameStored)
     .maybeSingle();
 
   if (existingEmp) {
-    if (!existingEmp.active) {
+    const empActive = (existingEmp as { active?: boolean }).active;
+    if (empActive === false) {
       await supabaseAdmin
         .from('employees')
         .update({ active: true, deactivated_at: null })

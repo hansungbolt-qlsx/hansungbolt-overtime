@@ -16,12 +16,16 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Thiếu tham số date' }, { status: 400 });
   }
 
-  const { data: emps, error: empErr } = await supabaseAdmin
+  const { data: empsRaw, error: empErr } = await supabaseAdmin
     .from('employees')
-    .select('id, full_name, order_no')
+    .select('*')
     .eq('department', session.department)
-    .eq('active', true)
     .order('order_no', { ascending: true });
+  // Filter active=true ở JS để forward-compat với DB chưa có cột `active`
+  // (trước migration 08 thì field undefined → vẫn coi là đang làm)
+  const emps = (empsRaw ?? []).filter(
+    (e: { active?: boolean }) => e.active !== false,
+  );
   if (empErr) return NextResponse.json({ error: empErr.message }, { status: 500 });
 
   type MachineWithItems = {
