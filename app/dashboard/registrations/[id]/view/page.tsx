@@ -33,7 +33,7 @@ export default async function PrintViewPage({
 
   const { data: reg } = await supabaseAdmin
     .from('overtime_registrations')
-    .select('id, department, overtime_date, day_type, time_from, time_to, duration_hours')
+    .select('id, department, overtime_date, day_type, time_from, time_to, duration_hours, registered_by')
     .eq('id', id)
     .maybeSingle();
 
@@ -64,13 +64,21 @@ export default async function PrintViewPage({
   const empIds = Array.from(new Set((items ?? []).map((i) => i.employee_id)));
   const eqIds = Array.from(new Set((items ?? []).map((i) => i.equipment_id)));
 
-  const [{ data: emps }, { data: eqs }] = await Promise.all([
+  const [{ data: emps }, { data: eqs }, { data: requestor }] = await Promise.all([
     supabaseAdmin.from('employees').select('id, full_name, order_no').in('id', empIds),
     supabaseAdmin.from('equipments').select('id, code, machine_type').in('id', eqIds),
+    reg.registered_by
+      ? supabaseAdmin
+          .from('users')
+          .select('full_name')
+          .eq('id', reg.registered_by)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const empMap = new Map((emps ?? []).map((e) => [e.id, e]));
   const eqMap = new Map((eqs ?? []).map((e) => [e.id, e]));
+  const requestorName = requestor?.full_name ?? '—';
 
   // HD: HD-15..HD-31 = M4, HD-50..HD-55 = M3
   // RL: RL-09..RL-23 = M4 (RL-24 đặc thù, không gộp), RL-40..RL-42 = M3
@@ -233,7 +241,7 @@ export default async function PrintViewPage({
           <div className="grid grid-cols-2 ot-bordered mb-0">
             <div className="p-2 ot-border-r">
               <div>
-                Người yêu cầu: <strong>HOÀNG CHÍNH HỮU</strong>
+                Người yêu cầu: <strong>{requestorName}</strong>
               </div>
               <div className="text-xs italic text-gray-600">Requestor</div>
             </div>

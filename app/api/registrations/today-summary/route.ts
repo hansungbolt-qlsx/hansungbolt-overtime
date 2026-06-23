@@ -11,6 +11,13 @@ type EmployeeRow = {
   machines: Array<{ code: string; isOther: boolean; otherText?: string }>;
 };
 
+type MachineDetail = {
+  equipment_code: string;
+  item_code: string | null;
+  employee_name: string;
+  is_other: boolean;
+};
+
 export async function GET(req: Request) {
   const session = await getSession();
   if (!session) {
@@ -102,5 +109,49 @@ export async function GET(req: Request) {
   hd.sort((a, b) => a.order_no - b.order_no);
   rl.sort((a, b) => a.order_no - b.order_no);
 
-  return NextResponse.json({ date, departments: { HD: hd, RL: rl } });
+  // Chi tiết từng máy — để NV chụp gửi nhóm cho biết ai chạy máy nào + mã hàng nào.
+  // 1 dòng = 1 item (1 máy × 1 mã hàng × 1 NV). Sort theo natural order của mã máy.
+  const detailsHD: MachineDetail[] = [];
+  const detailsRL: MachineDetail[] = [];
+  for (const it of items ?? []) {
+    const dept = regDeptMap.get(it.registration_id);
+    const emp = empMap.get(it.employee_id);
+    const eq = eqMap.get(it.equipment_id);
+    if (!dept || !emp || !eq) continue;
+    const isOther = eq.machine_type === 'OTHER';
+    const row: MachineDetail = {
+      equipment_code: eq.code,
+      item_code: it.item_code ?? null,
+      employee_name: emp.full_name,
+      is_other: isOther,
+    };
+    if (dept === 'HD') detailsHD.push(row);
+    else if (dept === 'RL') detailsRL.push(row);
+  }
+  detailsHD.sort(naturalCompareDetail);
+  detailsRL.sort(naturalCompareDetail);
+
+  return NextResponse.json({
+    date,
+    departments: { HD: hd, RL: rl },
+    details: { HD: detailsHD, RL: detailsRL },
+  });
+}
+
+function naturalCompareDetail(a: MachineDetail, b: MachineDetail): number {
+  // CVK (Công việc khác) đẩy xuống cuối
+  if (a.is_other !== b.is_other) return a.is_other ? 1 : -1;
+  return naturalCompareCode(a.equipment_code, b.equipment_code);
+}
+
+function naturalCompareCode(a: string, b: string): number {
+  // Tách prefix + số + suffix để sort tự nhiên: HD-9A < HD-9B < HD-10
+  const ma = a.match(/^([A-Z]+)-?(\d+)([A-Z]*)/i);
+  const mb = b.match(/^([A-Z]+)-?(\d+)([A-Z]*)/i);
+  if (!ma || !mb) return a.localeCompare(b);
+  if (ma[1] !== mb[1]) return ma[1].localeCompare(mb[1]);
+  const na = parseInt(ma[2], 10);
+  const nb = parseInt(mb[2], 10);
+  if (na !== nb) return na - nb;
+  return ma[3].localeCompare(mb[3]);
 }

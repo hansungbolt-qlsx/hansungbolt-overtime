@@ -10,7 +10,17 @@ type EmpRow = {
   order_no: number;
   machines: Array<{ code: string; isOther: boolean; otherText?: string }>;
 };
-type Summary = { date: string; departments: { HD: EmpRow[]; RL: EmpRow[] } };
+type MachineDetail = {
+  equipment_code: string;
+  item_code: string | null;
+  employee_name: string;
+  is_other: boolean;
+};
+type Summary = {
+  date: string;
+  departments: { HD: EmpRow[]; RL: EmpRow[] };
+  details?: { HD: MachineDetail[]; RL: MachineDetail[] };
+};
 
 function todayISO() {
   const d = new Date();
@@ -51,6 +61,8 @@ export default function TodayOvertimeCard({
   const rl = data?.departments.RL ?? [];
   const hdMachines = hd.reduce((s, e) => s + e.machines.length, 0);
   const rlMachines = rl.reduce((s, e) => s + e.machines.length, 0);
+  const hdDetails = data?.details?.HD ?? [];
+  const rlDetails = data?.details?.RL ?? [];
 
   return (
     <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden">
@@ -83,8 +95,20 @@ export default function TodayOvertimeCard({
 
       {!loading && (hd.length > 0 || rl.length > 0) && (
         <div className="divide-y divide-brand-surface-alt">
-          <DeptSection title="HD" accent="#063882" employees={hd} totalMachines={hdMachines} />
-          <DeptSection title="RL" accent="#2db5a1" employees={rl} totalMachines={rlMachines} />
+          <DeptSection
+            title="HD"
+            accent="#063882"
+            employees={hd}
+            totalMachines={hdMachines}
+            details={hdDetails}
+          />
+          <DeptSection
+            title="RL"
+            accent="#2db5a1"
+            employees={rl}
+            totalMachines={rlMachines}
+            details={rlDetails}
+          />
         </div>
       )}
     </section>
@@ -96,11 +120,13 @@ function DeptSection({
   accent,
   employees,
   totalMachines,
+  details,
 }: {
   title: string;
   accent: string;
   employees: EmpRow[];
   totalMachines: number;
+  details: MachineDetail[];
 }) {
   if (employees.length === 0) {
     return (
@@ -129,7 +155,7 @@ function DeptSection({
         </span>
         <span className="text-xs text-brand-navy-soft">• {totalMachines} máy</span>
       </div>
-      <ol className="space-y-1.5">
+      <ol className="space-y-1.5 mb-3">
         {employees.map((emp, idx) => (
           <li
             key={emp.employee_id}
@@ -146,6 +172,52 @@ function DeptSection({
           </li>
         ))}
       </ol>
+
+      {details.length > 0 && (
+        <div className="mt-3 border-t border-brand-surface-alt pt-3">
+          <p className="text-xs font-bold text-brand-navy-soft mb-2 uppercase tracking-wide">
+            Chi tiết máy &amp; mã hàng
+          </p>
+          <div className="overflow-x-auto rounded-lg border border-brand-surface-alt">
+            <table className="w-full text-xs">
+              <thead className="bg-[#f0f5ff] text-[#063882]">
+                <tr>
+                  <th className="text-left px-2 py-1.5 font-semibold w-8">STT</th>
+                  <th className="text-left px-2 py-1.5 font-semibold">Máy</th>
+                  <th className="text-left px-2 py-1.5 font-semibold">Mã hàng</th>
+                  <th className="text-left px-2 py-1.5 font-semibold">Nhân viên</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-brand-surface-alt bg-white">
+                {details.map((d, i) => (
+                  <tr key={`${d.equipment_code}-${d.employee_name}-${i}`}>
+                    <td className="px-2 py-1.5 text-brand-navy-soft tabular-nums">
+                      {i + 1}
+                    </td>
+                    <td className="px-2 py-1.5 font-semibold text-brand-navy whitespace-nowrap">
+                      {d.is_other ? 'Công việc khác' : d.equipment_code}
+                    </td>
+                    <td className="px-2 py-1.5 text-brand-navy">
+                      {d.item_code ? (
+                        d.is_other ? (
+                          <em className="text-brand-navy-soft">{d.item_code}</em>
+                        ) : (
+                          <span className="font-mono">{d.item_code}</span>
+                        )
+                      ) : (
+                        <span className="text-brand-navy-soft">—</span>
+                      )}
+                    </td>
+                    <td className="px-2 py-1.5 text-brand-navy whitespace-nowrap">
+                      {toTitleCase(d.employee_name)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
