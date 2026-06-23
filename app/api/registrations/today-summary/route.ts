@@ -11,14 +11,6 @@ type EmployeeRow = {
   machines: Array<{ code: string; isOther: boolean; otherText?: string }>;
 };
 
-type MachineDetail = {
-  equipment_code: string;
-  item_code: string | null;
-  employee_name: string;
-  employee_order: number;
-  is_other: boolean;
-};
-
 export async function GET(req: Request) {
   const session = await getSession();
   if (!session) {
@@ -53,7 +45,6 @@ export async function GET(req: Request) {
       date,
       restrictDept,
       departments: { HD: [], RL: [] },
-      details: { HD: [], RL: [] },
     });
   }
 
@@ -116,59 +107,37 @@ export async function GET(req: Request) {
   const rl: EmployeeRow[] = [];
   for (const row of groupMap.values()) {
     const { dept, ...rest } = row;
+    // Dedup máy theo code (1 NV có thể chạy 1 máy với 2+ mã hàng → 2+ items
+    // cùng equipment_id) + sort tự nhiên, CVK đẩy xuống cuối.
+    const seen = new Set<string>();
+    const deduped: EmployeeRow['machines'] = [];
+    for (const m of rest.machines) {
+      const key = m.isOther ? `OTHER:${m.otherText ?? ''}` : `M:${m.code}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      deduped.push(m);
+    }
+    deduped.sort((a, b) => {
+      if (a.isOther !== b.isOther) return a.isOther ? 1 : -1;
+      return naturalCompareCode(a.code, b.code);
+    });
+    rest.machines = deduped;
+
     if (dept === 'HD') hd.push(rest);
     else if (dept === 'RL') rl.push(rest);
   }
   hd.sort((a, b) => a.order_no - b.order_no);
   rl.sort((a, b) => a.order_no - b.order_no);
 
-  // Chi tiết từng máy — để NV chụp gửi nhóm cho biết ai chạy máy nào + mã hàng nào.
-  // 1 dòng = 1 item (1 máy × 1 mã hàng × 1 NV).
-  // Sort: theo NV (order_no) trước → trong nhóm NV sort theo mã máy → mã hàng.
-  const detailsHD: MachineDetail[] = [];
-  const detailsRL: MachineDetail[] = [];
-  for (const it of items ?? []) {
-    const dept = regDeptMap.get(it.registration_id);
-    const emp = empMap.get(it.employee_id);
-    const eq = eqMap.get(it.equipment_id);
-    if (!dept || !emp || !eq) continue;
-    const isOther = eq.machine_type === 'OTHER';
-    const row: MachineDetail = {
-      equipment_code: eq.code,
-      item_code: it.item_code ?? null,
-      employee_name: emp.full_name,
-      employee_order: emp.order_no ?? 9999,
-      is_other: isOther,
-    };
-    if (dept === 'HD') detailsHD.push(row);
-    else if (dept === 'RL') detailsRL.push(row);
-  }
-  detailsHD.sort(compareDetail);
-  detailsRL.sort(compareDetail);
-
   return NextResponse.json({
     date,
     restrictDept,
     departments: { HD: hd, RL: rl },
-    details: { HD: detailsHD, RL: detailsRL },
   });
 }
 
-function compareDetail(a: MachineDetail, b: MachineDetail): number {
-  // 1. Theo NV (order_no asc) — NV order thấp đứng trước
-  if (a.employee_order !== b.employee_order) return a.employee_order - b.employee_order;
-  if (a.employee_name !== b.employee_name) return a.employee_name.localeCompare(b.employee_name, 'vi');
-  // 2. CVK đẩy xuống cuối trong nhóm NV
-  if (a.is_other !== b.is_other) return a.is_other ? 1 : -1;
-  // 3. Theo mã máy tự nhiên (HD-9A < HD-9B < HD-10)
-  const cmpCode = naturalCompareCode(a.equipment_code, b.equipment_code);
-  if (cmpCode !== 0) return cmpCode;
-  // 4. Cùng máy thì theo mã hàng
-  return (a.item_code ?? '').localeCompare(b.item_code ?? '');
-}
-
 function naturalCompareCode(a: string, b: string): number {
-  // Tách prefix + số + suffix để sort tự nhiên: HD-9A < HD-9B < HD-10
+  // HD-9A < HD-9B < HD-10
   const ma = a.match(/^([A-Z]+)-?(\d+)([A-Z]*)/i);
   const mb = b.match(/^([A-Z]+)-?(\d+)([A-Z]*)/i);
   if (!ma || !mb) return a.localeCompare(b);
