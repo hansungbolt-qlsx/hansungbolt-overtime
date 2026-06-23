@@ -43,7 +43,8 @@ const emptyRow = (): EmployeeRow => ({
 
 export default function OvertimeForm({ department }: { department: string }) {
   const [date, setDate] = useState(todayISO());
-  const [dayType, setDayType] = useState<'weekday' | 'sunday'>('weekday');
+  // Mặc định null — form chọn NV/máy ẩn; user phải click 1 nút loại ngày trước.
+  const [dayType, setDayType] = useState<'weekday' | 'sunday' | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [machines, setMachines] = useState<Machine[]>([]);
   const [rows, setRows] = useState<EmployeeRow[]>([emptyRow()]);
@@ -54,9 +55,15 @@ export default function OvertimeForm({ department }: { department: string }) {
   const [myRegs, setMyRegs] = useState<MyRegistration[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // Giờ tính sản lượng (trừ break) — KHÁC giờ hiển thị
-  const calcHours = dayType === 'weekday' ? 2.5 : 7.5;
-  const timeLabel = dayType === 'weekday' ? '16:30 – 19:30 (3 giờ)' : '06:00 – 14:00 (8 giờ)';
+  // Giờ tính sản lượng (trừ break) — KHÁC giờ hiển thị. Khi dayType=null,
+  // form NV/máy bị ẩn nên giá trị này không hiển thị; dùng 0 cho an toàn.
+  const calcHours = dayType === 'sunday' ? 7.5 : dayType === 'weekday' ? 2.5 : 0;
+  const timeLabel =
+    dayType === 'weekday'
+      ? '16:30 – 19:30 (3 giờ)'
+      : dayType === 'sunday'
+        ? '06:00 – 14:00 (8 giờ)'
+        : 'Chọn loại ngày để bắt đầu thêm nhân viên';
   const totalItems = rows.reduce(
     (sum, row) => sum + row.checkedMachineIds.length + (row.useOther ? 1 : 0),
     0,
@@ -230,6 +237,7 @@ export default function OvertimeForm({ department }: { department: string }) {
       }
     }
     if (items.length === 0) return setError('Không có dòng nào hợp lệ');
+    if (!dayType) return setError('Chưa chọn loại ngày');
     setSubmitting(true);
     try {
       const res = await fetch('/api/registrations', {
@@ -278,7 +286,9 @@ export default function OvertimeForm({ department }: { department: string }) {
               </button>
             ))}
           </div>
-          <p className="text-xs text-brand-navy-soft mt-1.5">{timeLabel}</p>
+          <p className={`text-xs mt-1.5 ${dayType ? 'text-brand-navy-soft' : 'text-brand-teal font-medium'}`}>
+            {timeLabel}
+          </p>
         </div>
       </div>
 
@@ -298,7 +308,7 @@ export default function OvertimeForm({ department }: { department: string }) {
         </div>
       )}
 
-      {!loadingOpts && machines.length > 0 && (
+      {!loadingOpts && machines.length > 0 && dayType && (
         <>
           <div className="space-y-4">
             {rows.map((row, idx) => {
@@ -363,7 +373,7 @@ export default function OvertimeForm({ department }: { department: string }) {
                       {visibleMachines.length} máy khả dụng
                     </span>
                   </div>
-                  <div className="max-h-[360px] overflow-y-auto border border-brand-surface-alt rounded-lg p-1.5 bg-brand-surface/40">
+                  <div className="max-h-[220px] overflow-y-auto border border-brand-surface-alt rounded-lg p-1.5 bg-brand-surface/40">
                     <div className={`grid grid-cols-2 gap-1.5 ${row.useOther ? 'opacity-50' : ''}`}>
                       {visibleMachines.map((machine) => {
                         const checked = row.checkedMachineIds.includes(machine.id);
@@ -513,7 +523,7 @@ export default function OvertimeForm({ department }: { department: string }) {
         </div>
       )}
 
-      {!loadingOpts && machines.length > 0 && (
+      {!loadingOpts && machines.length > 0 && dayType && (
         <button
           type="button"
           onClick={submit}

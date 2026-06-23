@@ -457,7 +457,7 @@ export default function LeaderEditForm({
                         {visibleMachines.length} máy khả dụng
                       </span>
                     </div>
-                    <div className="max-h-[360px] overflow-y-auto border border-brand-surface-alt rounded-lg p-1.5 bg-brand-surface/40">
+                    <div className="max-h-[220px] overflow-y-auto border border-brand-surface-alt rounded-lg p-1.5 bg-brand-surface/40">
                       <div
                         className={`grid grid-cols-2 gap-1.5 ${row.useOther ? 'opacity-50' : ''}`}
                       >
