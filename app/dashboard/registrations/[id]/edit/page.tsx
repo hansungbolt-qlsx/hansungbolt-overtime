@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth-server';
 import { supabaseAdmin } from '@/lib/supabase';
 import EditRegistrationForm from '@/components/EditRegistrationForm';
+import LeaderEditForm from '@/components/LeaderEditForm';
 
 export default async function EditRegistrationPage({
   params,
@@ -11,7 +12,6 @@ export default async function EditRegistrationPage({
   const session = await getSession();
   if (!session) redirect('/login');
 
-  // Admin xem mọi phiếu; leader chỉ xem phiếu bộ phận mình; worker không cho.
   if (session.role === 'worker') redirect('/register');
 
   const { id } = await params;
@@ -60,6 +60,34 @@ export default async function EditRegistrationPage({
       .eq('department', reg.department)
       .order('code'),
   ]);
+
+  // Leader -> form mobile-friendly y hệt OvertimeForm; admin -> form per-row time edit.
+  if (!isAdmin) {
+    return (
+      <main className="min-h-screen bg-brand-pattern p-4">
+        <div className="max-w-xl mx-auto">
+          <LeaderEditForm
+            registrationId={reg.id}
+            department={reg.department}
+            initialDate={reg.overtime_date}
+            initialDayType={reg.day_type as 'weekday' | 'sunday'}
+            initialItems={(items ?? []).map((i) => ({
+              id: i.id,
+              employee_id: i.employee_id,
+              equipment_id: i.equipment_id,
+              item_code: i.item_code,
+            }))}
+            equipments={(equipments ?? []).map((e) => ({
+              id: e.id,
+              code: e.code,
+              machine_type: e.machine_type,
+            }))}
+            backHref={backHref}
+          />
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-brand-pattern p-4 md:p-8">
