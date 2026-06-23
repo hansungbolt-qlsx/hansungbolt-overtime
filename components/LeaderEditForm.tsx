@@ -44,6 +44,17 @@ const emptyRow = (): EmployeeRow => ({
   otherItemId: null,
 });
 
+function machineCodeColor(code: string): string {
+  const prefix = code.split('-')[0]?.toUpperCase();
+  switch (prefix) {
+    case 'HD': return 'text-[#063882]';
+    case 'RL': return 'text-[#0c6c3d]';
+    case 'SM': return 'text-[#7c3aed]';
+    case 'CT': return 'text-[#dc2626]';
+    default: return 'text-brand-navy';
+  }
+}
+
 // Khi load phiếu cũ, biết được equipment nào là OTHER từ equipments table (machine_type='OTHER').
 // Pass list equipments của phiếu xuống để check.
 function itemsToRows(
@@ -507,7 +518,7 @@ export default function LeaderEditForm({
                                   </div>
                                   <div className="min-w-0 flex-1">
                                     <div className="flex items-baseline justify-between gap-1">
-                                      <span className="text-sm font-bold text-brand-navy leading-tight">
+                                      <span className={`text-sm font-bold leading-tight ${machineCodeColor(machine.code)}`}>
                                         {machine.code}
                                       </span>
                                       <span className="text-[10px] text-brand-navy-soft leading-tight">

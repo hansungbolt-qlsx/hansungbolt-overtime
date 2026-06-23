@@ -41,6 +41,18 @@ const emptyRow = (): EmployeeRow => ({
   otherTask: '',
 });
 
+// Màu chữ mã máy theo nhóm prefix — giúp dễ phân biệt RL/SM/CT/HD
+function machineCodeColor(code: string): string {
+  const prefix = code.split('-')[0]?.toUpperCase();
+  switch (prefix) {
+    case 'HD': return 'text-[#063882]'; // navy
+    case 'RL': return 'text-[#0c6c3d]'; // green
+    case 'SM': return 'text-[#7c3aed]'; // purple
+    case 'CT': return 'text-[#dc2626]'; // red
+    default: return 'text-brand-navy';
+  }
+}
+
 export default function OvertimeForm({ department }: { department: string }) {
   const [date, setDate] = useState(todayISO());
   // Mặc định null — form chọn NV/máy ẩn; user phải click 1 nút loại ngày trước.
@@ -417,7 +429,7 @@ export default function OvertimeForm({ department }: { department: string }) {
                                 </div>
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-baseline justify-between gap-1">
-                                    <span className="text-sm font-bold text-brand-navy leading-tight">
+                                    <span className={`text-sm font-bold leading-tight ${machineCodeColor(machine.code)}`}>
                                       {machine.code}
                                     </span>
                                     <span className="text-[10px] text-brand-navy-soft leading-tight">
