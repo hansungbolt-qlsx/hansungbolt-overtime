@@ -14,10 +14,12 @@ type MachineDetail = {
   equipment_code: string;
   item_code: string | null;
   employee_name: string;
+  employee_order: number;
   is_other: boolean;
 };
 type Summary = {
   date: string;
+  restrictDept?: 'HD' | 'RL' | null;
   departments: { HD: EmpRow[]; RL: EmpRow[] };
   details?: { HD: MachineDetail[]; RL: MachineDetail[] };
 };
@@ -57,6 +59,9 @@ export default function TodayOvertimeCard({
     };
   }, [date]);
 
+  const restrictDept = data?.restrictDept ?? null;
+  const showHD = !restrictDept || restrictDept === 'HD';
+  const showRL = !restrictDept || restrictDept === 'RL';
   const hd = data?.departments.HD ?? [];
   const rl = data?.departments.RL ?? [];
   const hdMachines = hd.reduce((s, e) => s + e.machines.length, 0);
@@ -95,20 +100,24 @@ export default function TodayOvertimeCard({
 
       {!loading && (hd.length > 0 || rl.length > 0) && (
         <div className="divide-y divide-brand-surface-alt">
-          <DeptSection
-            title="HD"
-            accent="#063882"
-            employees={hd}
-            totalMachines={hdMachines}
-            details={hdDetails}
-          />
-          <DeptSection
-            title="RL"
-            accent="#2db5a1"
-            employees={rl}
-            totalMachines={rlMachines}
-            details={rlDetails}
-          />
+          {showHD && (
+            <DeptSection
+              title="HD"
+              accent="#063882"
+              employees={hd}
+              totalMachines={hdMachines}
+              details={hdDetails}
+            />
+          )}
+          {showRL && (
+            <DeptSection
+              title="RL"
+              accent="#2db5a1"
+              employees={rl}
+              totalMachines={rlMachines}
+              details={rlDetails}
+            />
+          )}
         </div>
       )}
     </section>
@@ -173,31 +182,58 @@ function DeptSection({
         ))}
       </ol>
 
-      {details.length > 0 && (
-        <div className="mt-3 border-t border-brand-surface-alt pt-3">
-          <p className="text-xs font-bold text-brand-navy-soft mb-2 uppercase tracking-wide">
-            Chi tiết máy &amp; mã hàng
-          </p>
-          <div className="overflow-x-auto rounded-lg border border-brand-surface-alt">
-            <table className="w-full text-xs">
-              <thead className="bg-[#f0f5ff] text-[#063882]">
-                <tr>
-                  <th className="text-left px-2 py-1.5 font-semibold w-8">STT</th>
-                  <th className="text-left px-2 py-1.5 font-semibold">Máy</th>
-                  <th className="text-left px-2 py-1.5 font-semibold">Mã hàng</th>
-                  <th className="text-left px-2 py-1.5 font-semibold">Nhân viên</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-brand-surface-alt bg-white">
-                {details.map((d, i) => (
-                  <tr key={`${d.equipment_code}-${d.employee_name}-${i}`}>
-                    <td className="px-2 py-1.5 text-brand-navy-soft tabular-nums">
-                      {i + 1}
+      {details.length > 0 && <DetailTable details={details} />}
+    </div>
+  );
+}
+
+function DetailTable({ details }: { details: MachineDetail[] }) {
+  // Group theo NV (giữ thứ tự xuất hiện sau khi đã sort ở server).
+  // 1 ô 'Nhân viên' gộp rowSpan = số máy của NV.
+  const groups: Array<{ name: string; rows: MachineDetail[] }> = [];
+  for (const d of details) {
+    const last = groups[groups.length - 1];
+    if (last && last.name === d.employee_name) last.rows.push(d);
+    else groups.push({ name: d.employee_name, rows: [d] });
+  }
+
+  let stt = 0;
+  return (
+    <div className="mt-3 border-t border-brand-surface-alt pt-3">
+      <p className="text-xs font-bold text-brand-navy-soft mb-2 uppercase tracking-wide">
+        Chi tiết máy &amp; mã hàng
+      </p>
+      <div className="overflow-x-auto rounded-lg border border-brand-surface-alt">
+        <table className="w-full text-xs border-collapse">
+          <thead className="bg-[#f0f5ff] text-[#063882]">
+            <tr>
+              <th className="text-left px-2 py-1.5 font-semibold w-8 border border-brand-surface-alt">STT</th>
+              <th className="text-left px-2 py-1.5 font-semibold border border-brand-surface-alt">Nhân viên</th>
+              <th className="text-left px-2 py-1.5 font-semibold border border-brand-surface-alt">Máy</th>
+              <th className="text-left px-2 py-1.5 font-semibold border border-brand-surface-alt">Mã hàng</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white">
+            {groups.flatMap((g) =>
+              g.rows.map((d, idx) => {
+                stt += 1;
+                return (
+                  <tr key={`${d.employee_name}-${d.equipment_code}-${d.item_code ?? ''}-${idx}`}>
+                    <td className="px-2 py-1.5 text-brand-navy-soft tabular-nums border border-brand-surface-alt">
+                      {stt}
                     </td>
-                    <td className="px-2 py-1.5 font-semibold text-brand-navy whitespace-nowrap">
+                    {idx === 0 && (
+                      <td
+                        rowSpan={g.rows.length}
+                        className="px-2 py-1.5 font-semibold text-brand-navy whitespace-nowrap align-middle border border-brand-surface-alt bg-[#fafbfd]"
+                      >
+                        {toTitleCase(g.name)}
+                      </td>
+                    )}
+                    <td className="px-2 py-1.5 font-semibold text-brand-navy whitespace-nowrap border border-brand-surface-alt">
                       {d.is_other ? 'Công việc khác' : d.equipment_code}
                     </td>
-                    <td className="px-2 py-1.5 text-brand-navy">
+                    <td className="px-2 py-1.5 text-brand-navy border border-brand-surface-alt">
                       {d.item_code ? (
                         d.is_other ? (
                           <em className="text-brand-navy-soft">{d.item_code}</em>
@@ -208,16 +244,13 @@ function DeptSection({
                         <span className="text-brand-navy-soft">—</span>
                       )}
                     </td>
-                    <td className="px-2 py-1.5 text-brand-navy whitespace-nowrap">
-                      {toTitleCase(d.employee_name)}
-                    </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+                );
+              }),
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

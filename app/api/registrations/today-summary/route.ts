@@ -15,6 +15,7 @@ type MachineDetail = {
   equipment_code: string;
   item_code: string | null;
   employee_name: string;
+  employee_order: number;
   is_other: boolean;
 };
 
@@ -33,15 +34,27 @@ export async function GET(req: Request) {
     );
   }
 
-  // Load phiếu cả 2 bộ phận cho ngày đó
-  const { data: regs, error: regErr } = await supabaseAdmin
+  // Non-admin chỉ thấy phiếu bộ phận mình; admin thấy cả 2.
+  const restrictDept =
+    session.role !== 'admin' && session.department
+      ? (session.department as 'HD' | 'RL')
+      : null;
+
+  let regQuery = supabaseAdmin
     .from('overtime_registrations')
     .select('id, department')
     .eq('overtime_date', date);
+  if (restrictDept) regQuery = regQuery.eq('department', restrictDept);
+  const { data: regs, error: regErr } = await regQuery;
   if (regErr) return NextResponse.json({ error: regErr.message }, { status: 500 });
 
   if (!regs || regs.length === 0) {
-    return NextResponse.json({ date, departments: { HD: [], RL: [] } });
+    return NextResponse.json({
+      date,
+      restrictDept,
+      departments: { HD: [], RL: [] },
+      details: { HD: [], RL: [] },
+    });
   }
 
   const regDeptMap = new Map(regs.map((r) => [r.id, r.department as string]));
@@ -110,7 +123,8 @@ export async function GET(req: Request) {
   rl.sort((a, b) => a.order_no - b.order_no);
 
   // Chi tiết từng máy — để NV chụp gửi nhóm cho biết ai chạy máy nào + mã hàng nào.
-  // 1 dòng = 1 item (1 máy × 1 mã hàng × 1 NV). Sort theo natural order của mã máy.
+  // 1 dòng = 1 item (1 máy × 1 mã hàng × 1 NV).
+  // Sort: theo NV (order_no) trước → trong nhóm NV sort theo mã máy → mã hàng.
   const detailsHD: MachineDetail[] = [];
   const detailsRL: MachineDetail[] = [];
   for (const it of items ?? []) {
@@ -123,25 +137,34 @@ export async function GET(req: Request) {
       equipment_code: eq.code,
       item_code: it.item_code ?? null,
       employee_name: emp.full_name,
+      employee_order: emp.order_no ?? 9999,
       is_other: isOther,
     };
     if (dept === 'HD') detailsHD.push(row);
     else if (dept === 'RL') detailsRL.push(row);
   }
-  detailsHD.sort(naturalCompareDetail);
-  detailsRL.sort(naturalCompareDetail);
+  detailsHD.sort(compareDetail);
+  detailsRL.sort(compareDetail);
 
   return NextResponse.json({
     date,
+    restrictDept,
     departments: { HD: hd, RL: rl },
     details: { HD: detailsHD, RL: detailsRL },
   });
 }
 
-function naturalCompareDetail(a: MachineDetail, b: MachineDetail): number {
-  // CVK (Công việc khác) đẩy xuống cuối
+function compareDetail(a: MachineDetail, b: MachineDetail): number {
+  // 1. Theo NV (order_no asc) — NV order thấp đứng trước
+  if (a.employee_order !== b.employee_order) return a.employee_order - b.employee_order;
+  if (a.employee_name !== b.employee_name) return a.employee_name.localeCompare(b.employee_name, 'vi');
+  // 2. CVK đẩy xuống cuối trong nhóm NV
   if (a.is_other !== b.is_other) return a.is_other ? 1 : -1;
-  return naturalCompareCode(a.equipment_code, b.equipment_code);
+  // 3. Theo mã máy tự nhiên (HD-9A < HD-9B < HD-10)
+  const cmpCode = naturalCompareCode(a.equipment_code, b.equipment_code);
+  if (cmpCode !== 0) return cmpCode;
+  // 4. Cùng máy thì theo mã hàng
+  return (a.item_code ?? '').localeCompare(b.item_code ?? '');
 }
 
 function naturalCompareCode(a: string, b: string): number {
