@@ -37,6 +37,9 @@ function formatMachinesDetailed(machines: Machine[]): string {
   return [...codes, ...others].join(', ');
 }
 
+const SHARE_FONT =
+  '"Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+
 export default function TodayOvertimeCard({
   initialDate,
   hideDatePicker = false,
@@ -49,7 +52,7 @@ export default function TodayOvertimeCard({
   const [loading, setLoading] = useState(false);
   const [sharing, setSharing] = useState(false);
 
-  const shareRef = useRef<HTMLElement>(null);
+  const shareViewRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,24 +83,25 @@ export default function TodayOvertimeCard({
   const dateLabel = `${dd}/${mm}/${yy}`;
 
   async function handleShare() {
-    if (!hasData || !shareRef.current || sharing) return;
+    if (!hasData || !shareViewRef.current || sharing) return;
     setSharing(true);
     try {
       const filename = `tang-ca-${date}.png`;
       const title = `Tăng ca hôm nay ${dateLabel}`;
 
-      // Dynamic import — lib ~10KB gzipped, chỉ tải khi user tap Chia sẻ
+      // Đợi font load xong để render đúng
+      if (typeof document !== 'undefined' && document.fonts?.ready) {
+        await document.fonts.ready;
+      }
+
       const { toBlob } = await import('html-to-image');
-      const blob = await toBlob(shareRef.current, {
+      const node = shareViewRef.current;
+      const blob = await toBlob(node, {
         pixelRatio: 2,
         backgroundColor: '#ffffff',
         cacheBust: true,
-        filter: (node) => {
-          if (node instanceof HTMLElement && node.dataset.noShareCapture === 'true') {
-            return false;
-          }
-          return true;
-        },
+        width: node.offsetWidth,
+        height: node.offsetHeight,
       });
 
       if (!blob) {
@@ -107,7 +111,6 @@ export default function TodayOvertimeCard({
 
       const file = new File([blob], filename, { type: 'image/png' });
 
-      // Web Share API Level 2 (file share) — iOS 15+, Android Chrome 75+
       if (
         typeof navigator !== 'undefined' &&
         typeof navigator.share === 'function' &&
@@ -123,7 +126,7 @@ export default function TodayOvertimeCard({
         }
       }
 
-      // Fallback: tải ảnh xuống máy, user mở Zalo gửi thủ công
+      // Fallback: tải xuống
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -142,72 +145,246 @@ export default function TodayOvertimeCard({
   }
 
   return (
-    <section
-      ref={shareRef}
-      className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden"
-    >
-      <div className="px-5 py-4 border-b border-brand-surface-alt flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-brand-navy">Tăng ca hôm nay</h2>
-          <p className="text-xs text-brand-navy-soft mt-0.5">
-            Ngày {dateLabel}
+    <>
+      <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden">
+        <div className="px-5 py-4 border-b border-brand-surface-alt flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-brand-navy">Tăng ca hôm nay</h2>
+            <p className="text-xs text-brand-navy-soft mt-0.5">Ngày {dateLabel}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {!hideDatePicker && (
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="px-3 py-1.5 border border-gray-300 rounded-md text-brand-navy text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal"
+              />
+            )}
+            {hasData && (
+              <button
+                type="button"
+                onClick={handleShare}
+                disabled={sharing}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-brand-teal hover:bg-brand-teal-dark active:scale-95 disabled:opacity-60 disabled:cursor-wait text-white text-sm font-semibold shadow-sm transition"
+              >
+                {sharing ? <SpinnerIcon /> : <ShareIcon />}
+                {sharing ? 'Đang tạo ảnh...' : 'Chia sẻ'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {loading && (
+          <p className="p-5 text-sm text-brand-navy-soft text-center">Đang tải...</p>
+        )}
+
+        {!loading && !hasData && (
+          <p className="p-5 text-sm text-brand-navy-soft text-center">
+            Chưa có phiếu nào cho ngày này.
           </p>
-        </div>
-        {/* Vùng buttons — loại khỏi ảnh chia sẻ */}
-        <div data-no-share-capture="true" className="flex items-center gap-2">
-          {!hideDatePicker && (
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 rounded-md text-brand-navy text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal"
-            />
-          )}
-          {hasData && (
-            <button
-              type="button"
-              onClick={handleShare}
-              disabled={sharing}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-brand-teal hover:bg-brand-teal-dark active:scale-95 disabled:opacity-60 disabled:cursor-wait text-white text-sm font-semibold shadow-sm transition"
+        )}
+
+        {!loading && hasData && (
+          <div className="divide-y divide-brand-surface-alt">
+            {showHD && (
+              <DeptSection
+                title="HD"
+                accent="#063882"
+                employees={hd}
+                totalMachines={hdMachines}
+              />
+            )}
+            {showRL && (
+              <DeptSection
+                title="RL"
+                accent="#2db5a1"
+                employees={rl}
+                totalMachines={rlMachines}
+              />
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* Off-screen share view — chỉ dùng làm nguồn cho html-to-image.
+          Layout inline-styles + plain spans, không dùng flex gap để
+          tránh quirks của html-to-image. Position fixed kèm opacity 0
+          để không ảnh hưởng UI nhưng vẫn có kích thước thực để render. */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          pointerEvents: 'none',
+          opacity: 0,
+          zIndex: -1,
+        }}
+      >
+        <div
+          ref={shareViewRef}
+          style={{
+            width: 640,
+            background: '#ffffff',
+            color: '#1b3864',
+            fontFamily: SHARE_FONT,
+            border: '1px solid #e8f0fb',
+            borderRadius: 12,
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            style={{
+              padding: '20px 24px 16px 24px',
+              borderBottom: '1px solid #e8f0fb',
+              background: 'linear-gradient(135deg, #f0f5ff 0%, #ffffff 100%)',
+            }}
+          >
+            <div
+              style={{
+                fontSize: 24,
+                fontWeight: 800,
+                color: '#1b3864',
+                lineHeight: 1.2,
+              }}
             >
-              {sharing ? <SpinnerIcon /> : <ShareIcon />}
-              {sharing ? 'Đang tạo ảnh...' : 'Chia sẻ'}
-            </button>
-          )}
-        </div>
-      </div>
+              Tăng ca hôm nay
+            </div>
+            <div
+              style={{
+                fontSize: 15,
+                fontWeight: 600,
+                color: '#063882',
+                marginTop: 6,
+              }}
+            >
+              Ngày {dateLabel}
+            </div>
+          </div>
 
-      {loading && (
-        <p className="p-5 text-sm text-brand-navy-soft text-center">Đang tải...</p>
-      )}
-
-      {!loading && hd.length === 0 && rl.length === 0 && (
-        <p className="p-5 text-sm text-brand-navy-soft text-center">
-          Chưa có phiếu nào cho ngày này.
-        </p>
-      )}
-
-      {!loading && (hd.length > 0 || rl.length > 0) && (
-        <div className="divide-y divide-brand-surface-alt">
-          {showHD && (
-            <DeptSection
+          {showHD && hd.length > 0 && (
+            <ShareDept
               title="HD"
-              accent="#063882"
+              color="#063882"
               employees={hd}
               totalMachines={hdMachines}
             />
           )}
-          {showRL && (
-            <DeptSection
+          {showRL && rl.length > 0 && (
+            <ShareDept
               title="RL"
-              accent="#2db5a1"
+              color="#2db5a1"
               employees={rl}
               totalMachines={rlMachines}
             />
           )}
+
+          <div
+            style={{
+              padding: '10px 24px',
+              borderTop: '1px solid #e8f0fb',
+              fontSize: 11,
+              color: '#7a8aa3',
+              textAlign: 'right',
+            }}
+          >
+            Hansungbolt Vina · App đăng ký tăng ca
+          </div>
         </div>
-      )}
-    </section>
+      </div>
+    </>
+  );
+}
+
+function ShareDept({
+  title,
+  color,
+  employees,
+  totalMachines,
+}: {
+  title: string;
+  color: string;
+  employees: EmpRow[];
+  totalMachines: number;
+}) {
+  return (
+    <div
+      style={{
+        padding: '18px 24px',
+        borderTop: '1px solid #e8f0fb',
+      }}
+    >
+      <div style={{ marginBottom: 14, fontSize: 14, lineHeight: 1 }}>
+        <span
+          style={{
+            display: 'inline-block',
+            fontSize: 12,
+            fontWeight: 700,
+            padding: '4px 9px',
+            borderRadius: 6,
+            color: 'white',
+            background: color,
+            verticalAlign: 'middle',
+          }}
+        >
+          {title}
+        </span>
+        <span
+          style={{
+            fontSize: 15,
+            fontWeight: 700,
+            color: '#1b3864',
+            marginLeft: 10,
+            verticalAlign: 'middle',
+          }}
+        >
+          {employees.length} người
+        </span>
+        <span
+          style={{
+            fontSize: 13,
+            color: '#3b5788',
+            marginLeft: 8,
+            verticalAlign: 'middle',
+          }}
+        >
+          · {totalMachines} máy
+        </span>
+      </div>
+
+      {employees.map((emp, i) => (
+        <div
+          key={emp.employee_id}
+          style={{
+            marginBottom: i === employees.length - 1 ? 0 : 12,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 15,
+              fontWeight: 700,
+              color: '#1b3864',
+              lineHeight: 1.35,
+            }}
+          >
+            {i + 1}. {toTitleCase(emp.employee_name)}
+          </div>
+          <div
+            style={{
+              fontSize: 14,
+              color: '#1b3864',
+              marginTop: 3,
+              marginLeft: 18,
+              lineHeight: 1.45,
+              wordBreak: 'break-word',
+            }}
+          >
+            {formatMachinesDetailed(emp.machines)}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
