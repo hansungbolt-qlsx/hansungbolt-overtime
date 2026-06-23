@@ -40,6 +40,45 @@ function formatMachinesDetailed(machines: Machine[]): string {
   return [...codes, ...others].join(', ');
 }
 
+// Build text plain để chia sẻ qua Web Share API (Zalo, Messenger, SMS...)
+function buildShareText(
+  date: string,
+  showHD: boolean,
+  showRL: boolean,
+  hd: EmpRow[],
+  rl: EmpRow[],
+): string {
+  const [y, m, d] = date.split('-');
+  const lines: string[] = [];
+  lines.push(`Tăng ca hôm nay ${d}/${m}/${y}`);
+  lines.push('');
+
+  const renderDept = (title: string, employees: EmpRow[]) => {
+    if (employees.length === 0) return;
+    const totalMachines = employees.reduce((s, e) => s + e.machines.length, 0);
+    lines.push(`${title} - ${employees.length} người, ${totalMachines} máy`);
+    employees.forEach((emp, i) => {
+      lines.push(`${i + 1}. ${titleCase(emp.employee_name)}`);
+      lines.push(`   ${formatMachinesDetailed(emp.machines)}`);
+    });
+    lines.push('');
+  };
+
+  if (showHD) renderDept('HD', hd);
+  if (showRL) renderDept('RL', rl);
+
+  return lines.join('\n').trim();
+}
+
+// Bản gọn của toTitleCase để dùng trong text plain (không cần JSX)
+function titleCase(s: string): string {
+  return s
+    .toLowerCase()
+    .split(' ')
+    .map((w) => (w ? w[0].toLocaleUpperCase('vi') + w.slice(1) : w))
+    .join(' ');
+}
+
 export default function TodayOvertimeCard({
   initialDate,
   hideDatePicker = false,
@@ -74,6 +113,37 @@ export default function TodayOvertimeCard({
   const rl = data?.departments.RL ?? [];
   const hdMachines = hd.reduce((s, e) => s + e.machines.length, 0);
   const rlMachines = rl.reduce((s, e) => s + e.machines.length, 0);
+  const hasData = hd.length > 0 || rl.length > 0;
+
+  const [shareStatus, setShareStatus] = useState<'idle' | 'copied'>('idle');
+
+  async function handleShare() {
+    if (!hasData) return;
+    const text = buildShareText(date, showHD, showRL, hd, rl);
+    const [yy, mm, dd] = date.split('-');
+    const title = `Tăng ca hôm nay ${dd}/${mm}/${yy}`;
+
+    // Web Share API: trên iOS/Android tự bật share sheet (có Zalo nếu cài app)
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ title, text });
+        return;
+      } catch (e) {
+        // User cancel hoặc lỗi → fallback clipboard
+        const err = e as { name?: string };
+        if (err?.name === 'AbortError') return;
+      }
+    }
+
+    // Fallback: copy clipboard (desktop / trình duyệt không hỗ trợ share)
+    try {
+      await navigator.clipboard.writeText(text);
+      setShareStatus('copied');
+      setTimeout(() => setShareStatus('idle'), 2500);
+    } catch {
+      alert('Trình duyệt không hỗ trợ chia sẻ. Vui lòng chụp màn hình hoặc copy thủ công.');
+    }
+  }
 
   return (
     <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden">
@@ -84,14 +154,26 @@ export default function TodayOvertimeCard({
             Danh sách NV đăng ký theo bộ phận, ngày {date}
           </p>
         </div>
-        {!hideDatePicker && (
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="px-3 py-1.5 border border-gray-300 rounded-md text-brand-navy text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal"
-          />
-        )}
+        <div className="flex items-center gap-2">
+          {!hideDatePicker && (
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="px-3 py-1.5 border border-gray-300 rounded-md text-brand-navy text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal"
+            />
+          )}
+          {hasData && (
+            <button
+              type="button"
+              onClick={handleShare}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-brand-teal hover:bg-brand-teal-dark active:scale-95 text-white text-sm font-semibold shadow-sm transition"
+            >
+              <ShareIcon />
+              {shareStatus === 'copied' ? 'Đã sao chép' : 'Chia sẻ'}
+            </button>
+          )}
+        </div>
       </div>
 
       {loading && (
@@ -125,6 +207,28 @@ export default function TodayOvertimeCard({
         </div>
       )}
     </section>
+  );
+}
+
+function ShareIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="w-4 h-4"
+      aria-hidden="true"
+    >
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+      <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+    </svg>
   );
 }
 
