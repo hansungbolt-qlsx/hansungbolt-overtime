@@ -7,6 +7,7 @@ import MaterialLabelsAdminCard from '@/components/MaterialLabelsAdminCard';
 import OvertimeSummaryCard from '@/components/OvertimeSummaryCard';
 import DeleteRegistrationButton from '@/components/DeleteRegistrationButton';
 import TodayOvertimeCard from '@/components/TodayOvertimeCard';
+import PlanFilesCard from '@/components/PlanFilesCard';
 import { toTitleCase } from '@/lib/format';
 
 function todayISO() {
@@ -138,6 +139,10 @@ export default async function DashboardPage({
               Đang xem phiếu ngày <strong>{selectedDate}</strong>
             </p>
           </section>
+        </div>
+
+        <div className="mb-6">
+          <PlanFilesCard />
         </div>
 
         <div className="mb-6">
