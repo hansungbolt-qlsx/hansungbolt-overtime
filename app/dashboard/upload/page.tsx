@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ChangeEvent, type FormEvent } from 'react';
+import { useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } from 'react';
 import Link from 'next/link';
 
 type UploadResult = {
@@ -20,15 +20,15 @@ export default function UploadPlanPage() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<UploadResult | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  async function onFileChange(e: ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    setFile(f ?? null);
+  async function handleFile(f: File) {
+    setFile(f);
     setSheets([]);
     setSelectedSheet('');
     setResult(null);
     setError('');
-    if (!f) return;
 
     setInspecting(true);
     try {
@@ -47,6 +47,24 @@ export default function UploadPlanPage() {
     } finally {
       setInspecting(false);
     }
+  }
+
+  async function onFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (f) await handleFile(f);
+  }
+
+  function onDrop(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragOver(false);
+    const f = e.dataTransfer.files?.[0];
+    if (!f) return;
+    const lower = f.name.toLowerCase();
+    if (!lower.endsWith('.xlsx') && !lower.endsWith('.xls')) {
+      setError('Chỉ chấp nhận file .xlsx hoặc .xls');
+      return;
+    }
+    handleFile(f);
   }
 
   async function onSubmit(e: FormEvent) {
@@ -93,12 +111,43 @@ export default function UploadPlanPage() {
       >
         <div>
           <label className="block text-sm font-medium mb-1">File Excel (.xlsx)</label>
-          <input
-            type="file"
-            accept=".xlsx,.xls"
-            onChange={onFileChange}
-            className="block w-full text-sm border border-gray-300 rounded-md file:mr-3 file:py-2 file:px-3 file:border-0 file:bg-gray-100 file:text-sm"
-          />
+          <div
+            onDrop={onDrop}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onClick={() => inputRef.current?.click()}
+            className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition ${
+              dragOver
+                ? 'border-green-500 bg-green-50'
+                : file
+                  ? 'border-green-300 bg-green-50/40'
+                  : 'border-gray-300 hover:border-green-400 bg-gray-50/40'
+            }`}
+          >
+            <input
+              ref={inputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={onFileChange}
+              className="hidden"
+            />
+            {file ? (
+              <div className="text-sm">
+                <p className="font-semibold text-gray-800">{file.name}</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {(file.size / 1024).toFixed(0)} KB · Click hoặc kéo file khác để đổi
+                </p>
+              </div>
+            ) : (
+              <div className="text-sm text-gray-600 space-y-1">
+                <p className="font-medium">Kéo file Excel thả vào đây</p>
+                <p className="text-xs">hoặc click để chọn file</p>
+                <p className="text-[11px] text-gray-500 mt-2 leading-relaxed">
+                  Mẹo: nếu file đang mở trong Excel mà click chọn báo lỗi <em>&quot;file in use&quot;</em>, hãy kéo thẳng file từ File Explorer (Win+E) thả vào ô này — không cần đóng Excel.
+                </p>
+              </div>
+            )}
+          </div>
           {inspecting && (
             <p className="text-xs text-gray-500 mt-1">Đang đọc file…</p>
           )}
