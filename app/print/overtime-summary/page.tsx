@@ -26,9 +26,10 @@ export default async function PrintOvertimeSummaryPage({
   const startDate = `${month}-01`;
   const endDate = new Date(y, m, 0).toISOString().slice(0, 10);
 
-  // Filter dept: admin có thể truyền ?dept=HD/RL để xem riêng từng bộ phận;
+  // Filter dept: admin có thể truyền ?dept=HD/RL/QLSX để xem riêng từng bộ phận;
   // non-admin luôn force theo dept của mình.
-  const requestedDept = sp.dept === 'HD' || sp.dept === 'RL' ? sp.dept : null;
+  const requestedDept =
+    sp.dept === 'HD' || sp.dept === 'RL' || sp.dept === 'QLSX' ? sp.dept : null;
   const filterDept =
     session.role !== 'admin' && session.department
       ? session.department

@@ -3,13 +3,24 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toTitleCase } from '@/lib/format';
 
+type Dept = 'HD' | 'RL' | 'QLSX';
+type ActiveTab = 'all' | Dept;
+
 type SummaryRow = {
   employee_id: string;
   employee_name: string;
-  employee_department: 'HD' | 'RL' | null;
+  employee_department: Dept | null;
   weekday_count: number;
   sunday_count: number;
   total_hours: number;
+};
+
+const DEPT_ORDER: Dept[] = ['HD', 'RL', 'QLSX'];
+
+const DEPT_BADGE: Record<Dept, string> = {
+  HD: 'bg-[#063882] text-white',
+  RL: 'bg-[#2db5a1] text-white',
+  QLSX: 'bg-[#7c3aed] text-white',
 };
 
 function currentMonthISO() {
@@ -21,7 +32,7 @@ export default function OvertimeSummaryCard() {
   const [month, setMonth] = useState(currentMonthISO());
   const [rows, setRows] = useState<SummaryRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeDept, setActiveDept] = useState<'HD' | 'RL' | null>(null);
+  const [activeTab, setActiveTab] = useState<ActiveTab>('all');
 
   useEffect(() => {
     let cancelled = false;
@@ -34,35 +45,52 @@ export default function OvertimeSummaryCard() {
     return () => { cancelled = true; };
   }, [month]);
 
-  // Admin sẽ thấy cả HD lẫn RL → bật tabs. Leader/worker chỉ thấy 1 dept → không cần tab.
-  const distinctDepts = useMemo(() => {
-    const s = new Set<'HD' | 'RL'>();
+  // Detect các dept có dữ liệu, sort theo DEPT_ORDER (HD, RL, QLSX)
+  const distinctDepts = useMemo<Dept[]>(() => {
+    const s = new Set<Dept>();
     for (const r of rows) if (r.employee_department) s.add(r.employee_department);
-    return Array.from(s);
+    return DEPT_ORDER.filter((d) => s.has(d));
   }, [rows]);
+
+  // Hiện tabs khi có ≥ 2 dept (admin xem cả HD/RL/QLSX). Leader/worker chỉ thấy
+  // 1 dept của mình → không có tab.
   const showTabs = distinctDepts.length >= 2;
 
+  // Nếu tab đang chọn không còn data (vd đổi tháng) → reset về 'all'
   useEffect(() => {
     if (!showTabs) {
-      setActiveDept(null);
+      setActiveTab('all');
       return;
     }
-    setActiveDept((prev) => {
-      if (prev && distinctDepts.includes(prev)) return prev;
-      return distinctDepts.includes('HD') ? 'HD' : distinctDepts[0];
+    setActiveTab((prev) => {
+      if (prev === 'all') return prev;
+      if (distinctDepts.includes(prev)) return prev;
+      return 'all';
     });
   }, [showTabs, distinctDepts]);
 
+  // Display rows: tab 'all' show tất cả (sort theo dept rồi full_name);
+  // tab dept cụ thể: filter
   const displayRows = useMemo(() => {
-    if (!showTabs || !activeDept) return rows;
-    return rows.filter((r) => r.employee_department === activeDept);
-  }, [rows, showTabs, activeDept]);
+    if (activeTab === 'all') {
+      return [...rows].sort((a, b) => {
+        const ai = a.employee_department ? DEPT_ORDER.indexOf(a.employee_department) : 99;
+        const bi = b.employee_department ? DEPT_ORDER.indexOf(b.employee_department) : 99;
+        if (ai !== bi) return ai - bi;
+        return a.employee_name.localeCompare(b.employee_name, 'vi');
+      });
+    }
+    return rows.filter((r) => r.employee_department === activeTab);
+  }, [rows, activeTab]);
 
   const totalHours = displayRows.reduce((s, r) => s + r.total_hours, 0);
 
-  const printDeptParam = showTabs && activeDept ? `&dept=${activeDept}` : '';
+  // URL print/preview: 'all' tab không pass dept → backend trả về cả 3
+  const printDeptParam = activeTab !== 'all' ? `&dept=${activeTab}` : '';
   const previewUrl = `/print/overtime-summary?month=${month}&preview=1${printDeptParam}`;
   const printUrl = `/print/overtime-summary?month=${month}${printDeptParam}`;
+
+  const showDeptColumn = activeTab === 'all';
 
   return (
     <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden">
@@ -102,30 +130,38 @@ export default function OvertimeSummaryCard() {
       </div>
 
       {showTabs && (
-        <div className="flex gap-1 px-5 pt-3 bg-white border-b border-brand-surface-alt">
-          {(['HD', 'RL'] as const).map((d) => {
-            const isActive = activeDept === d;
-            const hasData = distinctDepts.includes(d);
+        <div className="flex gap-1 px-5 pt-3 bg-white border-b border-brand-surface-alt overflow-x-auto">
+          <button
+            type="button"
+            onClick={() => setActiveTab('all')}
+            className={`px-5 py-2 text-sm font-bold rounded-t-lg border border-b-0 transition whitespace-nowrap ${
+              activeTab === 'all'
+                ? 'bg-[#dce8fa] text-[#063882] border-[#dce8fa] -mb-px'
+                : 'bg-white text-brand-navy-soft border-transparent hover:bg-[#f0f5ff]'
+            }`}
+          >
+            Tất cả
+            <span className="ml-2 text-[10px] font-normal opacity-70">
+              ({rows.length})
+            </span>
+          </button>
+          {distinctDepts.map((d) => {
+            const isActive = activeTab === d;
             return (
               <button
                 key={d}
                 type="button"
-                onClick={() => setActiveDept(d)}
-                disabled={!hasData}
-                className={`px-5 py-2 text-sm font-bold rounded-t-lg border border-b-0 transition ${
+                onClick={() => setActiveTab(d)}
+                className={`px-5 py-2 text-sm font-bold rounded-t-lg border border-b-0 transition whitespace-nowrap ${
                   isActive
                     ? 'bg-[#dce8fa] text-[#063882] border-[#dce8fa] -mb-px'
-                    : hasData
-                      ? 'bg-white text-brand-navy-soft border-transparent hover:bg-[#f0f5ff]'
-                      : 'bg-white text-gray-300 border-transparent cursor-not-allowed'
+                    : 'bg-white text-brand-navy-soft border-transparent hover:bg-[#f0f5ff]'
                 }`}
               >
                 Bộ phận {d}
-                {hasData && (
-                  <span className="ml-2 text-[10px] font-normal opacity-70">
-                    ({rows.filter((r) => r.employee_department === d).length})
-                  </span>
-                )}
+                <span className="ml-2 text-[10px] font-normal opacity-70">
+                  ({rows.filter((r) => r.employee_department === d).length})
+                </span>
               </button>
             );
           })}
@@ -138,8 +174,8 @@ export default function OvertimeSummaryCard() {
         )}
         {!loading && displayRows.length === 0 && (
           <p className="text-sm text-brand-navy-soft text-center py-4">
-            {showTabs && activeDept
-              ? `Chưa có dữ liệu bộ phận ${activeDept} tháng này.`
+            {showTabs && activeTab !== 'all'
+              ? `Chưa có dữ liệu bộ phận ${activeTab} tháng này.`
               : 'Chưa có dữ liệu tháng này.'}
           </p>
         )}
@@ -148,6 +184,9 @@ export default function OvertimeSummaryCard() {
             <table className="w-full text-sm bg-white">
               <thead className="bg-[#dce8fa] text-[#063882]">
                 <tr>
+                  {showDeptColumn && (
+                    <th className="text-left px-4 py-2.5 font-semibold w-20">Bộ phận</th>
+                  )}
                   <th className="text-left px-4 py-2.5 font-semibold">Nhân viên</th>
                   <th className="text-right px-4 py-2.5 font-semibold">Ngày thường</th>
                   <th className="text-right px-4 py-2.5 font-semibold">Chủ nhật</th>
@@ -157,6 +196,17 @@ export default function OvertimeSummaryCard() {
               <tbody className="divide-y divide-[#e8f0fb]">
                 {displayRows.map((r) => (
                   <tr key={r.employee_id} className="hover:bg-[#f0f5ff]">
+                    {showDeptColumn && (
+                      <td className="px-4 py-2.5">
+                        {r.employee_department && (
+                          <span
+                            className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded ${DEPT_BADGE[r.employee_department]}`}
+                          >
+                            {r.employee_department}
+                          </span>
+                        )}
+                      </td>
+                    )}
                     <td className="px-4 py-2.5 font-semibold text-brand-navy">{toTitleCase(r.employee_name)}</td>
                     <td className="px-4 py-2.5 text-right text-brand-navy-soft">
                       {r.weekday_count > 0 ? `${r.weekday_count} ngày` : '—'}
@@ -172,7 +222,10 @@ export default function OvertimeSummaryCard() {
               </tbody>
               <tfoot className="bg-[#dce8fa]">
                 <tr>
-                  <td colSpan={3} className="px-4 py-2.5 font-bold text-[#063882] text-right">
+                  <td
+                    colSpan={showDeptColumn ? 4 : 3}
+                    className="px-4 py-2.5 font-bold text-[#063882] text-right"
+                  >
                     Tổng cộng
                   </td>
                   <td className="px-4 py-2.5 font-bold text-[#063882] text-right">
