@@ -7,7 +7,7 @@ import MaterialLabelsAdminCard from '@/components/MaterialLabelsAdminCard';
 import OvertimeSummaryCard from '@/components/OvertimeSummaryCard';
 import DeleteRegistrationButton from '@/components/DeleteRegistrationButton';
 import TodayOvertimeCard from '@/components/TodayOvertimeCard';
-import PlanFilesCard from '@/components/PlanFilesCard';
+import PlanFilesList from '@/components/PlanFilesList';
 import { toTitleCase } from '@/lib/format';
 
 function todayISO() {
@@ -96,8 +96,8 @@ export default async function DashboardPage({
       <div className="max-w-5xl mx-auto">
         <DashboardHeader fullName={session.fullName} active="overview" />
 
-        <div className="grid gap-4 md:grid-cols-2 mb-6">
-          <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-5">
+        <div className="grid gap-4 md:grid-cols-3 mb-6">
+          <section className="md:col-span-2 bg-white rounded-xl shadow-sm border border-brand-surface-alt p-5">
             <h2 className="text-lg font-semibold text-brand-navy mb-2">
               Kế hoạch sản xuất
             </h2>
@@ -115,22 +115,26 @@ export default async function DashboardPage({
             >
               Upload kế hoạch mới
             </Link>
+
+            <div className="mt-5 pt-4 border-t border-brand-surface-alt">
+              <PlanFilesList />
+            </div>
           </section>
 
-          <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-5">
+          <section className="md:col-span-1 bg-white rounded-xl shadow-sm border border-brand-surface-alt p-5">
             <h2 className="text-lg font-semibold text-brand-navy mb-2">
               Lọc phiếu theo ngày
             </h2>
-            <form method="get" className="flex gap-2">
+            <form method="get" className="flex flex-col gap-2">
               <input
                 type="date"
                 name="date"
                 defaultValue={selectedDate}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal focus:border-transparent"
               />
               <button
                 type="submit"
-                className="px-4 py-2 bg-brand-navy hover:bg-brand-navy-soft text-white text-sm font-semibold rounded-md transition"
+                className="w-full px-4 py-2 bg-brand-navy hover:bg-brand-navy-soft text-white text-sm font-semibold rounded-md transition"
               >
                 Xem
               </button>
@@ -139,10 +143,6 @@ export default async function DashboardPage({
               Đang xem phiếu ngày <strong>{selectedDate}</strong>
             </p>
           </section>
-        </div>
-
-        <div className="mb-6">
-          <PlanFilesCard />
         </div>
 
         <div className="mb-6">

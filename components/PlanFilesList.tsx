@@ -32,7 +32,7 @@ function formatSize(bytes: number | null): string {
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
-export default function PlanFilesCard() {
+export default function PlanFilesList() {
   const [files, setFiles] = useState<PlanFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [warning, setWarning] = useState<string | null>(null);
@@ -54,45 +54,45 @@ export default function PlanFilesCard() {
   }, []);
 
   return (
-    <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-5">
-      <div className="flex items-start justify-between mb-3 gap-3">
+    <div>
+      <div className="flex items-baseline justify-between mb-2 gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-brand-navy">
+          <h3 className="text-sm font-bold text-brand-navy uppercase tracking-wide">
             Kế hoạch đã tải lên
-          </h2>
-          <p className="text-xs text-brand-navy-soft mt-0.5">
+          </h3>
+          <p className="text-[11px] text-brand-navy-soft mt-0.5">
             Giữ 3 file gần nhất. Tải về để xem định dạng Excel gốc.
           </p>
         </div>
         <button
           type="button"
           onClick={load}
-          className="text-xs px-2.5 py-1 text-brand-navy-soft hover:text-brand-navy border border-brand-surface-alt rounded transition"
+          className="text-[11px] px-2 py-0.5 text-brand-navy-soft hover:text-brand-navy border border-brand-surface-alt rounded transition flex-shrink-0"
         >
           Tải lại
         </button>
       </div>
 
       {warning && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-900 text-xs p-3 rounded mb-3">
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 text-xs p-2.5 rounded mb-2">
           {warning}
         </div>
       )}
 
       {loading && (
-        <p className="text-sm text-brand-navy-soft text-center py-4">Đang tải...</p>
+        <p className="text-xs text-brand-navy-soft text-center py-3">Đang tải...</p>
       )}
 
       {!loading && files.length === 0 && !warning && (
-        <p className="text-sm text-brand-navy-soft text-center py-4">
-          Chưa có file nào. Upload kế hoạch để bắt đầu lưu.
+        <p className="text-xs text-brand-navy-soft text-center py-3 italic">
+          Chưa có file nào.
         </p>
       )}
 
       {!loading && files.length > 0 && (
         <ul className="divide-y divide-brand-surface-alt">
           {files.map((f) => (
-            <li key={f.id} className="py-2.5 flex items-center gap-3">
+            <li key={f.id} className="py-2 flex items-center gap-3">
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold text-brand-navy">
                   Ngày {formatDateVN(f.plan_date)}
@@ -100,14 +100,10 @@ export default function PlanFilesCard() {
                 <div className="text-xs text-brand-navy-soft truncate" title={f.file_name}>
                   {f.file_name}
                   {f.sheet_name && (
-                    <span className="ml-1 text-brand-navy-soft">
-                      • sheet {f.sheet_name}
-                    </span>
+                    <span className="ml-1">• sheet {f.sheet_name}</span>
                   )}
                   {f.file_size_bytes && (
-                    <span className="ml-1 text-brand-navy-soft">
-                      • {formatSize(f.file_size_bytes)}
-                    </span>
+                    <span className="ml-1">• {formatSize(f.file_size_bytes)}</span>
                   )}
                 </div>
                 <div className="text-[11px] text-brand-navy-soft mt-0.5">
@@ -124,6 +120,6 @@ export default function PlanFilesCard() {
           ))}
         </ul>
       )}
-    </section>
+    </div>
   );
 }
