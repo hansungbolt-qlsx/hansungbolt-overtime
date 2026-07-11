@@ -1,0 +1,18 @@
+{
+  "name": "hansungbolt-print-agent",
+  "version": "1.0.0",
+  "description": "Print agent — nhận lệnh in từ app Hansungbolt Overtime và gửi tới máy in Windows",
+  "type": "module",
+  "main": "agent.js",
+  "scripts": {
+    "start": "node agent.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "pdf-to-printer": "^5.6.0",
+    "puppeteer": "^23.9.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
