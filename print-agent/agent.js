@@ -137,10 +137,16 @@ async function renderPDF(job) {
     });
 
     console.log(`[${new Date().toISOString()}] Navigate: ${url}`);
-    await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
+    const response = await page.goto(url, {
+      waitUntil: 'domcontentloaded',
+      timeout: 60000,
+    });
+    if (!response || !response.ok()) {
+      throw new Error(`Load page failed: HTTP ${response?.status()} ${response?.statusText()}`);
+    }
 
-    // Đợi thêm 500ms cho font/image load
-    await new Promise((r) => setTimeout(r, 500));
+    // Đợi 1.5s cho font Geist + ảnh logo load xong
+    await new Promise((r) => setTimeout(r, 1500));
 
     const pdfBuffer = await page.pdf({
       format: 'A4',
