@@ -110,10 +110,21 @@ export default function PrintJobButton({
 
   if (job && job.status === 'done') {
     return (
-      <span
-        className={`inline-flex items-center gap-1 rounded-md font-semibold ${compact ? 'text-xs px-2 py-1' : 'text-xs px-2.5 py-1.5'} bg-green-100 text-green-800`}
-      >
-        ✓ Đã in
+      <span className="inline-flex items-center gap-1">
+        <span
+          className={`inline-flex items-center gap-1 rounded-md font-semibold ${compact ? 'text-xs px-2 py-1' : 'text-xs px-2.5 py-1.5'} bg-green-100 text-green-800`}
+        >
+          ✓ Đã in
+        </span>
+        <button
+          type="button"
+          onClick={send}
+          disabled={busy}
+          title="Gửi in lại 1 lần nữa"
+          className={`inline-flex items-center gap-1 rounded-md font-semibold transition active:scale-95 ${compact ? 'text-[11px] px-1.5 py-1' : 'text-xs px-2 py-1.5'} bg-white hover:bg-gray-100 disabled:opacity-60 text-brand-navy border border-brand-surface-alt`}
+        >
+          {busy ? <SpinnerIcon /> : '↻'} In lại
+        </button>
       </span>
     );
   }
