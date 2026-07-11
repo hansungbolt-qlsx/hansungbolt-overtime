@@ -250,9 +250,10 @@ async function pollLoop() {
       const jobs = await pollPendingJobs();
       if (jobs.length > 0) {
         console.log(`[${new Date().toISOString()}] Found ${jobs.length} pending job(s)`);
-        for (const job of jobs) {
-          await processJob(job);
-        }
+        // Chỉ xử lý job ĐẦU TIÊN mỗi vòng rồi poll lại ngay — danh sách luôn
+        // tươi, job đã tự hủy (quá 2') phía server không bao giờ được in ra.
+        await processJob(jobs[0]);
+        continue;
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

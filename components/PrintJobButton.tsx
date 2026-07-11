@@ -22,8 +22,9 @@ const TONE_CLS: Record<MsgTone, string> = {
 // Sau bao lâu job vẫn pending thì cảnh báo máy chủ in có thể đang tắt
 // (agent poll 10s + render ~25s → quá 40s chưa nhận là bất thường)
 const WARN_PENDING_MS = 40_000;
-// Tổng thời gian theo dõi tối đa
-const TRACK_TIMEOUT_MS = 120_000;
+// Tổng thời gian theo dõi tối đa — hơn TTL 2 phút của job một chút để nút
+// kịp nhận thông báo "lệnh đã tự hủy" từ server thay vì tự timeout trước.
+const TRACK_TIMEOUT_MS = 135_000;
 const POLL_MS = 3_000;
 
 // Nút gửi lệnh in + theo dõi job tới khi in xong:

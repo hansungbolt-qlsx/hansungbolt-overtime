@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
+import { expireStalePrintJobs } from '@/lib/print-jobs-expire';
 
 export const runtime = 'nodejs';
 
@@ -11,6 +12,10 @@ export async function GET() {
   if (!session) {
     return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
   }
+
+  // Nút In poll endpoint này mỗi 3s khi theo dõi → job quá 2 phút được dọn
+  // tại đây kể cả khi agent tắt hẳn, UI báo "lệnh đã tự hủy" đúng thời điểm.
+  await expireStalePrintJobs();
 
   const { data, error } = await supabaseAdmin
     .from('print_jobs')

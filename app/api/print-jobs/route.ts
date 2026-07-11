@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
+import { expireStalePrintJobs } from '@/lib/print-jobs-expire';
 
 export const runtime = 'nodejs';
 
@@ -127,28 +128,23 @@ export async function POST(req: Request) {
     }
   }
 
+  // Dọn job quá 2 phút trước, rồi mới xét trùng — job còn lại chắc chắn
+  // đang "sống" (mới gửi hoặc đang in thật) nên dedupe an toàn tuyệt đối.
+  await expireStalePrintJobs();
+
   // Chống gửi trùng: nếu đã có job giống hệt đang chờ/đang in thì trả về job đó
   // thay vì tạo mới — người dùng bấm lại nhiều lần khi chưa thấy giấy ra sẽ
   // không làm máy in ra nhiều bản giống nhau.
   const { data: dup } = await supabaseAdmin
     .from('print_jobs')
-    .select('id, type, ref_id, status, created_at, started_at')
+    .select('id, type, ref_id, status, created_at')
     .eq('type', type)
     .eq('ref_id', ref_id)
     .in('status', ['pending', 'printing'])
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
-  // 'printing' quá 3 phút = job mồ côi (agent chết giữa chừng, in thật chỉ
-  // ~30-60s) → KHÔNG coi là trùng, cho tạo job mới; job mồ côi sẽ được
-  // GET (agent poll) tự dọn bên dưới. 'pending' thì giữ dedupe mọi độ tuổi
-  // (agent tắt → job chờ hợp lệ, sẽ in khi agent chạy lại).
-  const dupUsable =
-    dup &&
-    (dup.status !== 'printing' ||
-      (dup.started_at &&
-        Date.now() - new Date(dup.started_at).getTime() < 3 * 60_000));
-  if (dupUsable) {
+  if (dup) {
     return NextResponse.json({ job: dup, duplicate: true });
   }
 
@@ -198,19 +194,9 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'status chỉ hỗ trợ pending' }, { status: 400 });
   }
 
-  // Tự chữa: job kẹt 'printing' quá 10 phút = agent bị gián đoạn giữa chừng
-  // (agent chỉ poll status=pending nên job này mồ côi vĩnh viễn). Đánh error
-  // để không chặn dedupe các lệnh in mới và UI báo đúng cho người gửi.
-  const stale = new Date(Date.now() - 10 * 60_000).toISOString();
-  await supabaseAdmin
-    .from('print_jobs')
-    .update({
-      status: 'error',
-      finished_at: new Date().toISOString(),
-      error_message: 'Agent bị gián đoạn khi đang in — vui lòng gửi lại lệnh in',
-    })
-    .eq('status', 'printing')
-    .lt('started_at', stale);
+  // Dọn job quá 2 phút TRƯỚC khi trả danh sách — agent không bao giờ nhận
+  // được lệnh đã tự hủy, nên không có chuyện bản in cũ bất ngờ chạy ra sau.
+  await expireStalePrintJobs();
 
   const { data, error } = await supabaseAdmin
     .from('print_jobs')
