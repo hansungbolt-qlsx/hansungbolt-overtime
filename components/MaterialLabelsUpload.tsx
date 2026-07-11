@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { HD_EMPLOYEES } from '@/lib/hd-employees';
+import PrintJobButton from './PrintJobButton';
 
 type Photo = { id: string; url: string | null; uploaded_at: string; employee_name: string | null };
 
@@ -256,7 +257,8 @@ export default function MaterialLabelsUpload({
                 </div>
               ))}
             </div>
-            <div className="mt-3 flex justify-end">
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <PrintJobButton type="labels_day" refId={date} label="Gửi in tất cả tem" />
               <button
                 type="button"
                 onClick={handleDeleteAll}

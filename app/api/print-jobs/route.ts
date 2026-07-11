@@ -1,0 +1,152 @@
+import { NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase';
+import { getSession } from '@/lib/auth-server';
+
+export const runtime = 'nodejs';
+
+// Giờ hành chính (VN) — chỉ nhận lệnh in trong khoảng này
+const OFFICE_HOURS_START = 8; // 08:00
+const OFFICE_HOURS_END = 17; // 17:00 (< 17)
+
+function isWithinOfficeHours(): boolean {
+  // Server timezone có thể khác VN → tính giờ VN qua offset +7
+  const now = new Date();
+  const utcHours = now.getUTCHours();
+  const vnHours = (utcHours + 7) % 24;
+  return vnHours >= OFFICE_HOURS_START && vnHours < OFFICE_HOURS_END;
+}
+
+// POST /api/print-jobs — tổ trưởng / admin tạo job in
+// Body: { type: 'registration' | 'labels_day', ref_id: string }
+//   registration: ref_id = registration.id (uuid)
+//   labels_day: ref_id = 'YYYY-MM-DD' (in tất cả tem của ngày đó)
+export async function POST(req: Request) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
+  }
+  if (session.role !== 'admin' && session.role !== 'leader') {
+    return NextResponse.json({ error: 'Không có quyền in' }, { status: 403 });
+  }
+
+  if (!isWithinOfficeHours()) {
+    return NextResponse.json(
+      {
+        error:
+          'Máy in đang tắt ngoài giờ hành chính. Chỉ in được từ 8h-17h.',
+      },
+      { status: 400 },
+    );
+  }
+
+  const body = await req.json().catch(() => null);
+  if (!body) {
+    return NextResponse.json({ error: 'Body JSON không hợp lệ' }, { status: 400 });
+  }
+
+  const { type, ref_id } = body as { type?: string; ref_id?: string };
+  if (type !== 'registration' && type !== 'labels_day') {
+    return NextResponse.json(
+      { error: 'type phải là registration hoặc labels_day' },
+      { status: 400 },
+    );
+  }
+  if (!ref_id || typeof ref_id !== 'string') {
+    return NextResponse.json({ error: 'Thiếu ref_id' }, { status: 400 });
+  }
+
+  // Validate ref_id + check quyền theo dept
+  if (type === 'registration') {
+    const { data: reg } = await supabaseAdmin
+      .from('overtime_registrations')
+      .select('id, department')
+      .eq('id', ref_id)
+      .maybeSingle();
+    if (!reg) {
+      return NextResponse.json({ error: 'Không tìm thấy phiếu' }, { status: 404 });
+    }
+    // Leader chỉ in được phiếu bộ phận mình
+    if (
+      session.role === 'leader' &&
+      session.department !== reg.department
+    ) {
+      return NextResponse.json(
+        { error: 'Chỉ in được phiếu của bộ phận mình' },
+        { status: 403 },
+      );
+    }
+  } else {
+    // labels_day: ref_id là YYYY-MM-DD
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ref_id)) {
+      return NextResponse.json(
+        { error: 'ref_id phải là YYYY-MM-DD' },
+        { status: 400 },
+      );
+    }
+    // Chỉ HD mới có tem
+    if (session.role === 'leader' && session.department !== 'HD') {
+      return NextResponse.json(
+        { error: 'Chỉ leader HD in được tem NVL' },
+        { status: 403 },
+      );
+    }
+  }
+
+  const { data: job, error } = await supabaseAdmin
+    .from('print_jobs')
+    .insert({
+      type,
+      ref_id,
+      requested_by: session.userId,
+      status: 'pending',
+    })
+    .select('id, type, ref_id, status, created_at')
+    .single();
+
+  if (error || !job) {
+    return NextResponse.json(
+      {
+        error:
+          error?.message ??
+          'Không tạo được job. Có thể migration 11 chưa chạy trên Supabase.',
+      },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json({ job });
+}
+
+// GET /api/print-jobs?status=pending — agent poll (auth Bearer AGENT_SECRET)
+// Trả về tối đa 5 job cùng lúc để agent xử lý tuần tự
+export async function GET(req: Request) {
+  const auth = req.headers.get('authorization') ?? '';
+  const secret = process.env.AGENT_SECRET;
+  if (!secret) {
+    return NextResponse.json(
+      { error: 'AGENT_SECRET chưa được cấu hình trên server' },
+      { status: 500 },
+    );
+  }
+  if (auth !== `Bearer ${secret}`) {
+    return NextResponse.json({ error: 'Sai AGENT_SECRET' }, { status: 401 });
+  }
+
+  const url = new URL(req.url);
+  const status = url.searchParams.get('status') ?? 'pending';
+  if (status !== 'pending') {
+    return NextResponse.json({ error: 'status chỉ hỗ trợ pending' }, { status: 400 });
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('print_jobs')
+    .select('id, type, ref_id, requested_by, status, created_at')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true })
+    .limit(5);
+
+  if (error) {
+    return NextResponse.json({ jobs: [], warning: error.message });
+  }
+  return NextResponse.json({ jobs: data ?? [] });
+}

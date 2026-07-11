@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { toTitleCase } from '@/lib/format';
+import PrintJobButton from './PrintJobButton';
 
 type Reg = {
   id: string;
@@ -108,21 +109,23 @@ export default function DepartmentRegistrationsList({
                     {formatDateTime(r.created_at)}
                   </td>
                   <td className="px-3 py-2.5 text-right">
-                    <div className="inline-flex gap-1.5">
+                    <div className="inline-flex items-center gap-1.5 flex-wrap justify-end">
+                      {canEdit && (
+                        <PrintJobButton
+                          type="registration"
+                          refId={r.id}
+                          label="Gửi in"
+                          compact
+                        />
+                      )}
                       {canEdit && (
                         <Link
                           href={`/dashboard/registrations/${r.id}/edit`}
-                          className="bg-[#f97316] hover:bg-[#ea580c] text-white text-xs font-semibold py-1.5 px-3 rounded-md transition"
+                          className="bg-[#f59e0b] hover:bg-[#d97706] text-white text-xs font-semibold py-1.5 px-3 rounded-md transition"
                         >
                           Sửa
                         </Link>
                       )}
-                      <Link
-                        href={`/dashboard/registrations/${r.id}/view?autoprint=1`}
-                        className="bg-brand-teal hover:bg-brand-teal-dark text-white text-xs font-semibold py-1.5 px-3 rounded-md shadow-sm shadow-brand-teal/30 transition"
-                      >
-                        In
-                      </Link>
                       <Link
                         href={`/dashboard/registrations/${r.id}/view`}
                         className="bg-brand-navy hover:bg-brand-navy-soft text-white text-xs font-semibold py-1.5 px-3 rounded-md transition"
