@@ -144,9 +144,12 @@ async function renderPDF(job) {
     });
 
     console.log(`[${new Date().toISOString()}] Navigate: ${url}`);
-    // networkidle2: chờ ảnh tem NVL / logo tải xong (domcontentloaded in ra ô trống)
+    // Tem NVL nhiều ảnh Supabase → chờ mạng lặng (networkidle2).
+    // Phiếu/tổng hợp chỉ chữ + bảng → domcontentloaded là đủ (nhanh hơn ~10-20s);
+    // ảnh logo + font chờ riêng bên dưới.
+    const waitMode = job.type === 'labels_day' ? 'networkidle2' : 'domcontentloaded';
     let response = await page.goto(url, {
-      waitUntil: 'networkidle2',
+      waitUntil: waitMode,
       timeout: 60000,
     });
     // Session hết hạn → bị redirect về /login → login lại + thử 1 lần nữa
@@ -161,7 +164,7 @@ async function renderPDF(job) {
         httpOnly: true,
         secure: true,
       });
-      response = await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+      response = await page.goto(url, { waitUntil: waitMode, timeout: 60000 });
       if (page.url().includes('/login')) {
         throw new Error('Vẫn bị đá về /login sau khi login lại');
       }
@@ -170,8 +173,24 @@ async function renderPDF(job) {
       throw new Error(`Load page failed: HTTP ${response?.status()} ${response?.statusText()}`);
     }
 
-    // Đợi thêm 1.5s cho font Geist render ổn định
-    await new Promise((r) => setTimeout(r, 1500));
+    // Chờ đúng thứ cần: mọi <img> tải xong (logo, tem) + font sẵn sàng,
+    // thay cho sleep 1.5s cố định — thường xong trong <500ms nhờ cache.
+    await page
+      .evaluate(() =>
+        Promise.all([
+          document.fonts.ready,
+          ...Array.from(document.images)
+            .filter((img) => !img.complete)
+            .map(
+              (img) =>
+                new Promise((res) => {
+                  img.onload = img.onerror = res;
+                }),
+            ),
+        ]),
+      )
+      .catch(() => {});
+    await new Promise((r) => setTimeout(r, 200));
 
     // Tổng hợp giờ tăng ca dùng A4 landscape (bảng nhiều cột)
     const isLandscape = job.type === 'overtime_summary';
