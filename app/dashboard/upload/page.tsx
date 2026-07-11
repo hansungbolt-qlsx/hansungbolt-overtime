@@ -15,7 +15,11 @@ export default function UploadPlanPage() {
   const [file, setFile] = useState<File | null>(null);
   const [sheets, setSheets] = useState<string[]>([]);
   const [selectedSheet, setSelectedSheet] = useState('');
-  const [planDate, setPlanDate] = useState(new Date().toISOString().slice(0, 10));
+  // toISOString = UTC (trước 7h sáng VN sẽ ra ngày hôm trước) → lấy ngày LOCAL của trình duyệt
+  const [planDate, setPlanDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
   const [inspecting, setInspecting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');

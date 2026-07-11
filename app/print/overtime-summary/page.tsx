@@ -4,8 +4,9 @@ import { supabaseAdmin } from '@/lib/supabase';
 import PrintClient from './PrintClient';
 
 function currentMonthISO() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  // Server UTC lệch −7h so VN — cộng 7h + getUTC* để đúng tháng theo giờ VN
+  const d = new Date(Date.now() + 7 * 60 * 60 * 1000);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 export default async function PrintOvertimeSummaryPage({
