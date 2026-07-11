@@ -114,7 +114,7 @@ export default function DepartmentRegistrationsList({
                         <PrintJobButton
                           type="registration"
                           refId={r.id}
-                          label="Gửi in"
+                          label="In phiếu"
                           compact
                         />
                       )}

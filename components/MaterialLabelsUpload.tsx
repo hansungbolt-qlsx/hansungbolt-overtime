@@ -258,7 +258,7 @@ export default function MaterialLabelsUpload({
               ))}
             </div>
             <div className="mt-3 flex items-center justify-between gap-3">
-              <PrintJobButton type="labels_day" refId={date} label="Gửi in tất cả tem" />
+              <PrintJobButton type="labels_day" refId={date} label="In tem" />
               <button
                 type="button"
                 onClick={handleDeleteAll}
