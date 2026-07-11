@@ -80,6 +80,20 @@
 - Người yêu cầu mặc định = admin đăng nhập.
 - Backend: POST `/api/registrations/qlsx`, auto-create equipment `CVK-QLSX` lần đầu, lưu lý do vào `item_code`.
 
+### 4.6. Kế hoạch đã tải lên (admin)
+- Card trong `/dashboard` Tổng quan (col-span-2, gộp với "Kế hoạch sản xuất"). Giữ 3 file Excel gốc gần nhất, tải về giữ nguyên định dạng.
+- Bucket Supabase Storage `plan-files` auto-tạo lần upload đầu. Metadata trong bảng `plan_files`. Re-upload cùng ngày replace file cũ; upload ngày thứ 4 → cleanup file cũ nhất.
+- Nút Upload có drag-and-drop bypass Windows "file in use" lock.
+
+### 4.7. Print server remote (tất cả role)
+- Kiến trúc: điện thoại 4G → Vercel (queue job) → máy tính admin chạy agent Node.js poll job → puppeteer render PDF → in ApeosPort-VI C4471 qua LAN.
+- Bảng `print_jobs` (id, type, ref_id, requested_by, status). Type: `registration` / `labels_day` / `overtime_summary`.
+- `AGENT_SECRET` env var Vercel. Agent login `qlsx` (password `qlsx123`) để có session render view page.
+- Chặn ngoài giờ 8h-17h (giờ VN). API validate quyền: leader chỉ in dept mình; leader HD mới in tem.
+- Folder `print-agent/` trong repo: `agent.js` + `install.bat` + `start.bat` + `README.md`. User đã cài trên máy admin.
+- Nút "In phiếu" (registration + overtime_summary) và "In tem" (labels_day) hiện cho leader/worker. Admin có thêm nút Xem + In/Xuất browser trong tổng hợp giờ.
+- Danh sách phiếu tăng ca auto refetch khi OvertimeForm submit (custom event `overtime:registered`).
+
 ## 5. DB schema & migrations
 
 Migrations đã chạy (tất cả thuần additive — `IF NOT EXISTS` hoặc DROP + ADD CONSTRAINT):
@@ -92,6 +106,9 @@ Migrations đã chạy (tất cả thuần additive — `IF NOT EXISTS` hoặc D
 7. `07-game-progress.sql` — (Bé Học cũ — đã gỡ khỏi code, bảng `game_progress` vẫn còn trên Supabase để tham khảo lịch sử, không dùng đến)
 8. `08-employee-active.sql` — soft delete: `active boolean default true` + `deactivated_at timestamptz` cho cả `users` lẫn `employees`. Toggle "Đã nghỉ" trong /dashboard/users.
 9. `09-qlsx-department.sql` — mở rộng CHECK constraint của 4 bảng để chấp nhận `QLSX`, seed 5 NV QLSX vào employees.
+10. `10-plan-files.sql` — bảng `plan_files` lưu metadata file Excel kế hoạch đã upload (giữ 3 file gần nhất trong Supabase Storage `plan-files`).
+11. `11-print-jobs.sql` — bảng `print_jobs` queue lệnh in cho agent Node.js.
+12. `12-print-jobs-overtime-summary.sql` — mở rộng CHECK constraint `print_jobs.type` thêm `overtime_summary`.
 
 Bảng `equipments` hiện ~84 rows (42 HD + 38 RL + RL-24 + HD-1A + có thể có CVK-HD/CVK-RL từ Công việc khác).
 
@@ -207,27 +224,37 @@ Claude máy cũ lưu memory tại `~/.claude/projects/c--hansungbolt-overtime/me
 6. Sửa nhẹ 1 file vô hại (vd thêm 1 dòng comment), commit + push → quan sát Vercel Dashboard auto-build → deploy success → URL prod vẫn hoạt động.
 7. Mở Claude Code trong VS Code, gõ vài câu — kiểm tra Claude đã đọc `PROJECT_CONTEXT.md` (hỏi "bạn còn nhớ dự án không" → nếu trả lời nắm context là OK).
 
-## 12. Trạng thái hiện tại (2026-06-23)
+## 12. Trạng thái hiện tại (2026-07-11)
 
-Session lớn — push ~17 commits. Đã thêm/sửa:
-- Gỡ Bé Học khỏi code (bảng `game_progress` vẫn còn trên Supabase, ko code dùng).
-- **Quản lý tài khoản** trong `/dashboard/users`: thêm NV mới (insert đồng bộ users + employees), toggle "Đã nghỉ" thay vì xóa cứng (migration 08, soft delete với `active` + `deactivated_at`). NV đã nghỉ không login + không hiện dropdown đăng ký + xếp cuối list + hiển thị ngày nghỉ.
-- Khôi phục `tranxuandat` (HD, order_no=12) đã lỡ xóa hôm 31/05/2026.
-- **Tổng hợp giờ**: tabs HD/RL + nút Xem (preview) bên cạnh nút In/Xuất.
-- **Phiếu in**: "Người yêu cầu" lấy đúng tên `registered_by` (bỏ hardcode "Hoàng Chính Hữu"). NV chỉ có CVK xếp cuối phiếu.
-- **Tăng ca hôm nay**: list đơn giản (NV + máy chi tiết, không gộp M4/M3 cho dễ chụp), non-admin chỉ thấy dept mình. Nút **Chia sẻ** chụp card thành PNG 480px (off-screen render với inline styles → ổn định) gửi Zalo qua Web Share API.
-- **Mở quyền sửa phiếu cho leader** HD+RL: `LeaderEditForm` mobile-friendly (UI giống đăng ký mới, đỡ table desktop khó tap). PATCH endpoint mở rộng support payload đơn giản (không cần per-row time) + auto-create CVK equipment. Admin vẫn dùng `EditRegistrationForm` cho per-row time edit.
-- **OvertimeForm**: ẩn form NV cho đến khi click chọn loại ngày. Lưới máy `max-h-[220px]` (~8 ô) thay vì 360. Mã máy fill màu theo prefix: HD navy, RL xanh lá, SM tím, CT đỏ.
-- **Logo click về trang chủ** ở mọi role (DashboardHeader → `/dashboard`, /register page → `/register`, view phiếu in → tùy role).
-- **Bộ phận QLSX** (mới): tab `/dashboard/qlsx`, 5 NV cố định, form không có máy chỉ chọn NV + textarea "Lý do tăng ca". POST `/api/registrations/qlsx`, auto-create equipment `CVK-QLSX`. Migration 09 đã chạy.
+Session lớn — hoàn thiện **print server remote** cho tổ trưởng ở xưởng in qua 4G.
 
-**Việc chưa hoàn thành** (đợi user phản hồi sau khi test):
-- Phiếu in QLSX có thể hiển thị cột thiết bị/SL lệch (layout cũ thiết kế cho HD/RL). Cần test thử rồi tính việc làm layout riêng cho QLSX nếu cần.
-- Tổng hợp giờ tháng chưa có tab QLSX (hiện code tabs hardcode HD/RL). Bổ sung nếu user yêu cầu.
+**Đã thêm/sửa (session mới nhất):**
+- **Kế hoạch đã tải lên**: card trong Dashboard Tổng quan, giữ 3 file Excel gốc gần nhất trong Supabase Storage `plan-files`. Nút Upload có drag-and-drop bypass Windows "file in use" lock (migration 10).
+- **Print server remote** cho tổ trưởng 4G:
+  * Bảng `print_jobs` queue (migration 11 + 12).
+  * Agent Node.js trong folder `print-agent/` chạy trên máy admin. Login `qlsx/qlsx123` → puppeteer render PDF → in ApeosPort qua LAN.
+  * `AGENT_SECRET=k7hf9x3nB8mp1WQ4Z2yLtG6cVsA5rDe` đã set trên Vercel + `.env` của agent.
+  * 3 loại print: `registration` (phiếu tăng ca) / `labels_day` (tem NVL) / `overtime_summary` (tổng hợp giờ, A4 landscape).
+  * Chặn ngoài giờ 8h-17h. API validate quyền dept.
+  * Nút "In phiếu" / "In tem" cho leader/worker. Admin có thêm Xem + In/Xuất browser.
+- **UI mobile-first refactor**:
+  * Gộp "Phiếu đã gửi" + "Danh sách phiếu" → 1 card mobile-friendly (card layout, không table).
+  * Component `DateButton` hiển thị "Ngày DD/MM/YYYY" chữ N viết hoa (thay browser locale lowercase).
+  * `OvertimeForm`: toggle chọn loại ngày (click active → thu gọn form). Time label hiện dưới nút được chọn thay vì dưới cả 2.
+  * Custom event `overtime:registered` → DepartmentRegistrationsList auto refetch không cần reload.
+- Tổng hợp giờ có thêm tab QLSX + tab "Tất cả" (admin).
+- Fix timezone Vercel (UTC → giờ VN cho date display).
+
+**Việc chưa hoàn thành:**
+- Phiếu in QLSX có thể vẫn hiển thị cột thiết bị/SL lệch (layout HD/RL). Cần test thử.
+- Agent chưa được cài auto-start Windows Task Scheduler — user vẫn phải double-click `start.bat` sau khi reboot. Xem `print-agent/README.md` mục "Auto-start khi Windows boot".
 
 **Lưu ý cho phiên sau:**
-- Quy tắc data safety đã củng cố: code phụ thuộc migration phải forward-compat (`SELECT *` thay vì select cột mới trực tiếp) để khi migration chưa chạy, app không crash. Đã rút kinh nghiệm từ commit 9440f0b → hotfix 7919ca6.
-- Khi cần chạy migration: viết file `docs/sql/NN-...sql`, gửi nội dung SQL cho user paste vào Supabase Dashboard SQL Editor (nhắc rõ **New Query tab MỚI TRỐNG**). Verify lại bằng script Node trước khi báo "đã xong".
+- Print agent chạy nền trên máy admin: kiểm tra bằng `taskkill //F //IM node.exe` xong `cd print-agent && node agent.js` (background). Trong session Claude Code, dùng `run_in_background: true`.
+- `AGENT_SECRET` là `k7hf9x3nB8mp1WQ4Z2yLtG6cVsA5rDe`. Nếu leak → sinh mới, update Vercel env + agent `.env` + Redeploy Vercel.
+- Password admin `qlsx` là `qlsx123` — lưu trong `print-agent/.env` (không commit, đã gitignored).
+- Quy tắc data safety đã củng cố: code phụ thuộc migration phải forward-compat (`SELECT *`). Đã có sự cố commit 9440f0b → hotfix 7919ca6 từ session trước.
+- Khi cần chạy migration: viết file `docs/sql/NN-...sql`, gửi user paste vào Supabase Dashboard SQL Editor (nhắc rõ **New Query tab MỚI TRỐNG**). Verify bằng script Node trước khi báo "đã xong".
 
 ---
 
