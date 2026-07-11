@@ -81,6 +81,23 @@ export default function DepartmentRegistrationsList({
     return () => { cancelled = true; };
   }, [date]);
 
+  // Auto refetch khi OvertimeForm gửi phiếu mới. Nếu event kèm date khác
+  // (user submit phiếu cho ngày khác) -> auto chuyển sang ngày đó.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ date?: string }>).detail;
+      if (detail?.date && detail.date !== date) {
+        setDate(detail.date);
+      } else {
+        loadRegs();
+      }
+    };
+    window.addEventListener('overtime:registered', handler);
+    return () => window.removeEventListener('overtime:registered', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date]);
+
   async function handleDelete(id: string) {
     if (!confirm('Xóa phiếu này? Thao tác không thể khôi phục.')) return;
     setDeletingId(id);

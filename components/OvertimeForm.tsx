@@ -221,6 +221,12 @@ export default function OvertimeForm({ department }: { department: string }) {
       if (!res.ok) { setError(data.error || 'Không gửi được phiếu'); return; }
       setSuccess(`Đã gửi phiếu với ${data.items_count} dòng. (ID: ${data.id.slice(0, 8)}…)`);
       setRows([emptyRow()]);
+      // Báo DepartmentRegistrationsList tự refetch (không cần user reload trang)
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('overtime:registered', { detail: { date } }),
+        );
+      }
     } finally { setSubmitting(false); }
   }
 
