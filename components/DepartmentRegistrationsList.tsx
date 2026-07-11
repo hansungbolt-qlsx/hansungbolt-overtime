@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { toTitleCase } from '@/lib/format';
 import PrintJobButton from './PrintJobButton';
+import DateButton from './DateButton';
 
 type Reg = {
   id: string;
@@ -48,6 +49,20 @@ export default function DepartmentRegistrationsList({
   const [date, setDate] = useState(todayISO());
   const [regs, setRegs] = useState<Reg[]>([]);
   const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function loadRegs() {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/registrations/department?date=${date}`);
+      const d = await res.json();
+      setRegs(d.registrations ?? []);
+    } catch {
+      setRegs([]);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -60,85 +75,99 @@ export default function DepartmentRegistrationsList({
     return () => { cancelled = true; };
   }, [date]);
 
+  async function handleDelete(id: string) {
+    if (!confirm('Xóa phiếu này? Thao tác không thể khôi phục.')) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/registrations/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(`Xóa thất bại: ${data.error ?? res.statusText}`);
+        return;
+      }
+      await loadRegs();
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   return (
     <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden">
-      <div className="px-5 py-4 border-b border-brand-surface-alt flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-brand-navy">Danh sách phiếu tăng ca</h2>
-          <p className="text-xs text-brand-navy-soft mt-0.5">
-            {loading ? 'Đang tải...' : regs.length === 0 ? 'Chưa có phiếu nào.' : `${regs.length} phiếu`}
-          </p>
+      <div className="px-4 py-3.5 border-b border-brand-surface-alt flex flex-col gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-semibold text-brand-navy leading-tight">
+            Danh sách phiếu tăng ca ngày {date}
+          </h2>
+          <DateButton value={date} onChange={setDate} compact />
         </div>
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="px-3 py-1.5 border border-gray-300 rounded-md text-brand-navy text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal"
-        />
+        <p className="text-xs text-brand-navy-soft">
+          {loading ? 'Đang tải...' : regs.length === 0 ? 'Chưa có phiếu nào.' : `${regs.length} phiếu`}
+        </p>
       </div>
 
       {regs.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-brand-surface-alt text-brand-navy">
-              <tr>
-                <th className="text-left px-3 py-2 font-semibold">Loại</th>
-                <th className="text-left px-3 py-2 font-semibold">Giờ</th>
-                <th className="text-right px-3 py-2 font-semibold">Số dòng</th>
-                <th className="text-left px-3 py-2 font-semibold">Người tạo</th>
-                <th className="text-left px-3 py-2 font-semibold">Gửi lúc</th>
-                <th className="text-right px-3 py-2 font-semibold">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-brand-surface-alt">
-              {regs.map((r) => (
-                <tr key={r.id} className="hover:bg-brand-surface/50">
-                  <td className="px-3 py-2.5 text-brand-navy">
-                    {r.day_type === 'weekday' ? 'Ngày thường' : 'Chủ nhật'}
-                  </td>
-                  <td className="px-3 py-2.5 text-brand-navy-soft">
-                    {formatTime(r.time_from)}–{formatTime(r.time_to)} ({r.duration_hours}h)
-                  </td>
-                  <td className="px-3 py-2.5 text-right font-semibold text-brand-navy">
-                    {r.items_count}
-                  </td>
-                  <td className="px-3 py-2.5 text-brand-navy-soft">
-                    {toTitleCase(r.registered_by_name) || '—'}
-                  </td>
-                  <td className="px-3 py-2.5 text-brand-navy-soft whitespace-nowrap">
-                    {formatDateTime(r.created_at)}
-                  </td>
-                  <td className="px-3 py-2.5 text-right">
-                    <div className="inline-flex items-center gap-1.5 flex-wrap justify-end">
-                      {canEdit && (
-                        <PrintJobButton
-                          type="registration"
-                          refId={r.id}
-                          label="In phiếu"
-                          compact
-                        />
-                      )}
-                      {canEdit && (
-                        <Link
-                          href={`/dashboard/registrations/${r.id}/edit`}
-                          className="bg-[#f59e0b] hover:bg-[#d97706] text-white text-xs font-semibold py-1.5 px-3 rounded-md transition"
-                        >
-                          Sửa
-                        </Link>
-                      )}
-                      <Link
-                        href={`/dashboard/registrations/${r.id}/view`}
-                        className="bg-brand-navy hover:bg-brand-navy-soft text-white text-xs font-semibold py-1.5 px-3 rounded-md transition"
-                      >
-                        Xem
-                      </Link>
+        <ul className="divide-y divide-brand-surface-alt">
+          {regs.map((r) => {
+            const isDeleting = deletingId === r.id;
+            return (
+              <li key={r.id} className="p-4 space-y-2.5">
+                <div className="flex items-baseline justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold text-brand-navy">
+                      {r.day_type === 'weekday' ? 'Ngày thường' : 'Chủ nhật'}
+                      <span className="text-brand-navy-soft font-normal ml-2">
+                        • {r.items_count} dòng
+                      </span>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    <div className="text-xs text-brand-navy-soft mt-0.5">
+                      {formatTime(r.time_from)}–{formatTime(r.time_to)} ({r.duration_hours}h)
+                      {r.registered_by_name && (
+                        <> • {toTitleCase(r.registered_by_name)}</>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-brand-navy-soft mt-0.5">
+                      Gửi lúc {formatDateTime(r.created_at)}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {canEdit && (
+                    <PrintJobButton
+                      type="registration"
+                      refId={r.id}
+                      label="In phiếu"
+                      compact
+                    />
+                  )}
+                  {canEdit && (
+                    <Link
+                      href={`/dashboard/registrations/${r.id}/edit`}
+                      className="inline-flex items-center bg-[#f59e0b] hover:bg-[#d97706] text-white text-xs font-semibold py-1.5 px-3 rounded-md transition"
+                    >
+                      Sửa
+                    </Link>
+                  )}
+                  <Link
+                    href={`/dashboard/registrations/${r.id}/view`}
+                    className="inline-flex items-center bg-brand-navy hover:bg-brand-navy-soft text-white text-xs font-semibold py-1.5 px-3 rounded-md transition"
+                  >
+                    Xem
+                  </Link>
+                  {canEdit && (
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(r.id)}
+                      disabled={isDeleting}
+                      className="inline-flex items-center bg-white hover:bg-red-50 border border-red-300 text-red-600 text-xs font-semibold py-1.5 px-3 rounded-md transition disabled:opacity-60"
+                    >
+                      {isDeleting ? 'Đang xóa...' : 'Xóa'}
+                    </button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       )}
     </section>
   );
