@@ -45,7 +45,7 @@ const TABS: {
   },
 ];
 
-export default function MaterialLabelsAdminCard({ date }: { date: string }) {
+export default function MaterialLabelsAdminCard() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<Tab>('view');
@@ -62,8 +62,9 @@ export default function MaterialLabelsAdminCard({ date }: { date: string }) {
     ],
     [],
   );
-  // Ngày đang xem trong card (riêng, không động tới bộ lọc phiếu phía trên).
-  const [day, setDay] = useState(date);
+  // Ngày đang xem trong card — LUÔN mặc định hôm nay, độc lập hoàn toàn với
+  // bộ lọc ngày của danh sách phiếu phía trên (tem hôm qua chỉ xem khi bấm tab).
+  const [day, setDay] = useState(() => ymdLocal(0));
 
   async function handleDeleteAll() {
     if (!confirm(`Xóa toàn bộ ${photos.length} ảnh ngày ${day}?`)) return;
