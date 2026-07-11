@@ -13,8 +13,9 @@ export type ParsedRow = {
  *   "15~31"  → ["HD-15", "HD-16", ..., "HD-31"]
  */
 export function expandMachineCode(raw: string): string[] {
+  // File ISO từ app chính: >2 máy xuống dòng theo cặp ("24,50\n51,52") → tách cả \n
   const tokens = raw
-    .split(',')
+    .split(/[,\n\r]+/)
     .map((s) => s.trim())
     .filter(Boolean);
 
@@ -44,7 +45,8 @@ export function expandMachineCode(raw: string): string[] {
   return result;
 }
 
-const MACHINE_HEADERS = ['SỐ MÁY', 'M/C', 'THIẾT BỊ', 'MÁY'];
+// 'MÁY HD' = sheet "KHSX hôm nay" trong file Excel ISO app chính gửi sang (11/7)
+const MACHINE_HEADERS = ['SỐ MÁY', 'M/C', 'THIẾT BỊ', 'MÁY', 'MÁY HD'];
 const ITEM_HEADERS = ['MÃ SẢN PHẨM', 'ITEM CODE', 'MÃ HÀNG', 'MÃ SP'];
 
 function normalize(value: unknown): string {
