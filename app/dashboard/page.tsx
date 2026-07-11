@@ -5,6 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import DashboardHeader from '@/components/DashboardHeader';
 import MaterialLabelsAdminCard from '@/components/MaterialLabelsAdminCard';
 import OvertimeSummaryCard from '@/components/OvertimeSummaryCard';
+// isAdmin=true chỉ cho dashboard admin — có Xem/In-Xuất trực tiếp browser.
 import DeleteRegistrationButton from '@/components/DeleteRegistrationButton';
 import TodayOvertimeCard from '@/components/TodayOvertimeCard';
 import PlanFilesList from '@/components/PlanFilesList';
@@ -229,7 +230,7 @@ export default async function DashboardPage({
         </div>
 
         <div className="mt-6">
-          <OvertimeSummaryCard />
+          <OvertimeSummaryCard isAdmin />
         </div>
       </div>
     </main>

@@ -29,7 +29,7 @@ function currentMonthISO() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-export default function OvertimeSummaryCard() {
+export default function OvertimeSummaryCard({ isAdmin = false }: { isAdmin?: boolean } = {}) {
   const [month, setMonth] = useState(currentMonthISO());
   const [rows, setRows] = useState<SummaryRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -119,23 +119,29 @@ export default function OvertimeSummaryCard() {
               <PrintJobButton
                 type="overtime_summary"
                 refId={printJobRefId}
-                label="Gửi in"
+                label="In phiếu"
                 compact
               />
-              <button
-                type="button"
-                onClick={() => window.open(previewUrl, '_blank')}
-                className="bg-[#063882] hover:bg-[#052a64] active:scale-95 text-white text-sm font-bold py-1.5 px-4 rounded-lg shadow-sm transition"
-              >
-                Xem
-              </button>
-              <button
-                type="button"
-                onClick={() => window.open(printUrl, '_blank')}
-                className="bg-[#e32531] hover:bg-[#c01f2a] active:scale-95 text-white text-sm font-bold py-1.5 px-4 rounded-lg shadow-sm transition"
-              >
-                In / Xuất
-              </button>
+              {/* Admin có thêm nút Xem/In-Xuất trực tiếp qua browser
+                  (ngồi máy tính, gần máy in). Leader/worker chỉ Gửi in qua agent. */}
+              {isAdmin && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => window.open(previewUrl, '_blank')}
+                    className="bg-[#063882] hover:bg-[#052a64] active:scale-95 text-white text-sm font-bold py-1.5 px-4 rounded-lg shadow-sm transition"
+                  >
+                    Xem
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => window.open(printUrl, '_blank')}
+                    className="bg-[#e32531] hover:bg-[#c01f2a] active:scale-95 text-white text-sm font-bold py-1.5 px-4 rounded-lg shadow-sm transition"
+                  >
+                    In / Xuất
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>
