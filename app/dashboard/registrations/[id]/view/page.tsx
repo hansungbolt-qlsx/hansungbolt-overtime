@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth-server';
 import { supabaseAdmin } from '@/lib/supabase';
 import PrintControls from '@/components/PrintControls';
+import MobileFitScale from '@/components/MobileFitScale';
 import { toTitleCase } from '@/lib/format';
 
 const FOOTER_NOTE =
@@ -228,6 +229,9 @@ export default async function PrintViewPage({
           <PrintControls id={id} autoprint={autoprint} />
         </div>
 
+        {/* Điện thoại (user 11/7): giữ layout giấy A4 chuẩn 760px, scale cả tờ vừa
+            bề ngang màn hình như xem PDF — cột không bị bóp méo chữ đè nhau */}
+        <div className="ot-fitbox overflow-hidden">
         <article className="ot-form bg-white p-6 md:p-10 shadow-sm print:shadow-none print:p-0 text-[13px] text-black">
           <div className="flex justify-between items-start mb-2">
             <div>
@@ -442,6 +446,8 @@ export default async function PrintViewPage({
 
           <p className="ot-footer italic text-xs mt-2 leading-relaxed">{FOOTER_NOTE}</p>
         </article>
+        </div>
+        <MobileFitScale />
       </div>
 
       <style>{`
@@ -468,6 +474,9 @@ export default async function PrintViewPage({
           @page { size: A4 portrait; margin: 8mm; }
           html, body { background: white !important; margin: 0 !important; padding: 0 !important; }
           main { min-height: 0 !important; padding: 0 !important; background: white !important; }
+          /* Scale mobile KHÔNG được dính vào bản in */
+          .ot-fitbox { height: auto !important; overflow: visible !important; }
+          .ot-form { transform: none !important; width: auto !important; }
           .ot-form {
             font-size: 8.5pt !important;
             page-break-inside: avoid !important;
