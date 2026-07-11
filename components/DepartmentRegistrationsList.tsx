@@ -41,6 +41,12 @@ function formatDateTime(iso: string) {
   return `${hh}:${mm} ${dd}/${mo}`;
 }
 
+// "2026-07-11" → "11-07-2026"
+function formatDateShort(iso: string): string {
+  const [y, m, d] = iso.split('-');
+  return `${d}-${m}-${y}`;
+}
+
 export default function DepartmentRegistrationsList({
   canEdit = false,
 }: {
@@ -96,7 +102,7 @@ export default function DepartmentRegistrationsList({
       <div className="px-4 py-3.5 border-b border-brand-surface-alt flex flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-semibold text-brand-navy leading-tight">
-            Danh sách phiếu tăng ca ngày {date}
+            Danh sách phiếu tăng ca {formatDateShort(date)}
           </h2>
           <DateButton value={date} onChange={setDate} compact />
         </div>

@@ -60,12 +60,6 @@ export default function OvertimeForm({ department }: { department: string }) {
   // Giờ tính sản lượng (trừ break) — KHÁC giờ hiển thị. Khi dayType=null,
   // form NV/máy bị ẩn nên giá trị này không hiển thị; dùng 0 cho an toàn.
   const calcHours = dayType === 'sunday' ? 7.5 : dayType === 'weekday' ? 2.5 : 0;
-  const timeLabel =
-    dayType === 'weekday'
-      ? '16:30 – 19:30 (3 giờ)'
-      : dayType === 'sunday'
-        ? '06:00 – 14:00 (8 giờ)'
-        : 'Chọn loại ngày để bắt đầu thêm nhân viên';
   const totalItems = rows.reduce(
     (sum, row) => sum + row.checkedMachineIds.length + (row.useOther ? 1 : 0),
     0,
@@ -243,24 +237,37 @@ export default function OvertimeForm({ department }: { department: string }) {
         <div>
           <span className="block text-sm font-semibold text-brand-navy mb-1.5">Loại ngày</span>
           <div className="grid grid-cols-2 gap-2">
-            {(['weekday', 'sunday'] as const).map((type) => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => setDayType(type)}
-                className={`py-2.5 rounded-md border text-sm font-medium transition ${
-                  dayType === type
-                    ? 'bg-brand-teal text-white border-brand-teal'
-                    : 'bg-white text-brand-navy border-gray-300 hover:border-brand-teal'
-                }`}
-              >
-                {type === 'weekday' ? 'Ngày thường' : 'Chủ nhật'}
-              </button>
-            ))}
+            {(['weekday', 'sunday'] as const).map((type) => {
+              const isActive = dayType === type;
+              const timeText = type === 'weekday' ? '16:30 – 19:30 (3h)' : '06:00 – 14:00 (8h)';
+              return (
+                <div key={type} className="flex flex-col gap-1">
+                  <button
+                    type="button"
+                    // Click nút đang active -> thu gọn (dayType=null); click nút khác -> switch
+                    onClick={() => setDayType(isActive ? null : type)}
+                    className={`py-2.5 rounded-md border text-sm font-medium transition ${
+                      isActive
+                        ? 'bg-brand-teal text-white border-brand-teal'
+                        : 'bg-white text-brand-navy border-gray-300 hover:border-brand-teal'
+                    }`}
+                  >
+                    {type === 'weekday' ? 'Ngày thường' : 'Chủ nhật'}
+                  </button>
+                  {isActive && (
+                    <p className="text-xs text-brand-navy-soft text-center">
+                      {timeText}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
-          <p className={`text-xs mt-1.5 ${dayType ? 'text-brand-navy-soft' : 'text-brand-teal font-medium'}`}>
-            {timeLabel}
-          </p>
+          {!dayType && (
+            <p className="text-xs mt-1.5 text-brand-teal font-medium">
+              Chọn loại ngày để bắt đầu thêm nhân viên
+            </p>
+          )}
         </div>
       </div>
 

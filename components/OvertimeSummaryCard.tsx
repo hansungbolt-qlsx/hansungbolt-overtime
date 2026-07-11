@@ -90,7 +90,9 @@ export default function OvertimeSummaryCard() {
   const previewUrl = `/print/overtime-summary?month=${month}&preview=1${printDeptParam}`;
   const printUrl = `/print/overtime-summary?month=${month}${printDeptParam}`;
 
-  const showDeptColumn = activeTab === 'all';
+  // Cột 'Bộ phận' chỉ hiển thị khi admin xem tab 'Tất cả' (có nhiều dept).
+  // Non-admin chỉ có 1 dept -> ẩn cột này (redundant).
+  const showDeptColumn = showTabs && activeTab === 'all';
 
   return (
     <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden">
