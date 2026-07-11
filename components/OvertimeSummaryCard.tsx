@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { toTitleCase } from '@/lib/format';
+import PrintJobButton from './PrintJobButton';
 
 type Dept = 'HD' | 'RL' | 'QLSX';
 type ActiveTab = 'all' | Dept;
@@ -90,6 +91,9 @@ export default function OvertimeSummaryCard() {
   const previewUrl = `/print/overtime-summary?month=${month}&preview=1${printDeptParam}`;
   const printUrl = `/print/overtime-summary?month=${month}${printDeptParam}`;
 
+  // ref_id cho print job: 'YYYY-MM' hoặc 'YYYY-MM|DEPT'
+  const printJobRefId = activeTab !== 'all' ? `${month}|${activeTab}` : month;
+
   // Cột 'Bộ phận' chỉ hiển thị khi admin xem tab 'Tất cả' (có nhiều dept).
   // Non-admin chỉ có 1 dept -> ẩn cột này (redundant).
   const showDeptColumn = showTabs && activeTab === 'all';
@@ -112,6 +116,12 @@ export default function OvertimeSummaryCard() {
           />
           {displayRows.length > 0 && (
             <>
+              <PrintJobButton
+                type="overtime_summary"
+                refId={printJobRefId}
+                label="Gửi in"
+                compact
+              />
               <button
                 type="button"
                 onClick={() => window.open(previewUrl, '_blank')}

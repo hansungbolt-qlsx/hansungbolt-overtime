@@ -111,6 +111,13 @@ function jobUrl(job) {
   if (job.type === 'labels_day') {
     return `${APP_URL}/print/labels?date=${job.ref_id}`;
   }
+  if (job.type === 'overtime_summary') {
+    // ref_id: 'YYYY-MM' hoặc 'YYYY-MM|DEPT'
+    const [month, dept] = job.ref_id.split('|');
+    let url = `${APP_URL}/print/overtime-summary?month=${month}`;
+    if (dept) url += `&dept=${dept}`;
+    return url;
+  }
   throw new Error(`Unknown job type: ${job.type}`);
 }
 
@@ -148,8 +155,11 @@ async function renderPDF(job) {
     // Đợi 1.5s cho font Geist + ảnh logo load xong
     await new Promise((r) => setTimeout(r, 1500));
 
+    // Tổng hợp giờ tăng ca dùng A4 landscape (bảng nhiều cột)
+    const isLandscape = job.type === 'overtime_summary';
     const pdfBuffer = await page.pdf({
       format: 'A4',
+      landscape: isLandscape,
       printBackground: true,
       margin: {
         top: '8mm',

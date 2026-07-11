@@ -45,9 +45,13 @@ export async function POST(req: Request) {
   }
 
   const { type, ref_id } = body as { type?: string; ref_id?: string };
-  if (type !== 'registration' && type !== 'labels_day') {
+  if (
+    type !== 'registration' &&
+    type !== 'labels_day' &&
+    type !== 'overtime_summary'
+  ) {
     return NextResponse.json(
-      { error: 'type phải là registration hoặc labels_day' },
+      { error: 'type phải là registration / labels_day / overtime_summary' },
       { status: 400 },
     );
   }
@@ -75,7 +79,7 @@ export async function POST(req: Request) {
         { status: 403 },
       );
     }
-  } else {
+  } else if (type === 'labels_day') {
     // labels_day: ref_id là YYYY-MM-DD
     if (!/^\d{4}-\d{2}-\d{2}$/.test(ref_id)) {
       return NextResponse.json(
@@ -89,6 +93,25 @@ export async function POST(req: Request) {
         { error: 'Chỉ leader HD in được tem NVL' },
         { status: 403 },
       );
+    }
+  } else if (type === 'overtime_summary') {
+    // overtime_summary: ref_id = 'YYYY-MM' hoặc 'YYYY-MM|DEPT'
+    const match = ref_id.match(/^(\d{4}-\d{2})(?:\|(HD|RL|QLSX))?$/);
+    if (!match) {
+      return NextResponse.json(
+        { error: 'ref_id phải là YYYY-MM hoặc YYYY-MM|HD/RL/QLSX' },
+        { status: 400 },
+      );
+    }
+    const dept = match[2] ?? null;
+    // Leader chỉ được in tổng hợp bộ phận mình (bắt buộc có dept, khớp session)
+    if (session.role === 'leader') {
+      if (!dept || dept !== session.department) {
+        return NextResponse.json(
+          { error: 'Leader chỉ in được tổng hợp bộ phận của mình' },
+          { status: 403 },
+        );
+      }
     }
   }
 

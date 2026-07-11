@@ -18,7 +18,7 @@ export default function PrintJobButton({
   label = 'In phiếu',
   compact = false,
 }: {
-  type: 'registration' | 'labels_day';
+  type: 'registration' | 'labels_day' | 'overtime_summary';
   refId: string;
   label?: string;
   compact?: boolean;
