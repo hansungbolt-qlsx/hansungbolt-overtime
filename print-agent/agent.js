@@ -144,29 +144,44 @@ async function renderPDF(job) {
     });
 
     console.log(`[${new Date().toISOString()}] Navigate: ${url}`);
-    const response = await page.goto(url, {
-      waitUntil: 'domcontentloaded',
+    // networkidle2: chờ ảnh tem NVL / logo tải xong (domcontentloaded in ra ô trống)
+    let response = await page.goto(url, {
+      waitUntil: 'networkidle2',
       timeout: 60000,
     });
+    // Session hết hạn → bị redirect về /login → login lại + thử 1 lần nữa
+    if (page.url().includes('/login')) {
+      console.log(`[${new Date().toISOString()}] Session hết hạn, login lại...`);
+      await login();
+      await page.setCookie({
+        name: 'session',
+        value: sessionCookie,
+        domain: host,
+        path: '/',
+        httpOnly: true,
+        secure: true,
+      });
+      response = await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+      if (page.url().includes('/login')) {
+        throw new Error('Vẫn bị đá về /login sau khi login lại');
+      }
+    }
     if (!response || !response.ok()) {
       throw new Error(`Load page failed: HTTP ${response?.status()} ${response?.statusText()}`);
     }
 
-    // Đợi 1.5s cho font Geist + ảnh logo load xong
+    // Đợi thêm 1.5s cho font Geist render ổn định
     await new Promise((r) => setTimeout(r, 1500));
 
     // Tổng hợp giờ tăng ca dùng A4 landscape (bảng nhiều cột)
     const isLandscape = job.type === 'overtime_summary';
+    // preferCSSPageSize: tôn trọng @page của từng trang
+    // (tem: A4 dọc lề 0 · tổng hợp: A4 ngang lề 1cm · phiếu: A4 dọc lề 8mm)
     const pdfBuffer = await page.pdf({
       format: 'A4',
       landscape: isLandscape,
       printBackground: true,
-      margin: {
-        top: '8mm',
-        right: '8mm',
-        bottom: '8mm',
-        left: '8mm',
-      },
+      preferCSSPageSize: true,
     });
 
     return Buffer.from(pdfBuffer);

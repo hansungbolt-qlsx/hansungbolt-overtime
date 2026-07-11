@@ -127,6 +127,22 @@ export async function POST(req: Request) {
     }
   }
 
+  // Chống gửi trùng: nếu đã có job giống hệt đang chờ/đang in thì trả về job đó
+  // thay vì tạo mới — người dùng bấm lại nhiều lần khi chưa thấy giấy ra sẽ
+  // không làm máy in ra nhiều bản giống nhau.
+  const { data: dup } = await supabaseAdmin
+    .from('print_jobs')
+    .select('id, type, ref_id, status, created_at')
+    .eq('type', type)
+    .eq('ref_id', ref_id)
+    .in('status', ['pending', 'printing'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (dup) {
+    return NextResponse.json({ job: dup, duplicate: true });
+  }
+
   const { data: job, error } = await supabaseAdmin
     .from('print_jobs')
     .insert({
