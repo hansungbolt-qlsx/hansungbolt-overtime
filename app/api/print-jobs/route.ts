@@ -44,7 +44,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Body JSON không hợp lệ' }, { status: 400 });
   }
 
-  const { type, ref_id } = body as { type?: string; ref_id?: string };
+  const { type } = body as { type?: string; ref_id?: string };
+  let ref_id = (body as { ref_id?: string }).ref_id;
   if (
     type !== 'registration' &&
     type !== 'labels_day' &&
@@ -103,10 +104,21 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    const dept = match[2] ?? null;
-    // Leader chỉ được in tổng hợp bộ phận mình (bắt buộc có dept, khớp session)
+    const month = match[1];
+    let dept: string | null = match[2] ?? null;
+    // Leader không truyền dept -> auto điền dept của mình.
+    // Leader truyền dept khác -> reject.
     if (session.role === 'leader') {
-      if (!dept || dept !== session.department) {
+      if (!dept) {
+        dept = session.department ?? null;
+        if (!dept) {
+          return NextResponse.json(
+            { error: 'Leader không có bộ phận' },
+            { status: 400 },
+          );
+        }
+        ref_id = `${month}|${dept}`;
+      } else if (dept !== session.department) {
         return NextResponse.json(
           { error: 'Leader chỉ in được tổng hợp bộ phận của mình' },
           { status: 403 },
