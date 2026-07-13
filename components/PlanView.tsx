@@ -245,7 +245,9 @@ function DccdCard({ options }: { options: [string, string][] }) {
             onChange={(e) => setCopies(e.target.value)}
             className="px-2 py-1.5 border border-gray-300 rounded-md text-sm text-brand-navy"
           >
-            {['1', '2', '3'].map((c) => <option key={c} value={c}>{c}</option>)}
+            {Array.from({ length: 10 }, (_, i) => String(i + 1)).map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
           </select>
         </div>
         {target ? (
@@ -276,18 +278,15 @@ function DccdCard({ options }: { options: [string, string][] }) {
           {matches.length > 0 && (
             <div className="border border-brand-surface-alt rounded-lg divide-y divide-slate-100 overflow-hidden">
               {matches.map((l) => (
+                // Gợi ý GỌN (user 13/7): chỉ mã hàng + số chỉ thị
                 <button
                   key={`${l.saeji}-${l.code}`}
                   type="button"
                   onClick={() => setSel(l)}
-                  className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-sky-50 transition"
+                  className="w-full flex items-center gap-4 px-3 py-2 text-left hover:bg-sky-50 transition"
                 >
+                  <span className="font-mono text-sm text-brand-navy flex-1">{l.code}</span>
                   <span className="font-mono font-bold text-[#063882] text-sm">{fmtSaeji(l)}</span>
-                  <span className="font-mono text-sm text-brand-navy">{l.code}</span>
-                  <span className="text-[11px] text-brand-navy-soft flex-1 truncate">{l.name}</span>
-                  <span className="text-[11px] text-brand-navy-soft whitespace-nowrap">
-                    {l.date && `duyệt ${l.date} · `}{l.qty.toLocaleString('vi')} EA
-                  </span>
                 </button>
               ))}
             </div>
