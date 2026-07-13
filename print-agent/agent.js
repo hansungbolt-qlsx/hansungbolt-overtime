@@ -5,9 +5,15 @@
 import 'dotenv/config';
 import { writeFileSync, unlinkSync, existsSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import puppeteer from 'puppeteer';
 import printer from 'pdf-to-printer';
+
+const execFileP = promisify(execFile);
+const AGENT_DIR = dirname(fileURLToPath(import.meta.url));
 
 const {
   APP_URL,
@@ -16,6 +22,9 @@ const {
   LOGIN_PASSWORD,
   PRINTER_NAME,
   POLL_INTERVAL_MS = '10000',
+  // In DCCD qua app chính (localhost) — user 13/7
+  MAIN_APP_URL,
+  MAIN_APP_TOKEN,
 } = process.env;
 
 // Validate config
@@ -210,6 +219,63 @@ async function renderPDF(job) {
 }
 
 // -----------------------------------------------------------
+// KHSX: tải file ISO từ app → Excel COM xuất PDF (giữ page setup) → in
+// -----------------------------------------------------------
+const KHSX_SHEET = { khsx_tong: 'KHSX tổng', khsx_homnay: 'KHSX hôm nay' };
+
+async function printKhsx(job) {
+  const res = await fetch(`${APP_URL}/api/plan-files/${job.ref_id}/download`, {
+    headers: { Cookie: `session=${sessionCookie}` },
+  });
+  if (!res.ok) throw new Error(`Tải file KHSX lỗi HTTP ${res.status}`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  const xlsxPath = join(TMP_DIR, `khsx-${job.id}.xlsx`);
+  const pdfPath = join(TMP_DIR, `khsx-${job.id}.pdf`);
+  writeFileSync(xlsxPath, buf);
+  try {
+    await execFileP(
+      'powershell.exe',
+      ['-NoProfile', '-ExecutionPolicy', 'Bypass',
+       '-File', join(AGENT_DIR, 'xlsx2pdf.ps1'),
+       '-InFile', xlsxPath, '-OutFile', pdfPath, '-SheetName', KHSX_SHEET[job.type]],
+      { timeout: 120000 },
+    );
+    if (!existsSync(pdfPath)) throw new Error('Excel không xuất được PDF');
+    await printer.print(pdfPath, { printer: PRINTER_NAME });
+    console.log(`[${new Date().toISOString()}] KHSX (${KHSX_SHEET[job.type]}) → ${PRINTER_NAME}`);
+  } finally {
+    try { unlinkSync(xlsxPath); } catch {}
+    try { unlinkSync(pdfPath); } catch {}
+  }
+}
+
+// -----------------------------------------------------------
+// DCCD: ủy quyền cho app chính in GDI (localhost + token, ref 'saeji|gj|copies')
+// -----------------------------------------------------------
+async function printDccd(job) {
+  if (!MAIN_APP_URL || !MAIN_APP_TOKEN) {
+    throw new Error('Thiếu MAIN_APP_URL / MAIN_APP_TOKEN trong .env');
+  }
+  const [saeji, gj, copies] = String(job.ref_id).split('|');
+  const body = new URLSearchParams({ saeji, gj: gj || '10', copies: copies || '1' });
+  const res = await fetch(`${MAIN_APP_URL}/planning/phieu-cd/print-local`, {
+    method: 'POST',
+    headers: {
+      'X-Agent-Token': MAIN_APP_TOKEN,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body,
+  });
+  const d = await res.json().catch(() => null);
+  if (!res.ok || !d || d.ok !== true) {
+    throw new Error((d && (d.detail || d.error)) || `App chính HTTP ${res.status}`);
+  }
+  console.log(
+    `[${new Date().toISOString()}] DCCD ${d.saeji} máy ${d.machine || '?'} → ${d.printer}`,
+  );
+}
+
+// -----------------------------------------------------------
 // Print PDF via Windows
 // -----------------------------------------------------------
 async function printPDFFile(pdfBuffer, jobId) {
@@ -233,8 +299,14 @@ async function processJob(job) {
   console.log(`\n[${new Date().toISOString()}] Processing job ${job.id.slice(0, 8)}... (type=${job.type})`);
   try {
     await updateJob(job.id, 'printing');
-    const pdf = await renderPDF(job);
-    await printPDFFile(pdf, job.id);
+    if (job.type === 'khsx_tong' || job.type === 'khsx_homnay') {
+      await printKhsx(job);
+    } else if (job.type === 'dccd') {
+      await printDccd(job);
+    } else {
+      const pdf = await renderPDF(job);
+      await printPDFFile(pdf, job.id);
+    }
     await updateJob(job.id, 'done');
     console.log(`[${new Date().toISOString()}] DONE job ${job.id.slice(0, 8)}`);
   } catch (e) {
