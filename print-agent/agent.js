@@ -276,6 +276,29 @@ async function printDccd(job) {
 }
 
 // -----------------------------------------------------------
+// Catalog chỉ thị mở (gợi ý In phiếu DCCD theo mã hàng) — kéo từ app chính
+// (localhost+token) đẩy lên app tăng ca mỗi 10 phút
+// -----------------------------------------------------------
+const CATALOG_MS = 10 * 60_000;
+let lastCatalogAt = 0;
+
+async function pushDccdCatalog() {
+  if (!MAIN_APP_URL || !MAIN_APP_TOKEN) return;
+  const res = await fetch(`${MAIN_APP_URL}/planning/phieu-cd/lots-all-local`, {
+    headers: { 'X-Agent-Token': MAIN_APP_TOKEN },
+  });
+  if (!res.ok) throw new Error(`lots-all-local HTTP ${res.status}`);
+  const d = await res.json();
+  const up = await fetch(`${APP_URL}/api/dccd-lots`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: `session=${sessionCookie}` },
+    body: JSON.stringify(d),
+  });
+  if (!up.ok) throw new Error(`push catalog HTTP ${up.status}`);
+  console.log(`[${new Date().toISOString()}] Catalog DCCD: ${d.lots?.length ?? 0} chỉ thị`);
+}
+
+// -----------------------------------------------------------
 // Print PDF via Windows
 // -----------------------------------------------------------
 async function printPDFFile(pdfBuffer, jobId) {
@@ -318,6 +341,16 @@ async function processJob(job) {
 
 async function pollLoop() {
   while (true) {
+    // Catalog DCCD mỗi 10' (lỗi → thử lại sau 1')
+    if (Date.now() - lastCatalogAt > CATALOG_MS) {
+      try {
+        await pushDccdCatalog();
+        lastCatalogAt = Date.now();
+      } catch (e) {
+        console.error(`[${new Date().toISOString()}] Catalog lỗi: ${e.message}`);
+        lastCatalogAt = Date.now() - CATALOG_MS + 60_000;
+      }
+    }
     try {
       const jobs = await pollPendingJobs();
       if (jobs.length > 0) {

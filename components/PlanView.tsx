@@ -152,30 +152,73 @@ const DCCD_GJ: Record<string, [string, string][]> = {
 };
 const DCCD_GJ_ALL: [string, string][] = [...DCCD_GJ.HD, ...DCCD_GJ.RL];
 
-// Card In phiếu DCCD LẺ (user 13/7): tổ trưởng gõ số chỉ thị + chọn công đoạn
-// của bộ phận mình → agent ủy quyền app chính in. Máy/khay app chính tự xử lý.
-function DccdManualCard({ options }: { options: [string, string][] }) {
-  const [saeji, setSaeji] = useState('');
+type Lot = {
+  saeji: string;
+  disp: string;
+  code: string;
+  name: string;
+  date: string;
+  qty: number;
+};
+
+// Card In phiếu DCCD (user chỉnh 13/7 chiều): nhập MÃ HÀNG → gợi ý số chỉ thị
+// đang mở (catalog agent đẩy từ app chính mỗi 10') như mục In phiếu lẻ app
+// chính; chọn chỉ thị → chọn công đoạn theo bộ phận → In. Gõ thẳng số chỉ thị
+// (6-9 số) vẫn nhận.
+function DccdCard({ options }: { options: [string, string][] }) {
+  const [q, setQ] = useState('');
+  const [catalog, setCatalog] = useState<Lot[] | null>(null);
+  const [catAt, setCatAt] = useState<string | null>(null);
+  const [sel, setSel] = useState<Lot | null>(null);
   const [gj, setGj] = useState(options[0][0]);
   const [copies, setCopies] = useState('1');
-  const digits = saeji.replace(/\D/g, '');
-  const valid = digits.length >= 6 && digits.length <= 9;
+
+  // Lazy tải catalog khi bắt đầu gõ (1 lần, ~50KB)
+  useEffect(() => {
+    if (!q || catalog !== null) return;
+    let cancelled = false;
+    fetch('/api/dccd-lots')
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        setCatalog(Array.isArray(d.lots) ? d.lots : []);
+        setCatAt(d.at ?? null);
+      })
+      .catch(() => { if (!cancelled) setCatalog([]); });
+    return () => { cancelled = true; };
+  }, [q, catalog]);
+
+  const qn = q.trim().toUpperCase();
+  const qDigits = qn.replace(/[^0-9]/g, '');
+  // Gõ thẳng số chỉ thị (chỉ số/dấu gạch) → cho in trực tiếp
+  const directSaeji =
+    /^[\d-]+$/.test(qn) && qDigits.length >= 6 && qDigits.length <= 9 ? qDigits : null;
+  const matches =
+    !sel && qn.length >= 3 && catalog
+      ? catalog.filter((l) => l.code.toUpperCase().includes(qn)).slice(0, 8)
+      : [];
+
+  const target = sel
+    ? { saeji: sel.saeji.replace(/\D/g, ''), label: `${sel.disp} — ${sel.code}` }
+    : directSaeji
+      ? { saeji: directSaeji, label: `chỉ thị ${qn}` }
+      : null;
 
   return (
     <div className="bg-white rounded-lg border border-brand-surface-alt p-3 mb-3">
-      <div className="text-sm font-bold text-brand-navy mb-2">🖨 In phiếu DCCD lẻ</div>
+      <div className="text-sm font-bold text-brand-navy mb-2">🖨 In phiếu DCCD</div>
       <div className="flex flex-wrap items-end gap-2">
-        <div>
+        <div className="flex-1 min-w-[180px]">
           <label className="block text-[11px] text-brand-navy-soft mb-0.5">
-            Số chỉ thị (vd 606-169)
+            Mã hàng (gợi ý chỉ thị đang mở) — hoặc gõ thẳng số chỉ thị
           </label>
           <input
             type="text"
-            inputMode="numeric"
-            value={saeji}
-            onChange={(e) => setSaeji(e.target.value)}
-            placeholder="606-169"
-            className="w-32 px-2 py-1.5 border border-gray-300 rounded-md text-sm font-mono text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal"
+            value={sel ? `${sel.code} · ${sel.disp}` : q}
+            onChange={(e) => { setSel(null); setQ(e.target.value); }}
+            onFocus={() => { if (sel) { setSel(null); setQ(''); } }}
+            placeholder="vd 050200-FS2W hoặc 606-169"
+            className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm font-mono text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal"
           />
         </div>
         <div>
@@ -200,14 +243,52 @@ function DccdManualCard({ options }: { options: [string, string][] }) {
             {['1', '2', '3'].map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
-        {valid ? (
-          <PrintJobButton type="dccd" refId={`${digits}|${gj}|${copies}`} label="In phiếu" />
+        {target ? (
+          <PrintJobButton
+            type="dccd"
+            refId={`${target.saeji}|${gj}|${copies}`}
+            label="In phiếu"
+          />
         ) : (
           <span className="text-[11px] text-brand-navy-soft pb-1.5">
-            ← nhập đủ số chỉ thị để in
+            ← gõ mã hàng rồi chọn chỉ thị
           </span>
         )}
       </div>
+
+      {/* Gợi ý chỉ thị theo mã hàng */}
+      {!sel && qn.length >= 3 && !directSaeji && (
+        <div className="mt-2">
+          {catalog === null && (
+            <p className="text-[11px] text-brand-navy-soft">Đang tải danh sách chỉ thị...</p>
+          )}
+          {catalog !== null && matches.length === 0 && (
+            <p className="text-[11px] text-brand-navy-soft">
+              Không có chỉ thị đang mở khớp &quot;{qn}&quot;
+              {catAt ? ` (danh sách lúc ${catAt.slice(11, 16)})` : ''}
+            </p>
+          )}
+          {matches.length > 0 && (
+            <div className="border border-brand-surface-alt rounded-lg divide-y divide-slate-100 overflow-hidden">
+              {matches.map((l) => (
+                <button
+                  key={`${l.saeji}-${l.code}`}
+                  type="button"
+                  onClick={() => setSel(l)}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-sky-50 transition"
+                >
+                  <span className="font-mono font-bold text-[#063882] text-sm">{l.disp}</span>
+                  <span className="font-mono text-sm text-brand-navy">{l.code}</span>
+                  <span className="text-[11px] text-brand-navy-soft flex-1 truncate">{l.name}</span>
+                  <span className="text-[11px] text-brand-navy-soft whitespace-nowrap">
+                    {l.date && `duyệt ${l.date} · `}{l.qty.toLocaleString('vi')} EA
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -245,7 +326,9 @@ export default function PlanView({
 
   // Click mã hàng in phiếu DCCD nhanh (CĐ 10): HD leader + admin
   const canDccd = isAdmin || (isLeader && department === 'HD');
-  // In DCCD lẻ: theo công đoạn của bộ phận (HD→10; RL→30/45/60); admin đủ 4
+  // In nguyên trang KHSX: CHỈ HD leader + admin (user 13/7 — RL chỉ xem)
+  const canPrintKhsx = isAdmin || (isLeader && department === 'HD');
+  // In DCCD: theo công đoạn của bộ phận (HD→10; RL→30/45/60); admin đủ 4
   const dccdOptions = isAdmin
     ? DCCD_GJ_ALL
     : isLeader
@@ -268,7 +351,7 @@ export default function PlanView({
             </p>
           )}
         </div>
-        {data && sheet && (
+        {data && sheet && canPrintKhsx && (
           <PrintJobButton
             type={tab === 'homnay' ? 'khsx_homnay' : 'khsx_tong'}
             refId={data.fileId}
@@ -300,7 +383,7 @@ export default function PlanView({
       </div>
 
       <div className="p-3 bg-[#f0f5ff] min-h-[120px]">
-        {dccdOptions.length > 0 && <DccdManualCard options={dccdOptions} />}
+        {dccdOptions.length > 0 && <DccdCard options={dccdOptions} />}
         {loading && <p className="text-sm text-brand-navy-soft text-center py-6">Đang tải...</p>}
         {err && <p className="text-sm text-red-600 text-center py-6">{err}</p>}
         {!loading && !err && sheet == null && (

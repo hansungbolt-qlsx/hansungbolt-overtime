@@ -103,7 +103,13 @@ export async function POST(req: Request) {
       );
     }
   } else if (type === 'khsx_tong' || type === 'khsx_homnay') {
-    // In nguyên sheet KHSX: ref_id = plan_files.id (uuid) — leader/admin đều in được
+    // In nguyên sheet KHSX: CHỈ HD leader + admin (user 13/7 — RL chỉ xem)
+    if (session.role === 'leader' && session.department !== 'HD') {
+      return NextResponse.json(
+        { error: 'Chỉ tổ trưởng HD in được bảng KHSX — bộ phận khác chỉ xem' },
+        { status: 403 },
+      );
+    }
     const { data: pf } = await supabaseAdmin
       .from('plan_files')
       .select('id')
