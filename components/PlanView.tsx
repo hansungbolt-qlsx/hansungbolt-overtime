@@ -141,6 +141,77 @@ function SheetTable({
   );
 }
 
+// Công đoạn in được phiếu DCCD lẻ theo bộ phận (khớp phân quyền API print-jobs)
+const DCCD_GJ: Record<string, [string, string][]> = {
+  HD: [['10', 'CĐ 10 — H/D']],
+  RL: [
+    ['30', 'CĐ 30 — R/L'],
+    ['45', 'CĐ 45 — S/R'],
+    ['60', 'CĐ 60 — C/T'],
+  ],
+};
+const DCCD_GJ_ALL: [string, string][] = [...DCCD_GJ.HD, ...DCCD_GJ.RL];
+
+// Card In phiếu DCCD LẺ (user 13/7): tổ trưởng gõ số chỉ thị + chọn công đoạn
+// của bộ phận mình → agent ủy quyền app chính in. Máy/khay app chính tự xử lý.
+function DccdManualCard({ options }: { options: [string, string][] }) {
+  const [saeji, setSaeji] = useState('');
+  const [gj, setGj] = useState(options[0][0]);
+  const [copies, setCopies] = useState('1');
+  const digits = saeji.replace(/\D/g, '');
+  const valid = digits.length >= 6 && digits.length <= 9;
+
+  return (
+    <div className="bg-white rounded-lg border border-brand-surface-alt p-3 mb-3">
+      <div className="text-sm font-bold text-brand-navy mb-2">🖨 In phiếu DCCD lẻ</div>
+      <div className="flex flex-wrap items-end gap-2">
+        <div>
+          <label className="block text-[11px] text-brand-navy-soft mb-0.5">
+            Số chỉ thị (vd 606-169)
+          </label>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={saeji}
+            onChange={(e) => setSaeji(e.target.value)}
+            placeholder="606-169"
+            className="w-32 px-2 py-1.5 border border-gray-300 rounded-md text-sm font-mono text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal"
+          />
+        </div>
+        <div>
+          <label className="block text-[11px] text-brand-navy-soft mb-0.5">Công đoạn</label>
+          <select
+            value={gj}
+            onChange={(e) => setGj(e.target.value)}
+            className="px-2 py-1.5 border border-gray-300 rounded-md text-sm text-brand-navy"
+          >
+            {options.map(([v, label]) => (
+              <option key={v} value={v}>{label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-[11px] text-brand-navy-soft mb-0.5">Số liên</label>
+          <select
+            value={copies}
+            onChange={(e) => setCopies(e.target.value)}
+            className="px-2 py-1.5 border border-gray-300 rounded-md text-sm text-brand-navy"
+          >
+            {['1', '2', '3'].map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        {valid ? (
+          <PrintJobButton type="dccd" refId={`${digits}|${gj}|${copies}`} label="In phiếu" />
+        ) : (
+          <span className="text-[11px] text-brand-navy-soft pb-1.5">
+            ← nhập đủ số chỉ thị để in
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function PlanView({
   department,
   isLeader,
@@ -172,8 +243,14 @@ export default function PlanView({
     return () => { cancelled = true; };
   }, []);
 
-  // Click mã hàng in phiếu DCCD: HD (CĐ 10) + admin — RL/SR/CT mở giai đoạn sau
+  // Click mã hàng in phiếu DCCD nhanh (CĐ 10): HD leader + admin
   const canDccd = isAdmin || (isLeader && department === 'HD');
+  // In DCCD lẻ: theo công đoạn của bộ phận (HD→10; RL→30/45/60); admin đủ 4
+  const dccdOptions = isAdmin
+    ? DCCD_GJ_ALL
+    : isLeader
+      ? (DCCD_GJ[department] ?? [])
+      : [];
 
   const sheet = data ? (tab === 'homnay' ? data.homnay : data.tong) : null;
 
@@ -223,6 +300,7 @@ export default function PlanView({
       </div>
 
       <div className="p-3 bg-[#f0f5ff] min-h-[120px]">
+        {dccdOptions.length > 0 && <DccdManualCard options={dccdOptions} />}
         {loading && <p className="text-sm text-brand-navy-soft text-center py-6">Đang tải...</p>}
         {err && <p className="text-sm text-red-600 text-center py-6">{err}</p>}
         {!loading && !err && sheet == null && (

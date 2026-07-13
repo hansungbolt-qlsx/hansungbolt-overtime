@@ -126,18 +126,17 @@ export async function POST(req: Request) {
       );
     }
     const gj = m[2];
-    // Phân quyền công đoạn theo bộ phận: HD → CĐ 10. RL/SR/CT mở giai đoạn sau.
+    // Phân quyền công đoạn theo bộ phận (13/7): HD → CĐ 10; RL → 30 R/L,
+    // 45 S/R, 60 C/T; admin tự do.
     if (session.role === 'leader') {
-      const allowed: Record<string, string[]> = { HD: ['10'] };
+      const allowed: Record<string, string[]> = {
+        HD: ['10'],
+        RL: ['30', '45', '60'],
+      };
       const ok = (allowed[session.department ?? ''] ?? []).includes(gj);
       if (!ok) {
         return NextResponse.json(
-          {
-            error:
-              session.department === 'RL'
-                ? 'Phiếu RL/SR/CT sẽ mở ở giai đoạn sau — hiện mới hỗ trợ công đoạn 10 (HD)'
-                : 'Bộ phận của bạn không in được phiếu công đoạn này',
-          },
+          { error: 'Bộ phận của bạn không in được phiếu công đoạn này' },
           { status: 403 },
         );
       }
