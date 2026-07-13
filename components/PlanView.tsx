@@ -161,6 +161,11 @@ type Lot = {
   qty: number;
 };
 
+// Hiển thị số chỉ thị dạng 3-3 như trên KHSX ('202607023' → '607-023')
+function fmtSaeji(l: Lot): string {
+  return l.saeji.length === 9 ? `${l.saeji.slice(3, 6)}-${l.saeji.slice(6)}` : l.disp;
+}
+
 // Card In phiếu DCCD (user chỉnh 13/7 chiều): nhập MÃ HÀNG → gợi ý số chỉ thị
 // đang mở (catalog agent đẩy từ app chính mỗi 10') như mục In phiếu lẻ app
 // chính; chọn chỉ thị → chọn công đoạn theo bộ phận → In. Gõ thẳng số chỉ thị
@@ -199,7 +204,7 @@ function DccdCard({ options }: { options: [string, string][] }) {
       : [];
 
   const target = sel
-    ? { saeji: sel.saeji.replace(/\D/g, ''), label: `${sel.disp} — ${sel.code}` }
+    ? { saeji: sel.saeji.replace(/\D/g, ''), label: `${fmtSaeji(sel)} — ${sel.code}` }
     : directSaeji
       ? { saeji: directSaeji, label: `chỉ thị ${qn}` }
       : null;
@@ -214,7 +219,7 @@ function DccdCard({ options }: { options: [string, string][] }) {
           </label>
           <input
             type="text"
-            value={sel ? `${sel.code} · ${sel.disp}` : q}
+            value={sel ? `${sel.code} · ${fmtSaeji(sel)}` : q}
             onChange={(e) => { setSel(null); setQ(e.target.value); }}
             onFocus={() => { if (sel) { setSel(null); setQ(''); } }}
             placeholder="vd 050200-FS2W hoặc 606-169"
@@ -277,7 +282,7 @@ function DccdCard({ options }: { options: [string, string][] }) {
                   onClick={() => setSel(l)}
                   className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-sky-50 transition"
                 >
-                  <span className="font-mono font-bold text-[#063882] text-sm">{l.disp}</span>
+                  <span className="font-mono font-bold text-[#063882] text-sm">{fmtSaeji(l)}</span>
                   <span className="font-mono text-sm text-brand-navy">{l.code}</span>
                   <span className="text-[11px] text-brand-navy-soft flex-1 truncate">{l.name}</span>
                   <span className="text-[11px] text-brand-navy-soft whitespace-nowrap">
