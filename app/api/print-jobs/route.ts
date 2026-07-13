@@ -50,10 +50,16 @@ export async function POST(req: Request) {
   if (
     type !== 'registration' &&
     type !== 'labels_day' &&
-    type !== 'overtime_summary'
+    type !== 'overtime_summary' &&
+    type !== 'khsx_tong' &&
+    type !== 'khsx_homnay' &&
+    type !== 'dccd'
   ) {
     return NextResponse.json(
-      { error: 'type phải là registration / labels_day / overtime_summary' },
+      {
+        error:
+          'type phải là registration / labels_day / overtime_summary / khsx_tong / khsx_homnay / dccd',
+      },
       { status: 400 },
     );
   }
@@ -95,6 +101,46 @@ export async function POST(req: Request) {
         { error: 'Chỉ leader HD in được tem NVL' },
         { status: 403 },
       );
+    }
+  } else if (type === 'khsx_tong' || type === 'khsx_homnay') {
+    // In nguyên sheet KHSX: ref_id = plan_files.id (uuid) — leader/admin đều in được
+    const { data: pf } = await supabaseAdmin
+      .from('plan_files')
+      .select('id')
+      .eq('id', ref_id)
+      .maybeSingle();
+    if (!pf) {
+      return NextResponse.json(
+        { error: 'Không tìm thấy file KHSX — tải lại trang rồi in lại' },
+        { status: 404 },
+      );
+    }
+  } else if (type === 'dccd') {
+    // In phiếu di chuyển công đoạn qua app chính (agent trung chuyển).
+    // ref_id = '<saeji digits>|<gjcode>|<số liên>'
+    const m = ref_id.match(/^(\d{6,9})\|(\d{2})\|([1-3])$/);
+    if (!m) {
+      return NextResponse.json(
+        { error: 'ref_id phiếu DCCD phải là saeji|gjcode|copies' },
+        { status: 400 },
+      );
+    }
+    const gj = m[2];
+    // Phân quyền công đoạn theo bộ phận: HD → CĐ 10. RL/SR/CT mở giai đoạn sau.
+    if (session.role === 'leader') {
+      const allowed: Record<string, string[]> = { HD: ['10'] };
+      const ok = (allowed[session.department ?? ''] ?? []).includes(gj);
+      if (!ok) {
+        return NextResponse.json(
+          {
+            error:
+              session.department === 'RL'
+                ? 'Phiếu RL/SR/CT sẽ mở ở giai đoạn sau — hiện mới hỗ trợ công đoạn 10 (HD)'
+                : 'Bộ phận của bạn không in được phiếu công đoạn này',
+          },
+          { status: 403 },
+        );
+      }
     }
   } else if (type === 'overtime_summary') {
     // overtime_summary: ref_id = 'YYYY-MM' hoặc 'YYYY-MM|DEPT'

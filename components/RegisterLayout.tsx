@@ -6,6 +6,7 @@ import MaterialLabelsUpload from './MaterialLabelsUpload';
 import OvertimeSummaryCard from './OvertimeSummaryCard';
 import DepartmentRegistrationsList from './DepartmentRegistrationsList';
 import TodayOvertimeCard from './TodayOvertimeCard';
+import PlanView from './PlanView';
 
 const todayISO = () => {
   const d = new Date();
@@ -15,7 +16,7 @@ const todayISO = () => {
   return `${y}-${m}-${day}`;
 };
 
-type Tab = 'overtime' | 'labels' | 'summary' | 'today';
+type Tab = 'overtime' | 'labels' | 'summary' | 'today' | 'plan';
 
 function OvertimeView({ department, isLeader }: { department: string; isLeader: boolean }) {
   return (
@@ -71,6 +72,7 @@ export default function RegisterLayout({
   const showSummaryTab = !isLeader;
   const showLabelsTab = isHD;
   const showTodayTab = true;
+  const showPlanTab = isLeader;   // KHSX: tổ trưởng xem + in (user 13/7)
   const defaultTab: Tab = showOvertimeTab ? 'overtime' : showLabelsTab ? 'labels' : 'summary';
 
   const [activeTab, setActiveTab] = useState<Tab>(defaultTab);
@@ -81,6 +83,7 @@ export default function RegisterLayout({
   if (showSummaryTab) tabs.push({ key: 'summary', label: 'Tổng hợp tăng ca', color: 'teal' });
   if (showLabelsTab) tabs.push({ key: 'labels', label: 'Tem NVL', color: 'navy' });
   if (showTodayTab) tabs.push({ key: 'today', label: 'Tăng ca hôm nay', color: 'green' });
+  if (showPlanTab) tabs.push({ key: 'plan', label: 'Kế hoạch SX', color: 'navy' });
 
   // Chỉ 1 tab → bỏ tab bar, render trực tiếp
   if (tabs.length === 1) {
@@ -98,7 +101,13 @@ export default function RegisterLayout({
   }
 
   const cols =
-    tabs.length === 2 ? 'grid-cols-2' : tabs.length === 3 ? 'grid-cols-3' : 'grid-cols-2 sm:grid-cols-4';
+    tabs.length === 2
+      ? 'grid-cols-2'
+      : tabs.length === 3
+        ? 'grid-cols-3'
+        : tabs.length === 4
+          ? 'grid-cols-2 sm:grid-cols-4'
+          : 'grid-cols-2 sm:grid-cols-5';
 
   return (
     <>
@@ -145,6 +154,8 @@ export default function RegisterLayout({
       )}
 
       {activeTab === 'today' && <TodayOvertimeCard />}
+
+      {activeTab === 'plan' && <PlanView department={department} isLeader={isLeader} />}
     </>
   );
 }
