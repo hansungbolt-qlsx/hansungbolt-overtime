@@ -6,12 +6,14 @@ import { toStorageKey, resolveDisplayName } from '@/lib/hd-employees';
 
 export const runtime = 'nodejs';
 
-// Chuẩn hóa ảnh để fit ô in A4 (105×74mm = landscape):
+// Chuẩn hóa ảnh để fit ô in A4 (105×74mm = landscape) + NÉN tiết kiệm egress
+// (13/7 — gói Free 5GB/tháng chạm 90%, thủ phạm = ảnh điện thoại 3-6MB/tấm):
 //   1. Áp dụng EXIF orientation rồi strip tag (phone chụp xoay nhưng flag EXIF).
 //   2. Nếu sau EXIF mà ảnh dọc (H > W) → xoay 90° CW để thành ngang.
-//   3. Giữ format gốc (jpeg/png/webp).
+//   3. Resize cạnh dài ≤1600px + JPEG q80 → ~200-400KB/ảnh; in lưới 8 ô/A4
+//      (~105mm/ô) thì 1600px vẫn thừa nét.
 // KHÔNG crop/nhận dạng vùng tem — nhân viên chụp sao lưu vậy (chỉ xoay).
-async function orientForLandscapeSlot(input: Buffer, ext: string): Promise<Buffer> {
+async function orientForLandscapeSlot(input: Buffer): Promise<Buffer> {
   // Step 1: EXIF auto-orient + strip. .rotate() không có args = tự xoay theo EXIF.
   const oriented = await sharp(input).rotate().toBuffer();
   const meta = await sharp(oriented).metadata();
@@ -22,10 +24,11 @@ async function orientForLandscapeSlot(input: Buffer, ext: string): Promise<Buffe
   // Step 2: Dọc → xoay 90° CW thành ngang (fit ô in landscape).
   if (h > w) pipeline = pipeline.rotate(90);
 
-  // Step 3: Giữ format gốc, re-encode để chắc chắn EXIF đã bị strip.
-  if (ext === 'png') return pipeline.png().toBuffer();
-  if (ext === 'webp') return pipeline.webp({ quality: 92 }).toBuffer();
-  return pipeline.jpeg({ quality: 92 }).toBuffer();
+  // Step 3: nén — sau xoay ảnh luôn ngang nên width = cạnh dài.
+  return pipeline
+    .resize({ width: 1600, withoutEnlargement: true })
+    .jpeg({ quality: 80, mozjpeg: true })
+    .toBuffer();
 }
 
 const BUCKET = 'material-labels';
@@ -84,22 +87,30 @@ export async function POST(req: Request) {
       continue;
     }
 
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-    const safeExt = ['jpg', 'jpeg', 'png', 'webp'].includes(ext) ? ext : 'jpg';
     const rand = Math.random().toString(36).slice(2, 8);
     const nameSuffix = typeof employeeName === 'string' && employeeName
       ? `__${toStorageKey(employeeName)}`
       : '';
-    const path = `${date}/${Date.now()}_${rand}${nameSuffix}.${safeExt}`;
+    // Sau nén luôn là JPEG
+    const path = `${date}/${Date.now()}_${rand}${nameSuffix}.jpg`;
     const rawBuf = Buffer.from(await file.arrayBuffer());
-    // Xoay ngang nếu ảnh dọc — fallback raw nếu sharp fail với ảnh đặc biệt.
-    const buf = await orientForLandscapeSlot(rawBuf, safeExt).catch(() => rawBuf);
+    // Xoay ngang + nén — fallback raw nếu sharp fail với ảnh đặc biệt.
+    let buf: Buffer = rawBuf;
+    let ctype = file.type;
+    try {
+      buf = await orientForLandscapeSlot(rawBuf);
+      ctype = 'image/jpeg';
+    } catch {
+      /* giữ nguyên gốc */
+    }
 
     const { error: upErr } = await supabaseAdmin.storage
       .from(BUCKET)
       .upload(path, buf, {
-        contentType: file.type,
+        contentType: ctype,
         upsert: false,
+        // Ảnh bất biến (tên file random) → cache dài để trình duyệt không tải lại
+        cacheControl: '2592000',
       });
     if (upErr) {
       warnings.push(`${file.name}: upload lỗi — ${upErr.message}`);
@@ -183,25 +194,27 @@ export async function GET(req: Request) {
     .order('uploaded_at', { ascending: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const photos = await Promise.all(
-    (data ?? []).map(async (p) => {
-      const { data: signed } = await supabaseAdmin.storage
-        .from(BUCKET)
-        .createSignedUrl(p.storage_path, 3600);
-      const filename = p.storage_path.split('/').pop() ?? '';
-      const nameWithoutExt = filename.replace(/\.[^.]+$/, '');
-      const parts = nameWithoutExt.split('__');
-      const rawKey = parts.length >= 2 ? parts[1] : null;
-      const employee_name = rawKey ? resolveDisplayName(rawKey) : null;
-      return {
-        id: p.id,
-        url: signed?.signedUrl ?? null,
-        uploaded_at: p.uploaded_at,
-        uploaded_by: p.uploaded_by,
-        employee_name,
-      };
-    }),
-  );
+  // Public URL CỐ ĐỊNH (bucket đã chuyển public 13/7 — tên file random không
+  // đoán được): trình duyệt cache được → hết cảnh mỗi lần mở trang tải lại
+  // toàn bộ ảnh (signed URL cũ đổi token mỗi lần gọi = cache vô dụng, thủ
+  // phạm chính làm egress Free 5GB chạm 90%).
+  const photos = (data ?? []).map((p) => {
+    const { data: pub } = supabaseAdmin.storage
+      .from(BUCKET)
+      .getPublicUrl(p.storage_path);
+    const filename = p.storage_path.split('/').pop() ?? '';
+    const nameWithoutExt = filename.replace(/\.[^.]+$/, '');
+    const parts = nameWithoutExt.split('__');
+    const rawKey = parts.length >= 2 ? parts[1] : null;
+    const employee_name = rawKey ? resolveDisplayName(rawKey) : null;
+    return {
+      id: p.id,
+      url: pub?.publicUrl ?? null,
+      uploaded_at: p.uploaded_at,
+      uploaded_by: p.uploaded_by,
+      employee_name,
+    };
+  });
 
   return NextResponse.json({ photos });
 }
