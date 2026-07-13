@@ -325,6 +325,7 @@ export default function PlanView({
   const [dccd, setDccd] = useState<{ saeji: string; item: string; machine: string } | null>(
     null,
   );
+  const [dccdMc, setDccdMc] = useState('');   // máy đã chọn khi chỉ thị nhiều máy
 
   useEffect(() => {
     let cancelled = false;
@@ -417,48 +418,96 @@ export default function PlanView({
             )}
             <SheetTable
               sheet={sheet}
-              onItemClick={tab === 'homnay' && canDccd ? setDccd : undefined}
+              onItemClick={
+                tab === 'homnay' && canDccd
+                  ? (info) => { setDccdMc(''); setDccd(info); }
+                  : undefined
+              }
             />
           </>
         )}
       </div>
 
-      {/* Modal in phiếu DCCD */}
-      {dccd && (
-        <div
-          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-          onClick={() => setDccd(null)}
-        >
+      {/* Modal in phiếu DCCD — chỉ thị nhiều máy phải chọn 1 máy (user 13/7:
+          mỗi phiếu 1 máy, MC = đúng máy đã chọn) */}
+      {dccd && (() => {
+        const mcTokens = dccd.machine.split(/[,\s]+/).filter(Boolean);
+        const multi = mcTokens.length > 1;
+        const mcOk = !multi || dccdMc !== '';
+        const refId = `${dccd.saeji}|10|1${multi && dccdMc ? `|${dccdMc}` : ''}`;
+        return (
           <div
-            className="bg-white rounded-xl shadow-xl p-5 w-full max-w-sm"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setDccd(null)}
           >
-            <h3 className="font-bold text-brand-navy text-base mb-3">
-              🖨 In phiếu DCCD — công đoạn 10
-            </h3>
-            <div className="text-sm text-brand-navy space-y-1.5 mb-4">
-              <div><span className="text-brand-navy-soft">Item code:</span>{' '}
-                <b className="font-mono">{dccd.item}</b></div>
-              <div><span className="text-brand-navy-soft">Số chỉ thị:</span>{' '}
-                <b className="font-mono">{dccd.saeji}</b></div>
-              <div><span className="text-brand-navy-soft">Máy:</span> <b>{dccd.machine || '—'}</b></div>
-              <p className="text-[11px] text-brand-navy-soft">
-                Máy in văn phòng · khay giấy do app chính tự chọn theo quy định
-              </p>
-            </div>
-            <div className="flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setDccd(null)}
-                className="text-sm px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-brand-navy font-semibold"
-              >
-                Đóng
-              </button>
-              <PrintJobButton type="dccd" refId={`${dccd.saeji}|10|1`} label="In phiếu DCCD" />
+            <div
+              className="bg-white rounded-xl shadow-xl p-5 w-full max-w-sm"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="font-bold text-brand-navy text-base mb-3">
+                🖨 In phiếu DCCD — công đoạn 10
+              </h3>
+              <div className="text-sm text-brand-navy space-y-1.5 mb-4">
+                <div><span className="text-brand-navy-soft">Item code:</span>{' '}
+                  <b className="font-mono">{dccd.item}</b></div>
+                <div><span className="text-brand-navy-soft">Số chỉ thị:</span>{' '}
+                  <b className="font-mono">{dccd.saeji}</b></div>
+                {!multi && (
+                  <div><span className="text-brand-navy-soft">Máy:</span>{' '}
+                    <b>{dccd.machine || '—'}</b></div>
+                )}
+                {multi && (
+                  <div className="border-2 border-amber-300 bg-amber-50 rounded-lg p-2">
+                    <div className="text-[12px] font-bold text-amber-800 mb-1">
+                      ⚠ Chỉ thị chạy {mcTokens.length} máy — chọn máy cần in:
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {mcTokens.map((tk) => (
+                        <label
+                          key={tk}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border-2 text-sm font-bold cursor-pointer ${
+                            dccdMc === tk
+                              ? 'border-[#063882] bg-[#dce8fa] text-[#063882]'
+                              : 'border-amber-400 bg-white text-brand-navy'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="dccd-mc"
+                            checked={dccdMc === tk}
+                            onChange={() => setDccdMc(tk)}
+                            className="w-4 h-4 accent-[#063882]"
+                          />
+                          HD-{tk}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <p className="text-[11px] text-brand-navy-soft">
+                  Máy in văn phòng · khay giấy do app chính tự chọn theo quy định
+                </p>
+              </div>
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setDccd(null)}
+                  className="text-sm px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-brand-navy font-semibold"
+                >
+                  Đóng
+                </button>
+                {mcOk ? (
+                  <PrintJobButton type="dccd" refId={refId} label="In phiếu DCCD" />
+                ) : (
+                  <span className="text-[11px] text-amber-700 font-semibold">
+                    ← chọn máy trước khi in
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </section>
   );
 }

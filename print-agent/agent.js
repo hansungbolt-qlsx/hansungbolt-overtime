@@ -256,8 +256,9 @@ async function printDccd(job) {
   if (!MAIN_APP_URL || !MAIN_APP_TOKEN) {
     throw new Error('Thiếu MAIN_APP_URL / MAIN_APP_TOKEN trong .env');
   }
-  const [saeji, gj, copies] = String(job.ref_id).split('|');
+  const [saeji, gj, copies, mc] = String(job.ref_id).split('|');
   const body = new URLSearchParams({ saeji, gj: gj || '10', copies: copies || '1' });
+  if (mc) body.set('mc', mc);   // chỉ thị nhiều máy: MC = máy user chọn (13/7)
   const res = await fetch(`${MAIN_APP_URL}/planning/phieu-cd/print-local`, {
     method: 'POST',
     headers: {

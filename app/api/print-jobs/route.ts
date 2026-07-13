@@ -123,8 +123,9 @@ export async function POST(req: Request) {
     }
   } else if (type === 'dccd') {
     // In phiếu di chuyển công đoạn qua app chính (agent trung chuyển).
-    // ref_id = '<saeji digits>|<gjcode>|<số liên 1-10>'
-    const m = ref_id.match(/^(\d{6,9})\|(\d{2})\|([1-9]|10)$/);
+    // ref_id = '<saeji digits>|<gjcode>|<số bản 1-10>[|<máy>]' — máy: chỉ thị
+    // chạy nhiều máy phải chọn 1 máy, MC phiếu = đúng máy đó (user 13/7)
+    const m = ref_id.match(/^(\d{6,9})\|(\d{2})\|([1-9]|10)(?:\|(\d{1,2}[A-Za-z]?))?$/);
     if (!m) {
       return NextResponse.json(
         { error: 'ref_id phiếu DCCD phải là saeji|gjcode|copies' },
