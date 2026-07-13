@@ -4,7 +4,13 @@ import { useEffect, useRef, useState } from 'react';
 import { HD_EMPLOYEES } from '@/lib/hd-employees';
 import PrintJobButton from './PrintJobButton';
 
-type Photo = { id: string; url: string | null; uploaded_at: string; employee_name: string | null };
+type Photo = {
+  id: string;
+  url: string | null;
+  thumb_url: string | null;
+  uploaded_at: string;
+  employee_name: string | null;
+};
 
 export default function MaterialLabelsUpload({
   date,
@@ -229,11 +235,17 @@ export default function MaterialLabelsUpload({
                   className="relative aspect-square bg-white rounded-lg overflow-hidden shadow-sm"
                 >
                   {p.url ? (
+                    // Lưới dùng THUMBNAIL (~20KB) tiết kiệm egress gói Free
                     <img
-                      src={p.url}
+                      src={p.thumb_url ?? p.url}
                       alt="Tem NVL"
                       className="w-full h-full object-cover"
                       loading="lazy"
+                      onError={(e) => {
+                        if (p.url && e.currentTarget.src !== p.url) {
+                          e.currentTarget.src = p.url;
+                        }
+                      }}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-xs text-brand-navy-soft">

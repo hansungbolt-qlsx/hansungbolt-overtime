@@ -3,18 +3,17 @@ import { supabaseAdmin } from '@/lib/supabase';
 
 export const runtime = 'nodejs';
 
-// Vercel cron job — keeps the 3 most recent days of label photos
-// (today + 2 previous days); deletes anything older.
+// Vercel cron job — giữ 2 ngày gần nhất (hôm nay + hôm qua — user rút từ 3
+// ngày 13/7 để tiết kiệm egress/storage gói Free); xóa cũ hơn (kèm thumbnail).
 export async function GET(req: Request) {
   const auth = req.headers.get('authorization');
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Cutoff = today − 2 days, in Vietnam time (UTC+7).
-  // Keep label_date >= cutoff (today, yesterday, the day before); delete older.
+  // Cutoff = hôm nay − 1 ngày theo giờ VN (giữ hôm nay + hôm qua, xóa cũ hơn)
   const vnNow = new Date(Date.now() + 7 * 60 * 60 * 1000);
-  const cutoff = new Date(vnNow.getTime() - 2 * 24 * 60 * 60 * 1000)
+  const cutoff = new Date(vnNow.getTime() - 1 * 24 * 60 * 60 * 1000)
     .toISOString()
     .slice(0, 10);
 
@@ -26,7 +25,7 @@ export async function GET(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data || data.length === 0) return NextResponse.json({ deleted: 0 });
 
-  const paths = data.map((p) => p.storage_path);
+  const paths = data.flatMap((p) => [p.storage_path, `${p.storage_path}.thumb.jpg`]);
   await supabaseAdmin.storage.from('material-labels').remove(paths);
 
   const { error: delErr } = await supabaseAdmin

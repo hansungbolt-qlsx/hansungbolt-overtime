@@ -2,7 +2,13 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-type Photo = { id: string; url: string | null; uploaded_at: string; employee_name: string | null };
+type Photo = {
+  id: string;
+  url: string | null;
+  thumb_url: string | null;
+  uploaded_at: string;
+  employee_name: string | null;
+};
 type Tab = 'view' | 'download' | 'print';
 
 // Ngày local (giờ máy = giờ VN) dạng YYYY-MM-DD, lùi `offsetDays` ngày.
@@ -53,12 +59,11 @@ export default function MaterialLabelsAdminCard() {
   const [rotation, setRotation] = useState(0);
   const [deletingAll, setDeletingAll] = useState(false);
 
-  // 3 ngày đang được giữ (khớp cron cleanup: hôm nay + 2 ngày trước).
+  // 2 ngày đang được giữ (khớp cron cleanup — user rút 3→2 ngày 13/7 tiết kiệm egress).
   const dayOptions = useMemo(
     () => [
       { label: 'Hôm nay', value: ymdLocal(0) },
       { label: 'Hôm qua', value: ymdLocal(1) },
-      { label: 'Hôm kia', value: ymdLocal(2) },
     ],
     [],
   );
@@ -170,11 +175,18 @@ export default function MaterialLabelsAdminCard() {
                       className="relative aspect-square bg-white rounded-lg overflow-hidden shadow-sm hover:ring-2 hover:ring-[#063882] transition"
                     >
                       {p.url && (
+                        // Lưới dùng THUMBNAIL (~20KB) tiết kiệm egress; phóng to mới
+                        // tải ảnh full. Thiếu thumb (ảnh cũ) → fallback ảnh full.
                         <img
-                          src={p.url}
+                          src={p.thumb_url ?? p.url}
                           alt="Tem"
                           className="w-full h-full object-cover"
                           loading="lazy"
+                          onError={(e) => {
+                            if (p.url && e.currentTarget.src !== p.url) {
+                              e.currentTarget.src = p.url;
+                            }
+                          }}
                         />
                       )}
                       {p.employee_name && (

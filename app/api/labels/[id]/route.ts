@@ -29,7 +29,9 @@ export async function DELETE(
     return NextResponse.json({ error: 'Không có quyền xóa' }, { status: 403 });
   }
 
-  await supabaseAdmin.storage.from(BUCKET).remove([rec.storage_path]);
+  await supabaseAdmin.storage
+    .from(BUCKET)
+    .remove([rec.storage_path, `${rec.storage_path}.thumb.jpg`]);
   const { error: delErr } = await supabaseAdmin
     .from('material_label_photos')
     .delete()

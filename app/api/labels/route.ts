@@ -116,6 +116,22 @@ export async function POST(req: Request) {
       warnings.push(`${file.name}: upload lỗi — ${upErr.message}`);
       continue;
     }
+    // THUMBNAIL 320px (~15-25KB) cho lưới xem — 13 người mở app xem lưới mỗi
+    // ngày chỉ tốn vài MB egress thay vì tải ảnh đầy đủ; ảnh full chỉ tải khi
+    // bấm phóng to / in. Best-effort: thiếu thumb thì client fallback ảnh full.
+    try {
+      const thumb = await sharp(buf)
+        .resize({ width: 320, withoutEnlargement: true })
+        .jpeg({ quality: 70, mozjpeg: true })
+        .toBuffer();
+      await supabaseAdmin.storage.from(BUCKET).upload(`${path}.thumb.jpg`, thumb, {
+        contentType: 'image/jpeg',
+        upsert: true,
+        cacheControl: '2592000',
+      });
+    } catch {
+      /* thumb best-effort */
+    }
 
     const { data: rec, error: insErr } = await supabaseAdmin
       .from('material_label_photos')
@@ -163,7 +179,7 @@ export async function DELETE(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data || data.length === 0) return NextResponse.json({ deleted: 0 });
 
-  const paths = data.map((p) => p.storage_path);
+  const paths = data.flatMap((p) => [p.storage_path, `${p.storage_path}.thumb.jpg`]);
   await supabaseAdmin.storage.from(BUCKET).remove(paths);
 
   const { error: delErr } = await supabaseAdmin
@@ -202,6 +218,9 @@ export async function GET(req: Request) {
     const { data: pub } = supabaseAdmin.storage
       .from(BUCKET)
       .getPublicUrl(p.storage_path);
+    const { data: pubThumb } = supabaseAdmin.storage
+      .from(BUCKET)
+      .getPublicUrl(`${p.storage_path}.thumb.jpg`);
     const filename = p.storage_path.split('/').pop() ?? '';
     const nameWithoutExt = filename.replace(/\.[^.]+$/, '');
     const parts = nameWithoutExt.split('__');
@@ -210,6 +229,7 @@ export async function GET(req: Request) {
     return {
       id: p.id,
       url: pub?.publicUrl ?? null,
+      thumb_url: pubThumb?.publicUrl ?? null,
       uploaded_at: p.uploaded_at,
       uploaded_by: p.uploaded_by,
       employee_name,
