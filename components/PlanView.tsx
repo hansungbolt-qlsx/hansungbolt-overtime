@@ -195,13 +195,20 @@ function DccdCard({ options }: { options: [string, string][] }) {
 
   const qn = q.trim().toUpperCase();
   const qDigits = qn.replace(/[^0-9]/g, '');
-  // Gõ thẳng số chỉ thị (chỉ số/dấu gạch) → cho in trực tiếp
-  const directSaeji =
-    /^[\d-]+$/.test(qn) && qDigits.length >= 6 && qDigits.length <= 9 ? qDigits : null;
   const matches =
     !sel && qn.length >= 3 && catalog
       ? catalog.filter((l) => l.code.toUpperCase().includes(qn)).slice(0, 8)
       : [];
+  // Gõ thẳng số chỉ thị (chỉ số/dấu gạch) → in trực tiếp, nhưng CHỈ khi không
+  // khớp mã hàng nào — mã hàng nào cũng mở đầu bằng 6 chữ số (bug 13/7: gõ tới
+  // số thứ 6 của mã hàng bị hiểu nhầm là số chỉ thị làm tắt gợi ý)
+  const directSaeji =
+    matches.length === 0 &&
+    /^[\d-]+$/.test(qn) &&
+    qDigits.length >= 6 &&
+    qDigits.length <= 9
+      ? qDigits
+      : null;
 
   const target = sel
     ? { saeji: sel.saeji.replace(/\D/g, ''), label: `${fmtSaeji(sel)} — ${sel.code}` }
@@ -239,7 +246,7 @@ function DccdCard({ options }: { options: [string, string][] }) {
           </select>
         </div>
         <div>
-          <label className="block text-[11px] text-brand-navy-soft mb-0.5">Số liên</label>
+          <label className="block text-[11px] text-brand-navy-soft mb-0.5">Số bản</label>
           <select
             value={copies}
             onChange={(e) => setCopies(e.target.value)}
@@ -264,15 +271,20 @@ function DccdCard({ options }: { options: [string, string][] }) {
       </div>
 
       {/* Gợi ý chỉ thị theo mã hàng */}
-      {!sel && qn.length >= 3 && !directSaeji && (
+      {!sel && qn.length >= 3 && (
         <div className="mt-2">
           {catalog === null && (
             <p className="text-[11px] text-brand-navy-soft">Đang tải danh sách chỉ thị...</p>
           )}
-          {catalog !== null && matches.length === 0 && (
+          {catalog !== null && matches.length === 0 && !directSaeji && (
             <p className="text-[11px] text-brand-navy-soft">
               Không có chỉ thị đang mở khớp &quot;{qn}&quot;
               {catAt ? ` (danh sách lúc ${catAt.slice(11, 16)})` : ''}
+            </p>
+          )}
+          {catalog !== null && matches.length === 0 && directSaeji && (
+            <p className="text-[11px] text-brand-navy-soft">
+              Sẽ in thẳng chỉ thị <b className="font-mono">{qn}</b> — bấm In phiếu
             </p>
           )}
           {matches.length > 0 && (
