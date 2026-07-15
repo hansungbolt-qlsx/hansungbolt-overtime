@@ -300,6 +300,34 @@ async function pushDccdCatalog() {
 }
 
 // -----------------------------------------------------------
+// Phiếu tăng ca GỘP THEO NGÀY (user 15/7): 1 lệnh in = mọi phiếu của ngày
+// (HD trước RL). Render TỪNG phiếu bằng đúng trang /registrations/{id}/view
+// (bản in y hệt in lẻ) rồi gửi máy in liên tiếp.
+// -----------------------------------------------------------
+async function printOvertimeSheets(job) {
+  const res = await fetch(
+    `${APP_URL}/api/registrations/by-date?date=${job.ref_id}`,
+    { headers: { Cookie: `session=${sessionCookie}` } },
+  );
+  if (res.status === 401) {
+    await login();
+    return printOvertimeSheets(job); // retry 1 lần với session mới
+  }
+  if (!res.ok) throw new Error(`Lấy danh sách phiếu lỗi HTTP ${res.status}`);
+  const { registrations } = await res.json();
+  if (!registrations || registrations.length === 0) {
+    throw new Error(`Ngày ${job.ref_id} không có phiếu tăng ca nào`);
+  }
+  for (const reg of registrations) {
+    const pdf = await renderPDF({ type: 'registration', ref_id: reg.id });
+    await printPDFFile(pdf, `${job.id}-${reg.department}`);
+    console.log(
+      `[${new Date().toISOString()}] Phiếu ${reg.department} ${reg.id.slice(0, 8)} → ${PRINTER_NAME}`,
+    );
+  }
+}
+
+// -----------------------------------------------------------
 // Print PDF via Windows
 // -----------------------------------------------------------
 async function printPDFFile(pdfBuffer, jobId) {
@@ -327,6 +355,8 @@ async function processJob(job) {
       await printKhsx(job);
     } else if (job.type === 'dccd') {
       await printDccd(job);
+    } else if (job.type === 'overtime_sheets') {
+      await printOvertimeSheets(job);
     } else {
       const pdf = await renderPDF(job);
       await printPDFFile(pdf, job.id);

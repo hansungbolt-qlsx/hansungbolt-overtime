@@ -53,12 +53,13 @@ export async function POST(req: Request) {
     type !== 'overtime_summary' &&
     type !== 'khsx_tong' &&
     type !== 'khsx_homnay' &&
-    type !== 'dccd'
+    type !== 'dccd' &&
+    type !== 'overtime_sheets'
   ) {
     return NextResponse.json(
       {
         error:
-          'type phải là registration / labels_day / overtime_summary / khsx_tong / khsx_homnay / dccd',
+          'type phải là registration / labels_day / overtime_summary / khsx_tong / khsx_homnay / dccd / overtime_sheets',
       },
       { status: 400 },
     );
@@ -177,6 +178,33 @@ export async function POST(req: Request) {
           { status: 403 },
         );
       }
+    }
+  } else if (type === 'overtime_sheets') {
+    // In GỘP mọi phiếu tăng ca của 1 NGÀY (HD + RL...) trong 1 lệnh —
+    // CHỈ ADMIN (user 15/7). ref_id = 'YYYY-MM-DD'.
+    if (session.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Chỉ admin in gộp được phiếu tăng ca theo ngày' },
+        { status: 403 },
+      );
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ref_id)) {
+      return NextResponse.json(
+        { error: 'ref_id phải là YYYY-MM-DD' },
+        { status: 400 },
+      );
+    }
+    const { data: anyReg } = await supabaseAdmin
+      .from('overtime_registrations')
+      .select('id')
+      .eq('overtime_date', ref_id)
+      .limit(1)
+      .maybeSingle();
+    if (!anyReg) {
+      return NextResponse.json(
+        { error: 'Ngày này chưa có phiếu tăng ca nào' },
+        { status: 404 },
+      );
     }
   }
 

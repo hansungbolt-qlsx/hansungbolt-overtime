@@ -43,7 +43,8 @@ export default function PrintJobButton({
     | 'overtime_summary'
     | 'khsx_tong'
     | 'khsx_homnay'
-    | 'dccd';
+    | 'dccd'
+    | 'overtime_sheets';
   refId: string;
   label?: string;
   compact?: boolean;

@@ -7,6 +7,7 @@ import MaterialLabelsAdminCard from '@/components/MaterialLabelsAdminCard';
 import OvertimeSummaryCard from '@/components/OvertimeSummaryCard';
 // isAdmin=true chỉ cho dashboard admin — có Xem/In-Xuất trực tiếp browser.
 import DeleteRegistrationButton from '@/components/DeleteRegistrationButton';
+import PrintJobButton from '@/components/PrintJobButton';
 import TodayOvertimeCard from '@/components/TodayOvertimeCard';
 import PlanFilesList from '@/components/PlanFilesList';
 import { toTitleCase } from '@/lib/format';
@@ -156,13 +157,23 @@ export default async function DashboardPage({
         </div>
 
         <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden">
-          <div className="p-5 border-b border-brand-surface-alt">
-            <h2 className="text-lg font-semibold text-brand-navy">
-              Phiếu tăng ca ngày {selectedDate}
-            </h2>
-            <p className="text-sm text-brand-navy-soft mt-0.5">
-              {regs.length === 0 ? 'Chưa có phiếu nào.' : `Tổng: ${regs.length} phiếu`}
-            </p>
+          <div className="p-5 border-b border-brand-surface-alt flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="text-lg font-semibold text-brand-navy">
+                Phiếu tăng ca ngày {selectedDate}
+              </h2>
+              <p className="text-sm text-brand-navy-soft mt-0.5">
+                {regs.length === 0 ? 'Chưa có phiếu nào.' : `Tổng: ${regs.length} phiếu`}
+              </p>
+            </div>
+            {/* In GỘP mọi phiếu của ngày (HD trước, RL sau) trong 1 lệnh — user 15/7 */}
+            {regs.length > 0 && (
+              <PrintJobButton
+                type="overtime_sheets"
+                refId={selectedDate}
+                label={`🖨 In ${regs.length} phiếu (${Array.from(new Set(regs.map((r) => r.department))).sort().join(' + ')})`}
+              />
+            )}
           </div>
 
           {regs.length > 0 && (
