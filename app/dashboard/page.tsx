@@ -7,7 +7,6 @@ import MaterialLabelsAdminCard from '@/components/MaterialLabelsAdminCard';
 import OvertimeSummaryCard from '@/components/OvertimeSummaryCard';
 // isAdmin=true chỉ cho dashboard admin — có Xem/In-Xuất trực tiếp browser.
 import DeleteRegistrationButton from '@/components/DeleteRegistrationButton';
-import PrintJobButton from '@/components/PrintJobButton';
 import TodayOvertimeCard from '@/components/TodayOvertimeCard';
 import PlanFilesList from '@/components/PlanFilesList';
 import { toTitleCase } from '@/lib/format';
@@ -166,13 +165,19 @@ export default async function DashboardPage({
                 {regs.length === 0 ? 'Chưa có phiếu nào.' : `Tổng: ${regs.length} phiếu`}
               </p>
             </div>
-            {/* In GỘP mọi phiếu của ngày (HD trước, RL sau) trong 1 lệnh — user 15/7 */}
+            {/* In GỘP mọi phiếu của ngày (HD trước, RL sau) trong 1 lệnh — mở trang
+                in gộp và in thẳng từ trình duyệt PC admin (user 16/7, bỏ đường
+                agent vì phải chờ ~1 phút mới ra giấy) */}
             {regs.length > 0 && (
-              <PrintJobButton
-                type="overtime_sheets"
-                refId={selectedDate}
-                label={`🖨 In ${regs.length} phiếu (${Array.from(new Set(regs.map((r) => r.department))).sort().join(' + ')})`}
-              />
+              <a
+                href={`/dashboard/print-day/${selectedDate}?autoprint=1`}
+                target="_blank"
+                rel="noopener"
+                className="inline-flex items-center gap-1 rounded-md font-semibold text-xs px-2.5 py-1.5 bg-[#f97316] hover:bg-[#ea580c] text-white transition active:scale-95"
+              >
+                🖨 In {regs.length} phiếu (
+                {Array.from(new Set(regs.map((r) => r.department))).sort().join(' + ')})
+              </a>
             )}
           </div>
 
