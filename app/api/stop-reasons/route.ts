@@ -38,7 +38,7 @@ export async function GET(req: Request) {
 
   // Danh sách máy cho UI — leader chỉ thấy bộ phận mình, admin thấy hết
   let eq = supabaseAdmin
-    .from('equipment')
+    .from('equipments')
     .select('code, department')
     .order('code');
   if (session.role === 'leader' && session.department) {
@@ -104,7 +104,7 @@ export async function POST(req: Request) {
 
   // Máy phải tồn tại (chặn gõ bừa); leader chỉ ghi máy bộ phận mình
   const { data: eq } = await supabaseAdmin
-    .from('equipment')
+    .from('equipments')
     .select('code, department')
     .eq('code', machine)
     .maybeSingle();
