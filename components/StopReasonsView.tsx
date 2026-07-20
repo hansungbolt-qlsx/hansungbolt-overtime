@@ -5,13 +5,15 @@
 // quả ngày (người tổng hợp TV vẫn là người chốt cuối, sửa đè được).
 import { useCallback, useEffect, useState } from 'react';
 
+// Nhãn kèm VIẾT TẮT đồng bộ chip TV (user 20/7) + lý do ST Setting mới
 const REASONS: Array<{ code: string; label: string }> = [
-  { code: 'NW', label: 'Không có người' },
-  { code: 'NM', label: 'Không có khuôn' },
-  { code: 'NP', label: 'Không có kế hoạch' },
-  { code: 'NR', label: 'Không có nguyên liệu' },
-  { code: 'MT', label: 'Hư máy / bảo trì' },
-  { code: 'ETC', label: 'Khác (ghi rõ)' },
+  { code: 'NW', label: 'Không có người (NW)' },
+  { code: 'NM', label: 'Không có khuôn (NM)' },
+  { code: 'NP', label: 'Không có kế hoạch (NP)' },
+  { code: 'NR', label: 'Không có nguyên liệu (NR)' },
+  { code: 'MT', label: 'Hư máy / bảo trì (MT)' },
+  { code: 'ST', label: 'Setting (ST)' },
+  { code: 'ETC', label: 'Khác — ghi rõ (Etc)' },
 ];
 const LABEL: Record<string, string> = Object.fromEntries(
   REASONS.map((r) => [r.code, r.label]),
@@ -22,7 +24,14 @@ type StopReason = {
   reason_code: string;
   reason_text: string | null;
   created_by_name: string | null;
+  updated_at?: string;
 };
+
+function fmtTimeVN(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(new Date(iso).getTime() + 7 * 3600 * 1000);
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+}
 
 function todayISO() {
   const d = new Date(Date.now() + 7 * 3600 * 1000);
@@ -242,9 +251,49 @@ export default function StopReasonsView() {
           })}
         </div>
       )}
+      {/* Bảng ĐỐI CHIẾU (user 20/7): tổ trưởng rà lại 1 lượt trước khi rời tay */}
+      {nSaved > 0 && (
+        <div className="mt-4 rounded-xl border-2 border-brand-navy/20 overflow-hidden">
+          <div className="bg-brand-navy/5 px-3 py-2 text-sm font-bold text-brand-navy">
+            📋 Đối chiếu — {nSaved} máy dừng đã ghi
+          </div>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-slate-100 text-slate-600 text-left">
+                <th className="px-3 py-1.5 font-bold">Máy</th>
+                <th className="px-3 py-1.5 font-bold">Lý do</th>
+                <th className="px-3 py-1.5 font-bold whitespace-nowrap">Người ghi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortMachines(Object.keys(saved)).map((mc) => {
+                const r = saved[mc];
+                const auto = r.created_by_name === 'KHSX tự động';
+                return (
+                  <tr key={mc} className="border-t border-slate-100">
+                    <td className="px-3 py-1.5 font-bold text-brand-navy whitespace-nowrap">{mc}</td>
+                    <td className="px-3 py-1.5">
+                      {LABEL[r.reason_code] ?? r.reason_code}
+                      {r.reason_text ? (
+                        <span className="text-slate-500"> — {r.reason_text}</span>
+                      ) : null}
+                    </td>
+                    <td className={`px-3 py-1.5 whitespace-nowrap ${auto ? 'italic text-teal-700' : 'text-slate-500'}`}>
+                      {auto ? '⚙ KHSX tự động' : r.created_by_name} {fmtTimeVN(r.updated_at)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       <p className="mt-3 text-[11px] text-slate-400">
-        Lý do sẽ tự cập nhật vào Kết quả ngày trên app chính. Người tổng hợp TV vẫn có
-        thể sửa lại — bản của người tổng hợp là bản chốt cuối.
+        Máy ngưng có nguyên nhân rõ trên KHSX (Hết NVL, Hết kế hoạch, Hư máy…) được{' '}
+        <b>điền sẵn tự động</b> — tổ trưởng chỉ rà lại, sai thì bấm máy sửa hoặc “Máy có
+        chạy — bỏ”. Lý do sẽ tự cập nhật vào Kết quả ngày trên app chính; người tổng hợp
+        TV vẫn là bản chốt cuối.
       </p>
     </div>
   );
