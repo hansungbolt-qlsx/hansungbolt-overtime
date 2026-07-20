@@ -79,6 +79,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Thiếu machine_code' }, { status: 400 });
   }
 
+  // Tổ trưởng CHỈ ghi/sửa hôm nay + hôm qua (user chốt 20/7) — ngày cũ là lịch
+  // sử chỉ xem (bên TV thường đã chốt, bản người tổng hợp là chuẩn cao hơn).
+  // Admin không bị chặn (van ngoại lệ).
+  if (session.role === 'leader') {
+    const yesterdayVN = new Date(Date.now() + 7 * 3600 * 1000 - 86400 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    if (date !== todayVN() && date !== yesterdayVN) {
+      return NextResponse.json(
+        { error: 'Chỉ được ghi/sửa máy dừng của HÔM NAY hoặc HÔM QUA' },
+        { status: 403 },
+      );
+    }
+  }
+
   // Xóa đánh dấu
   if (body.reason_code === null || body.reason_code === '') {
     const { error } = await supabaseAdmin

@@ -81,7 +81,14 @@ export default function StopReasonsView() {
     void load(date);
   }, [date, load]);
 
+  // Chỉ ghi/sửa HÔM NAY + HÔM QUA (user chốt 20/7) — ngày khác là lịch sử chỉ xem
+  const yesterdayISO = new Date(Date.now() + 7 * 3600 * 1000 - 86400 * 1000)
+    .toISOString()
+    .slice(0, 10);
+  const canEdit = date === todayISO() || date === yesterdayISO;
+
   const openEdit = (machine: string) => {
+    if (!canEdit) return;
     const cur = saved[machine];
     setEditing(machine);
     setPickCode(cur?.reason_code ?? '');
@@ -130,6 +137,12 @@ export default function StopReasonsView() {
         Chỉ ghi máy <b>cả ngày không sản xuất</b> — chọn máy rồi chọn lý do. Đã ghi:{' '}
         <b className="text-brand-navy">{nSaved}</b> máy.
       </p>
+      {!canEdit && (
+        <div className="mb-3 rounded-lg bg-slate-100 border border-slate-300 text-slate-600 text-xs px-3 py-2">
+          📖 Đang xem <b>lịch sử</b> — chỉ được ghi/sửa máy dừng của <b>hôm nay</b> và{' '}
+          <b>hôm qua</b>.
+        </div>
+      )}
 
       {error && (
         <div className="mb-3 rounded-lg bg-red-50 border border-red-300 text-red-700 text-sm px-3 py-2">
