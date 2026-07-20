@@ -86,7 +86,7 @@ export default function RegisterLayout({
   if (showLabelsTab) tabs.push({ key: 'labels', label: 'Tem NVL', color: 'navy' });
   if (showTodayTab) tabs.push({ key: 'today', label: 'Tăng ca hôm nay', color: 'green' });
   if (showPlanTab) tabs.push({ key: 'plan', label: 'Kế hoạch SX', color: 'navy' });
-  if (showStopsTab) tabs.push({ key: 'stops', label: 'Máy dừng', color: 'green' });
+  if (showStopsTab) tabs.push({ key: 'stops', label: 'Máy dừng hôm nay', color: 'green' });
 
   // Chỉ 1 tab → bỏ tab bar, render trực tiếp
   if (tabs.length === 1) {

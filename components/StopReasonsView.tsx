@@ -118,7 +118,7 @@ export default function StopReasonsView() {
   return (
     <div className="bg-white rounded-2xl shadow-md p-4">
       <div className="flex items-center justify-between gap-2 mb-1">
-        <h2 className="text-base font-bold text-brand-navy">⏸ Máy dừng cả ngày</h2>
+        <h2 className="text-base font-bold text-brand-navy">⏸ Máy dừng hôm nay</h2>
         <input
           type="date"
           value={date}
