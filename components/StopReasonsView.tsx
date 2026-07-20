@@ -29,6 +29,25 @@ function todayISO() {
   return d.toISOString().slice(0, 10);
 }
 
+// Thứ tự máy GIỐNG file TV (user 20/7): theo số tăng dần, biến thể chữ ngay sau
+// số gốc (HD-01, HD-1A, HD-02… HD-9A, HD-9B, HD-10…); mã không theo mẫu
+// (vd CVK-HD) xuống cuối.
+function machineSortKey(code: string): [number, number, string] {
+  const m = code.match(/^[A-Z]+-(\d+)([A-Z]?)$/i);
+  if (!m) return [1, 9999, code];
+  return [0, parseInt(m[1], 10), m[2] || ''];
+}
+
+function sortMachines(codes: string[]): string[] {
+  return [...codes].sort((a, b) => {
+    const ka = machineSortKey(a);
+    const kb = machineSortKey(b);
+    if (ka[0] !== kb[0]) return ka[0] - kb[0];
+    if (ka[1] !== kb[1]) return ka[1] - kb[1];
+    return ka[2] < kb[2] ? -1 : ka[2] > kb[2] ? 1 : 0;
+  });
+}
+
 export default function StopReasonsView() {
   const [date, setDate] = useState(todayISO());
   const [machines, setMachines] = useState<string[]>([]);
@@ -47,7 +66,7 @@ export default function StopReasonsView() {
       const res = await fetch(`/api/stop-reasons?date=${d}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Lỗi tải dữ liệu');
-      setMachines((data.machines ?? []).map((m: { code: string }) => m.code));
+      setMachines(sortMachines((data.machines ?? []).map((m: { code: string }) => m.code)));
       const map: Record<string, StopReason> = {};
       for (const r of data.reasons ?? []) map[r.machine_code] = r;
       setSaved(map);
