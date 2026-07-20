@@ -176,13 +176,13 @@ export default function StopReasonsView() {
                     onClick={() => openEdit(m)}
                     className={`w-full rounded-xl border px-2 py-2 text-left transition active:scale-95 ${
                       cur
-                        ? 'bg-amber-50 border-amber-400'
+                        ? 'bg-red-50 border-red-400'
                         : 'bg-white border-slate-200 hover:border-brand-teal'
                     }`}
                   >
                     <div className="text-sm font-bold text-brand-navy">{m}</div>
                     {cur ? (
-                      <div className="text-[11px] leading-tight text-amber-700 font-semibold">
+                      <div className="text-[11px] leading-tight text-red-600 font-semibold">
                         {LABEL[cur.reason_code] ?? cur.reason_code}
                         {cur.reason_code === 'ETC' && cur.reason_text ? `: ${cur.reason_text}` : ''}
                       </div>
