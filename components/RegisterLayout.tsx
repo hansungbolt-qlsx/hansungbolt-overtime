@@ -7,6 +7,7 @@ import OvertimeSummaryCard from './OvertimeSummaryCard';
 import DepartmentRegistrationsList from './DepartmentRegistrationsList';
 import TodayOvertimeCard from './TodayOvertimeCard';
 import PlanView from './PlanView';
+import StopReasonsView from './StopReasonsView';
 
 const todayISO = () => {
   const d = new Date();
@@ -16,7 +17,7 @@ const todayISO = () => {
   return `${y}-${m}-${day}`;
 };
 
-type Tab = 'overtime' | 'labels' | 'summary' | 'today' | 'plan';
+type Tab = 'overtime' | 'labels' | 'summary' | 'today' | 'plan' | 'stops';
 
 function OvertimeView({ department, isLeader }: { department: string; isLeader: boolean }) {
   return (
@@ -73,6 +74,7 @@ export default function RegisterLayout({
   const showLabelsTab = isHD;
   const showTodayTab = true;
   const showPlanTab = isLeader;   // KHSX: tổ trưởng xem + in (user 13/7)
+  const showStopsTab = isLeader;  // Máy dừng cả ngày: tổ trưởng ghi lý do (user 19/7)
   const defaultTab: Tab = showOvertimeTab ? 'overtime' : showLabelsTab ? 'labels' : 'summary';
 
   const [activeTab, setActiveTab] = useState<Tab>(defaultTab);
@@ -84,6 +86,7 @@ export default function RegisterLayout({
   if (showLabelsTab) tabs.push({ key: 'labels', label: 'Tem NVL', color: 'navy' });
   if (showTodayTab) tabs.push({ key: 'today', label: 'Tăng ca hôm nay', color: 'green' });
   if (showPlanTab) tabs.push({ key: 'plan', label: 'Kế hoạch SX', color: 'navy' });
+  if (showStopsTab) tabs.push({ key: 'stops', label: 'Máy dừng', color: 'green' });
 
   // Chỉ 1 tab → bỏ tab bar, render trực tiếp
   if (tabs.length === 1) {
@@ -107,7 +110,9 @@ export default function RegisterLayout({
         ? 'grid-cols-3'
         : tabs.length === 4
           ? 'grid-cols-2 sm:grid-cols-4'
-          : 'grid-cols-2 sm:grid-cols-5';
+          : tabs.length === 5
+            ? 'grid-cols-2 sm:grid-cols-5'
+            : 'grid-cols-2 sm:grid-cols-3';
 
   return (
     <>
@@ -156,6 +161,8 @@ export default function RegisterLayout({
       {activeTab === 'today' && <TodayOvertimeCard />}
 
       {activeTab === 'plan' && <PlanView department={department} isLeader={isLeader} />}
+
+      {activeTab === 'stops' && <StopReasonsView />}
     </>
   );
 }
