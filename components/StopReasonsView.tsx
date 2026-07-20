@@ -41,10 +41,13 @@ function todayISO() {
 // Thứ tự máy GIỐNG file TV (user 20/7): theo số tăng dần, biến thể chữ ngay sau
 // số gốc (HD-01, HD-1A, HD-02… HD-9A, HD-9B, HD-10…); mã không theo mẫu
 // (vd CVK-HD) xuống cuối.
-function machineSortKey(code: string): [number, number, string] {
-  const m = code.match(/^[A-Z]+-(\d+)([A-Z]?)$/i);
-  if (!m) return [1, 9999, code];
-  return [0, parseInt(m[1], 10), m[2] || ''];
+const DEPT_RANK: Record<string, number> = { HD: 0, RL: 1, SM: 2, CT: 3 };
+
+function machineSortKey(code: string): [number, number, number, string] {
+  const m = code.match(/^([A-Z]+)-(\d+)([A-Z]?)$/i);
+  if (!m) return [9, 0, 9999, code];
+  const rank = DEPT_RANK[m[1].toUpperCase()] ?? 8;
+  return [rank, 0, parseInt(m[2], 10), m[3] || ''];
 }
 
 function sortMachines(codes: string[]): string[] {
@@ -52,8 +55,8 @@ function sortMachines(codes: string[]): string[] {
     const ka = machineSortKey(a);
     const kb = machineSortKey(b);
     if (ka[0] !== kb[0]) return ka[0] - kb[0];
-    if (ka[1] !== kb[1]) return ka[1] - kb[1];
-    return ka[2] < kb[2] ? -1 : ka[2] > kb[2] ? 1 : 0;
+    if (ka[2] !== kb[2]) return (ka[2] as number) - (kb[2] as number);
+    return ka[3] < kb[3] ? -1 : ka[3] > kb[3] ? 1 : 0;
   });
 }
 

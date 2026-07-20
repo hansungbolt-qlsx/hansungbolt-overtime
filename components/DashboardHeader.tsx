@@ -4,12 +4,13 @@ import LogoutButton from './LogoutButton';
 import ChangePasswordButton from './ChangePasswordButton';
 import { toTitleCase } from '@/lib/format';
 
-type Tab = 'overview' | 'users' | 'qlsx';
+type Tab = 'overview' | 'users' | 'qlsx' | 'stops';
 
 const TABS: Array<{ key: Tab; label: string; href: string }> = [
   { key: 'overview', label: 'Tổng quan', href: '/dashboard' },
   { key: 'users', label: 'Quản lý tài khoản', href: '/dashboard/users' },
   { key: 'qlsx', label: 'Tăng ca QLSX', href: '/dashboard/qlsx' },
+  { key: 'stops', label: 'Máy dừng hôm nay', href: '/dashboard/stop-reasons' },
 ];
 
 export default function DashboardHeader({
