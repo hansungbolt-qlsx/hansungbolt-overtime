@@ -33,13 +33,16 @@ export async function GET(req: Request) {
   }
   const url = new URL(req.url);
   const date = (url.searchParams.get('date') || todayVN()).slice(0, 10);
+  // all=1 (poller app chinh): tra ca ban ghi da bo (dismissed) de go nhan TV
+  const includeAll = url.searchParams.get('all') === '1';
 
-  const { data: reasons, error } = await supabaseAdmin
+  let q = supabaseAdmin
     .from('machine_stop_reasons')
-    .select('stop_date, machine_code, department, reason_code, reason_text, created_by_name, updated_at')
+    .select('stop_date, machine_code, department, reason_code, reason_text, created_by_name, updated_at, dismissed')
     .eq('stop_date', date)
-    .eq('dismissed', false)
     .order('machine_code');
+  if (!includeAll) q = q.eq('dismissed', false);
+  const { data: reasons, error } = await q;
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
