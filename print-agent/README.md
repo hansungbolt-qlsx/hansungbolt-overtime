@@ -15,7 +15,7 @@ Agent poll app mỗi 10 giây. Nếu có job pending → render PDF từ URL vie
 - Windows 10 hoặc 11
 - Node.js 20+ ([tải LTS](https://nodejs.org))
 - Máy in đã cài driver + kết nối OK trên Control Panel > Devices and Printers
-- Kết nối Internet ổn định (chỉ cần trong giờ 8h-17h)
+- Kết nối Internet ổn định (app nhận lệnh in cả ngày — PC tắt thì job hết hạn TTL)
 
 ## Cài đặt lần đầu (~10 phút)
 

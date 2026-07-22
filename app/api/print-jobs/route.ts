@@ -5,18 +5,6 @@ import { expireStalePrintJobs } from '@/lib/print-jobs-expire';
 
 export const runtime = 'nodejs';
 
-// Giờ hành chính (VN) — chỉ nhận lệnh in trong khoảng này
-const OFFICE_HOURS_START = 8; // 08:00
-const OFFICE_HOURS_END = 17; // 17:00 (< 17)
-
-function isWithinOfficeHours(): boolean {
-  // Server timezone có thể khác VN → tính giờ VN qua offset +7
-  const now = new Date();
-  const utcHours = now.getUTCHours();
-  const vnHours = (utcHours + 7) % 24;
-  return vnHours >= OFFICE_HOURS_START && vnHours < OFFICE_HOURS_END;
-}
-
 // POST /api/print-jobs — tổ trưởng / admin tạo job in
 // Body: { type: 'registration' | 'labels_day', ref_id: string }
 //   registration: ref_id = registration.id (uuid)
@@ -30,16 +18,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Không có quyền in' }, { status: 403 });
   }
 
-  if (!isWithinOfficeHours()) {
-    return NextResponse.json(
-      {
-        error:
-          'Máy in đang tắt ngoài giờ hành chính. Chỉ in được từ 8h-17h.',
-      },
-      { status: 400 },
-    );
-  }
-
+  // User 22/7: BỎ chặn giờ hành chính — cho gửi lệnh in cả ngày. Nếu PC máy in
+  // đang tắt, job hết hạn TTL và nút In tự báo 'máy chủ in có thể đang tắt'.
   const body = await req.json().catch(() => null);
   if (!body) {
     return NextResponse.json({ error: 'Body JSON không hợp lệ' }, { status: 400 });

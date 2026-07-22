@@ -2,14 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-const OFFICE_HOURS_START = 8;
-const OFFICE_HOURS_END = 17;
-
-function isWithinOfficeHoursClient(): boolean {
-  const h = new Date().getHours();
-  return h >= OFFICE_HOURS_START && h < OFFICE_HOURS_END;
-}
-
 type MsgTone = 'wait' | 'ok' | 'warn' | 'err';
 
 const TONE_CLS: Record<MsgTone, string> = {
@@ -120,10 +112,6 @@ export default function PrintJobButton({
 
   async function send() {
     setMsg(null);
-    if (!isWithinOfficeHoursClient()) {
-      setMsg({ text: 'Ngoài giờ 8h-17h, máy in tắt', tone: 'err' });
-      return;
-    }
     setBusy(true);
     try {
       const res = await fetch('/api/print-jobs', {

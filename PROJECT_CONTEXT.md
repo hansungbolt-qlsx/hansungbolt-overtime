@@ -89,7 +89,7 @@
 - Kiến trúc: điện thoại 4G → Vercel (queue job) → máy tính admin chạy agent Node.js poll job → puppeteer render PDF → in ApeosPort-VI C4471 qua LAN.
 - Bảng `print_jobs` (id, type, ref_id, requested_by, status). Type: `registration` / `labels_day` / `overtime_summary`.
 - `AGENT_SECRET` env var Vercel. Agent login `qlsx` (password `qlsx123`) để có session render view page.
-- Chặn ngoài giờ 8h-17h (giờ VN). API validate quyền: leader chỉ in dept mình; leader HD mới in tem.
+- Nhận lệnh in CẢ NGÀY (bỏ chặn giờ 22/7 — PC in tắt thì job hết TTL, nút In tự cảnh báo). API validate quyền: leader chỉ in dept mình; leader HD mới in tem.
 - Folder `print-agent/` trong repo: `agent.js` + `install.bat` + `start.bat` + `README.md`. User đã cài trên máy admin.
 - Nút "In phiếu" (registration + overtime_summary) và "In tem" (labels_day) hiện cho leader/worker. Admin có thêm nút Xem + In/Xuất browser trong tổng hợp giờ.
 - Danh sách phiếu tăng ca auto refetch khi OvertimeForm submit (custom event `overtime:registered`).
@@ -235,7 +235,7 @@ Session lớn — hoàn thiện **print server remote** cho tổ trưởng ở x
   * Agent Node.js trong folder `print-agent/` chạy trên máy admin. Login `qlsx/qlsx123` → puppeteer render PDF → in ApeosPort qua LAN.
   * `AGENT_SECRET=k7hf9x3nB8mp1WQ4Z2yLtG6cVsA5rDe` đã set trên Vercel + `.env` của agent.
   * 3 loại print: `registration` (phiếu tăng ca) / `labels_day` (tem NVL) / `overtime_summary` (tổng hợp giờ, A4 landscape).
-  * Chặn ngoài giờ 8h-17h. API validate quyền dept.
+  * Nhận lệnh in cả ngày (bỏ chặn giờ 22/7). API validate quyền dept.
   * Nút "In phiếu" / "In tem" cho leader/worker. Admin có thêm Xem + In/Xuất browser.
 - **UI mobile-first refactor**:
   * Gộp "Phiếu đã gửi" + "Danh sách phiếu" → 1 card mobile-friendly (card layout, không table).
