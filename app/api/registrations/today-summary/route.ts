@@ -26,9 +26,9 @@ export async function GET(req: Request) {
     );
   }
 
-  // Non-admin chỉ thấy phiếu bộ phận mình; admin thấy cả 2.
+  // Non-admin chỉ thấy phiếu bộ phận mình; admin + qlsx (user 24/7) thấy cả 2.
   const restrictDept =
-    session.role !== 'admin' && session.department
+    session.role !== 'admin' && session.role !== 'qlsx' && session.department
       ? (session.department as 'HD' | 'RL')
       : null;
 

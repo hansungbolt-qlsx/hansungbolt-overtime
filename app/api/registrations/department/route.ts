@@ -18,7 +18,9 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Thiếu tham số date' }, { status: 400 });
   }
 
-  const filterDept = session.role !== 'admin' && session.department ? session.department : null;
+  // admin + qlsx (user 24/7) xem tất cả bộ phận; leader/worker lọc theo dept mình
+  const filterDept = session.role !== 'admin' && session.role !== 'qlsx'
+    && session.department ? session.department : null;
 
   let regQuery = supabaseAdmin
     .from('overtime_registrations')

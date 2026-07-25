@@ -7,8 +7,8 @@ type User = {
   id: string;
   username: string;
   full_name: string;
-  role: 'admin' | 'leader' | 'worker';
-  department: 'HD' | 'RL' | null;
+  role: 'admin' | 'leader' | 'worker' | 'qlsx';
+  department: 'HD' | 'RL' | 'QLSX' | null;
   password_plain: string | null;
   // active/deactivated_at: optional vì có thể chưa chạy migration 08 trên DB.
   active?: boolean;
@@ -20,15 +20,17 @@ const ROLE_LABEL: Record<User['role'], string> = {
   admin: 'Admin',
   leader: 'Tổ trưởng/phó',
   worker: 'Nhân viên',
+  qlsx: 'QLSX (xem + in)',
 };
 
 const ROLE_BADGE: Record<User['role'], string> = {
   admin: 'bg-[#063882] text-white',
   leader: 'bg-[#2db5a1] text-white',
   worker: 'bg-[#dce8fa] text-[#063882]',
+  qlsx: 'bg-sky-600 text-white',
 };
 
-const ROLE_ORDER: Record<User['role'], number> = { leader: 0, worker: 1, admin: 2 };
+const ROLE_ORDER: Record<User['role'], number> = { leader: 0, worker: 1, qlsx: 2, admin: 3 };
 
 function formatDateVN(iso: string | null): string {
   if (!iso) return '';
@@ -120,7 +122,7 @@ export default function UserManagementCard() {
       return a.full_name.localeCompare(b.full_name, 'vi');
     });
   }
-  const order = ['Admin', 'HD', 'RL'];
+  const order = ['Admin', 'QLSX', 'HD', 'RL'];
   const sortedKeys = Object.keys(grouped).sort(
     (a, b) => (order.indexOf(a) === -1 ? 99 : order.indexOf(a)) - (order.indexOf(b) === -1 ? 99 : order.indexOf(b)),
   );
@@ -278,7 +280,8 @@ function AddUserModal({
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
   const [department, setDepartment] = useState<'HD' | 'RL'>('HD');
-  const [role, setRole] = useState<'worker' | 'leader'>('worker');
+  // qlsx (user 24/7): bộ phận cố định 'QLSX', không vào danh sách tăng ca
+  const [role, setRole] = useState<'worker' | 'leader' | 'qlsx'>('worker');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -301,7 +304,7 @@ function AddUserModal({
           full_name: fn,
           username: un,
           role,
-          department,
+          department: role === 'qlsx' ? 'QLSX' : department,
         }),
       });
       const d = await res.json().catch(() => ({}));
@@ -369,26 +372,6 @@ function AddUserModal({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-brand-navy mb-1">Bộ phận</label>
-            <div className="flex gap-2">
-              {(['HD', 'RL'] as const).map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setDepartment(d)}
-                  className={`flex-1 py-2 text-sm font-semibold rounded border transition ${
-                    department === d
-                      ? 'bg-[#063882] text-white border-[#063882]'
-                      : 'bg-white text-brand-navy border-brand-surface-alt hover:bg-[#f0f5ff]'
-                  }`}
-                >
-                  {d}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
             <label className="block text-xs font-semibold text-brand-navy mb-1">Vai trò</label>
             <div className="flex gap-2">
               <button
@@ -413,13 +396,55 @@ function AddUserModal({
               >
                 Tổ trưởng/phó
               </button>
+              <button
+                type="button"
+                onClick={() => setRole('qlsx')}
+                className={`flex-1 py-2 text-sm font-semibold rounded border transition ${
+                  role === 'qlsx'
+                    ? 'bg-sky-600 text-white border-sky-600'
+                    : 'bg-white text-brand-navy border-brand-surface-alt hover:bg-[#f0f5ff]'
+                }`}
+              >
+                QLSX
+              </button>
             </div>
           </div>
 
-          <div className="bg-[#f0f5ff] rounded px-3 py-2 text-xs text-[#063882]">
-            Mật khẩu mặc định: <strong className="font-mono">hd123</strong>. NV cũng được thêm
-            vào danh sách bộ phận {department} để xuất hiện trong phiếu đăng ký tăng ca.
-          </div>
+          {role !== 'qlsx' && (
+            <div>
+              <label className="block text-xs font-semibold text-brand-navy mb-1">Bộ phận</label>
+              <div className="flex gap-2">
+                {(['HD', 'RL'] as const).map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setDepartment(d)}
+                    className={`flex-1 py-2 text-sm font-semibold rounded border transition ${
+                      department === d
+                        ? 'bg-[#063882] text-white border-[#063882]'
+                        : 'bg-white text-brand-navy border-brand-surface-alt hover:bg-[#f0f5ff]'
+                    }`}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {role === 'qlsx' ? (
+            <div className="bg-sky-50 border border-sky-200 rounded px-3 py-2 text-xs text-sky-900">
+              Mật khẩu mặc định: <strong className="font-mono">hd123</strong>. Tài khoản QLSX:
+              <b> xem KHSX + in phiếu (KHSX/DCCD đủ 4 công đoạn), xem Máy dừng + Tổng hợp
+              tăng ca</b>; KHÔNG in tem, KHÔNG đăng ký tăng ca, không vào danh sách nhân
+              viên tăng ca.
+            </div>
+          ) : (
+            <div className="bg-[#f0f5ff] rounded px-3 py-2 text-xs text-[#063882]">
+              Mật khẩu mặc định: <strong className="font-mono">hd123</strong>. NV cũng được thêm
+              vào danh sách bộ phận {department} để xuất hiện trong phiếu đăng ký tăng ca.
+            </div>
+          )}
 
           {err && (
             <div className="bg-[#fde8e9] border border-[#fcd0d2] text-[#c01f2a] text-xs px-3 py-2 rounded">

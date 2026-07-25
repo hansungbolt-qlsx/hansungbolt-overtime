@@ -12,7 +12,8 @@ export default async function EditRegistrationPage({
   const session = await getSession();
   if (!session) redirect('/login');
 
-  if (session.role === 'worker') redirect('/register');
+  // worker + qlsx (24/7) không sửa phiếu tăng ca
+  if (session.role === 'worker' || session.role === 'qlsx') redirect('/register');
 
   const { id } = await params;
 

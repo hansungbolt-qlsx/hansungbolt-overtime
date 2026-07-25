@@ -4,8 +4,10 @@ export type Session = {
   userId: string;
   username: string;
   fullName: string;
-  role: 'admin' | 'leader' | 'worker';
-  department: 'HD' | 'RL' | null;
+  // qlsx (user 24/7): nhân viên QLSX — xem KHSX + in phiếu (KHSX/DCCD đủ 4 CĐ),
+  // xem Máy dừng + Tổng hợp tăng ca; KHÔNG in tem, KHÔNG đăng ký tăng ca
+  role: 'admin' | 'leader' | 'worker' | 'qlsx';
+  department: 'HD' | 'RL' | 'QLSX' | null;
 };
 
 export const SESSION_COOKIE = 'session';

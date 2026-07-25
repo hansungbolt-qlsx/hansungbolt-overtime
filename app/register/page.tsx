@@ -13,6 +13,9 @@ export default async function RegisterPage() {
   if (session.role === 'admin') redirect('/dashboard');
   if (!session.department) redirect('/login');
   const isLeader = session.role === 'leader';
+  // qlsx (user 24/7): xem KHSX + in phiếu đủ 4 CĐ, xem Máy dừng + Tổng hợp;
+  // KHÔNG tem, KHÔNG đăng ký tăng ca
+  const isQlsx = session.role === 'qlsx';
 
   return (
     <main className="min-h-screen bg-brand-pattern p-4">
@@ -53,6 +56,7 @@ export default async function RegisterPage() {
         <RegisterLayout
           department={session.department}
           isLeader={isLeader}
+          isQlsx={isQlsx}
           currentUserFullName={session.fullName}
         />
       </div>

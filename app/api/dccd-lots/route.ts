@@ -37,7 +37,8 @@ export async function POST(req: Request) {
 // GET — leader/admin lấy catalog cho ô gợi ý (client filter tại chỗ)
 export async function GET() {
   const session = await getSession();
-  if (!session || (session.role !== 'admin' && session.role !== 'leader')) {
+  if (!session || (session.role !== 'admin' && session.role !== 'leader'
+                   && session.role !== 'qlsx')) {
     return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   }
   const { data, error } = await supabaseAdmin.storage.from(BUCKET).download(PATH);

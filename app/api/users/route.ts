@@ -65,10 +65,17 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
-  if (role !== 'leader' && role !== 'worker') {
+  // qlsx (user 24/7): vai trò nhân viên QLSX — bộ phận cố định 'QLSX',
+  // KHÔNG thêm vào bảng employees (không xuất hiện phiếu đăng ký tăng ca)
+  if (role !== 'leader' && role !== 'worker' && role !== 'qlsx') {
     return NextResponse.json({ error: 'Vai trò không hợp lệ' }, { status: 400 });
   }
-  if (department !== 'HD' && department !== 'RL') {
+  if (role === 'qlsx') {
+    if (department !== 'QLSX') {
+      return NextResponse.json(
+        { error: 'Vai trò QLSX phải thuộc bộ phận QLSX' }, { status: 400 });
+    }
+  } else if (department !== 'HD' && department !== 'RL') {
     return NextResponse.json({ error: 'Bộ phận không hợp lệ' }, { status: 400 });
   }
 
@@ -106,7 +113,11 @@ export async function POST(req: Request) {
     );
   }
 
-  // 2. Nếu đã có employee cùng tên + dept và đang inactive → reactivate
+  // 2. qlsx KHÔNG vào danh sách nhân viên tăng ca (user 24/7)
+  if (role === 'qlsx') {
+    return NextResponse.json({ user: newUser });
+  }
+  // Nếu đã có employee cùng tên + dept và đang inactive → reactivate
   //    Nếu chưa có → tạo mới với order_no = max + 1
   // SELECT * để forward-compat với DB chưa có cột `active` (trước migration 08).
   const { data: existingEmp } = await supabaseAdmin

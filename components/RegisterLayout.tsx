@@ -59,23 +59,32 @@ function LabelsView({
 export default function RegisterLayout({
   department,
   isLeader,
+  isQlsx = false,
   currentUserFullName,
 }: {
   department: string;
   isLeader: boolean;
+  isQlsx?: boolean;
   currentUserFullName?: string | null;
 }) {
   const isHD = department === 'HD';
   // Tab "overtime" cho leader; tab "summary" cho worker (chỉ xem)
   // Tab "labels" cho HD (cả leader + worker)
   // Tab "today" — xem tổng hợp NV tăng ca cả HD+RL hôm nay (cả leader + worker)
+  // qlsx (user 24/7): KHSX + Máy dừng (chỉ xem) + Tổng hợp; KHÔNG tem/đăng ký
   const showOvertimeTab = isLeader;
   const showSummaryTab = !isLeader;
   const showLabelsTab = isHD;
   const showTodayTab = true;
-  const showPlanTab = isLeader;   // KHSX: tổ trưởng xem + in (user 13/7)
-  const showStopsTab = isLeader;  // Máy dừng cả ngày: tổ trưởng ghi lý do (user 19/7)
-  const defaultTab: Tab = showOvertimeTab ? 'overtime' : showLabelsTab ? 'labels' : 'summary';
+  const showPlanTab = isLeader || isQlsx;   // KHSX: tổ trưởng xem + in (user 13/7)
+  const showStopsTab = isLeader || isQlsx;  // Máy dừng: tổ trưởng ghi; qlsx xem (24/7)
+  const defaultTab: Tab = showOvertimeTab
+    ? 'overtime'
+    : isQlsx
+      ? 'plan'   // QLSX vào là thấy ngay KHSX (việc chính của họ)
+      : showLabelsTab
+        ? 'labels'
+        : 'summary';
 
   const [activeTab, setActiveTab] = useState<Tab>(defaultTab);
   const [labelsDate, setLabelsDate] = useState(todayISO());
@@ -164,9 +173,11 @@ export default function RegisterLayout({
 
       {activeTab === 'today' && <TodayOvertimeCard />}
 
-      {activeTab === 'plan' && <PlanView department={department} isLeader={isLeader} />}
+      {activeTab === 'plan' && (
+        <PlanView department={department} isLeader={isLeader} isQlsx={isQlsx} />
+      )}
 
-      {activeTab === 'stops' && <StopReasonsView />}
+      {activeTab === 'stops' && <StopReasonsView readOnly={isQlsx} />}
     </>
   );
 }

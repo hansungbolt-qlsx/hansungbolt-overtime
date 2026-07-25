@@ -28,7 +28,8 @@ export async function GET(req: Request) {
   if (!session) {
     return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
   }
-  if (session.role !== 'admin' && session.role !== 'leader') {
+  // qlsx (user 24/7): XEM được máy dừng mọi bộ phận — ghi/sửa vẫn chỉ tổ trưởng (POST)
+  if (session.role !== 'admin' && session.role !== 'leader' && session.role !== 'qlsx') {
     return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   }
   const url = new URL(req.url);

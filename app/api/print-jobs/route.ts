@@ -14,7 +14,8 @@ export async function POST(req: Request) {
   if (!session) {
     return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
   }
-  if (session.role !== 'admin' && session.role !== 'leader') {
+  // qlsx (user 24/7): được in KHSX + DCCD (đủ 4 CĐ) — các type khác chặn per-type dưới
+  if (session.role !== 'admin' && session.role !== 'leader' && session.role !== 'qlsx') {
     return NextResponse.json({ error: 'Không có quyền in' }, { status: 403 });
   }
 
@@ -58,7 +59,13 @@ export async function POST(req: Request) {
     if (!reg) {
       return NextResponse.json({ error: 'Không tìm thấy phiếu' }, { status: 404 });
     }
-    // Leader chỉ in được phiếu bộ phận mình
+    // Leader chỉ in được phiếu bộ phận mình; qlsx không in phiếu tăng ca
+    if (session.role === 'qlsx') {
+      return NextResponse.json(
+        { error: 'Tài khoản QLSX không in phiếu tăng ca' },
+        { status: 403 },
+      );
+    }
     if (
       session.role === 'leader' &&
       session.department !== reg.department
@@ -76,7 +83,13 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    // Chỉ HD mới có tem
+    // Chỉ HD mới có tem — qlsx KHÔNG in tem (user 24/7)
+    if (session.role === 'qlsx') {
+      return NextResponse.json(
+        { error: 'Tài khoản QLSX không in tem NVL' },
+        { status: 403 },
+      );
+    }
     if (session.role === 'leader' && session.department !== 'HD') {
       return NextResponse.json(
         { error: 'Chỉ leader HD in được tem NVL' },
@@ -84,7 +97,7 @@ export async function POST(req: Request) {
       );
     }
   } else if (type === 'khsx_tong' || type === 'khsx_homnay') {
-    // In nguyên sheet KHSX: CHỈ HD leader + admin (user 13/7 — RL chỉ xem)
+    // In nguyên sheet KHSX: HD leader + admin (user 13/7 — RL chỉ xem) + qlsx (24/7)
     if (session.role === 'leader' && session.department !== 'HD') {
       return NextResponse.json(
         { error: 'Chỉ tổ trưởng HD in được bảng KHSX — bộ phận khác chỉ xem' },
@@ -115,7 +128,7 @@ export async function POST(req: Request) {
     }
     const gj = m[2];
     // Phân quyền công đoạn theo bộ phận (13/7): HD → CĐ 10; RL → 30 R/L,
-    // 45 S/R, 60 C/T; admin tự do.
+    // 45 S/R, 60 C/T; admin + qlsx (user chốt 24/7) đủ 4 công đoạn.
     if (session.role === 'leader') {
       const allowed: Record<string, string[]> = {
         HD: ['10'],
@@ -140,6 +153,13 @@ export async function POST(req: Request) {
     }
     const month = match[1];
     let dept: string | null = match[2] ?? null;
+    // qlsx: chỉ XEM tổng hợp, không in (user 24/7)
+    if (session.role === 'qlsx') {
+      return NextResponse.json(
+        { error: 'Tài khoản QLSX không in tổng hợp tăng ca' },
+        { status: 403 },
+      );
+    }
     // Leader không truyền dept -> auto điền dept của mình.
     // Leader truyền dept khác -> reject.
     if (session.role === 'leader') {

@@ -313,10 +313,12 @@ export default function PlanView({
   department,
   isLeader,
   isAdmin = false,
+  isQlsx = false,
 }: {
   department: string;
   isLeader: boolean;
   isAdmin?: boolean;
+  isQlsx?: boolean;   // user 24/7: nhân viên QLSX — in KHSX + DCCD đủ 4 CĐ như admin
 }) {
   const [data, setData] = useState<KhsxData | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -341,12 +343,12 @@ export default function PlanView({
     return () => { cancelled = true; };
   }, []);
 
-  // Click mã hàng in phiếu DCCD nhanh (CĐ 10): HD leader + admin
-  const canDccd = isAdmin || (isLeader && department === 'HD');
-  // In nguyên trang KHSX: CHỈ HD leader + admin (user 13/7 — RL chỉ xem)
-  const canPrintKhsx = isAdmin || (isLeader && department === 'HD');
-  // In DCCD: theo công đoạn của bộ phận (HD→10; RL→30/45/60); admin đủ 4
-  const dccdOptions = isAdmin
+  // Click mã hàng in phiếu DCCD nhanh: HD leader + admin + qlsx (user 24/7)
+  const canDccd = isAdmin || isQlsx || (isLeader && department === 'HD');
+  // In nguyên trang KHSX: HD leader + admin + qlsx (user 13/7 — RL chỉ xem)
+  const canPrintKhsx = isAdmin || isQlsx || (isLeader && department === 'HD');
+  // In DCCD: theo công đoạn của bộ phận (HD→10; RL→30/45/60); admin + qlsx đủ 4
+  const dccdOptions = isAdmin || isQlsx
     ? DCCD_GJ_ALL
     : isLeader
       ? (DCCD_GJ[department] ?? [])

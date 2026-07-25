@@ -15,7 +15,7 @@ export async function GET() {
   if (!session) {
     return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
   }
-  if (session.role !== 'admin' && session.role !== 'leader') {
+  if (session.role !== 'admin' && session.role !== 'leader' && session.role !== 'qlsx') {
     return NextResponse.json({ error: 'Không có quyền xem KHSX' }, { status: 403 });
   }
 

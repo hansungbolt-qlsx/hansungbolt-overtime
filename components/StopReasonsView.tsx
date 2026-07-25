@@ -60,7 +60,8 @@ function sortMachines(codes: string[]): string[] {
   });
 }
 
-export default function StopReasonsView() {
+// readOnly (user 24/7): tài khoản QLSX chỉ XEM máy dừng — ghi/sửa vẫn là tổ trưởng
+export default function StopReasonsView({ readOnly = false }: { readOnly?: boolean }) {
   const [date, setDate] = useState(todayISO());
   const [machines, setMachines] = useState<string[]>([]);
   const [saved, setSaved] = useState<Record<string, StopReason>>({});
@@ -97,7 +98,7 @@ export default function StopReasonsView() {
   const yesterdayISO = new Date(Date.now() + 7 * 3600 * 1000 - 86400 * 1000)
     .toISOString()
     .slice(0, 10);
-  const canEdit = date === todayISO() || date === yesterdayISO;
+  const canEdit = !readOnly && (date === todayISO() || date === yesterdayISO);
 
   const openEdit = (machine: string) => {
     if (!canEdit) return;
@@ -151,8 +152,12 @@ export default function StopReasonsView() {
       </p>
       {!canEdit && (
         <div className="mb-3 rounded-lg bg-slate-100 border border-slate-300 text-slate-600 text-xs px-3 py-2">
-          📖 Đang xem <b>lịch sử</b> — chỉ được ghi/sửa máy dừng của <b>hôm nay</b> và{' '}
-          <b>hôm qua</b>.
+          {readOnly ? (
+            <>📖 Chế độ <b>chỉ xem</b> — ghi/sửa lý do máy dừng là việc của tổ trưởng.</>
+          ) : (
+            <>📖 Đang xem <b>lịch sử</b> — chỉ được ghi/sửa máy dừng của <b>hôm nay</b> và{' '}
+            <b>hôm qua</b>.</>
+          )}
         </div>
       )}
 
