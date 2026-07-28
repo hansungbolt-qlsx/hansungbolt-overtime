@@ -142,6 +142,19 @@ bản chờ duyệt · đã duyệt rồi thì tự mở phiếu mới · agent 
 cho phiếu quên bấm Gửi · chỉ 2 bộ phận Heading/Rolling (dầu 46HS·527V → Heading,
 322 → Rolling) · phụ liệu hết tồn thì chặn ngay trên điện thoại.
 
+**Danh sách cuộn (user chốt 28/7 sau 2 lần đổi ý — bản CUỐI):** xuất kho xếp FIFO
+(nhập trước lên trước), trả kho ngược lại (xuất ra line sau cùng lên đầu). Nhóm
+theo đợt cùng ngày, mỗi đợt 1 tông nền + nhãn chữ `Đợt N · nhập kho DD/MM · n cuộn
+· tổng kg`. Cuộn `OPN-*` = tồn đầu kỳ chuyển hệ thống, gom về đợt đầu. Mỗi dòng
+chỉ 1 cột định danh (Lot No, không có thì số cuộn nội bộ) + Kg đậm cam + ô tích ở
+cuối. ⚠ **FIFO chỉ là gợi ý — KHÔNG chặn, KHÔNG cảnh báo khi người dùng chọn khác
+thứ tự. Đừng thêm validate thứ tự.**
+
+⚠ **Đổi CẤU TRÚC payload `/api/ot/stock` thì phải tăng `STOCK_PAYLOAD_V` bên app
+chính** (`app/routers/ot_api.py`). Agent chỉ đẩy lại snapshot khi `stock-version`
+đổi; thêm field mới mà tồn không biến động thì điện thoại KHÔNG BAO GIỜ nhận được
+(đã dính 28/7 với `received_at`).
+
 ## 6. Convention quan trọng
 
 - **Ngôn ngữ**: tiếng Việt cho commit message, UI text, lời thoại với user. Reply ngắn gọn, giọng kể chuyện kỹ thuật, không khoe khoang.
