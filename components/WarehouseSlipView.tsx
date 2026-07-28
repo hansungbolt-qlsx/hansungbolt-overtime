@@ -246,9 +246,10 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
     ].filter(Boolean) as number[]),
     [lines, past],
   );
-  // FIFO (user chốt lại 28/7 — bỏ phương án xếp theo Kg): cuộn NHẬP TRƯỚC lên
-  // trước. Cùng ngày thì theo id (thứ tự nhập trong phiếu). Cuộn thiếu ngày
-  // xuống cuối.
+  // FIFO (user chốt lại 28/7): cuộn NHẬP TRƯỚC lên trước. **Trong cùng một đợt
+  // nhập thì xếp Kg TỪ NHỎ ĐẾN LỚN** (user chốt 28/7 17:58) — đợt Daeho 46 cuộn
+  // nặng xấp xỉ nhau, xếp theo Kg mới dò ra cuộn cần lấy nhanh. Kg bằng nhau thì
+  // theo id (thứ tự nhập trong phiếu). Cuộn thiếu ngày xuống cuối.
   //   · XUẤT kho: nhóm theo NGÀY NHẬP, cũ nhất lên đầu → đúng tinh thần FIFO.
   //   · TRẢ kho : nhóm theo NGÀY XUẤT RA LINE, MỚI NHẤT lên đầu — cuộn vừa mang
   //     ra line mới là cuộn hay bị trả lại, cuộn ra từ 3 tháng trước thì không.
@@ -267,6 +268,7 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
     return list.sort((a, b) => {
       const ka = k(a), kb = k(b);
       if (ka !== kb) return isReturn ? (ka < kb ? 1 : -1) : (ka < kb ? -1 : 1);
+      if (a.kg !== b.kg) return a.kg - b.kg;   // cùng đợt → Kg nhỏ trước
       return a.id - b.id;
     });
   }, [coils, pickedCode, usedCoilIds, dateOf, isReturn]);
