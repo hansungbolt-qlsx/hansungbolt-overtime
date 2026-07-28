@@ -83,13 +83,11 @@ export default function BarcodeScanButton({
         if (cancelled) return;
         const { Html5Qrcode, Html5QrcodeSupportedFormats } = mod;
         const scanner = new Html5Qrcode(BOX_ID, {
+          // Chỉ 3 định dạng có thật trên tem — chống đọc bừa (xem ghi chú ở onFile)
           formatsToSupport: [
             Html5QrcodeSupportedFormats.CODE_128,
             Html5QrcodeSupportedFormats.CODE_39,
             Html5QrcodeSupportedFormats.QR_CODE,
-            Html5QrcodeSupportedFormats.ITF,
-            Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.CODE_93,
           ],
           // Android/Chrome có bộ giải mã của hệ điều hành → nhanh và khoẻ hơn.
           // iOS không có thì thư viện tự dùng ZXing như cũ.
@@ -167,13 +165,14 @@ export default function BarcodeScanButton({
         const mod = await import('html5-qrcode');
         const { Html5Qrcode, Html5QrcodeSupportedFormats } = mod;
         const s = new Html5Qrcode(FILE_BOX_ID, {
+          // ⚠ CHỈ 3 định dạng CÓ THẬT trên tem 5 NCC. Thử nghiệm 28/7: để rộng
+          // thêm EAN/ITF/CODE_93 thì có ca đọc BỪA thành EAN_8 "21558788" trong
+          // khi giá trị đúng là CODE_39 "RP00226031324" → tick SAI CUỘN.
+          // Thu hẹp danh sách là cách chống đọc sai rẻ nhất. ĐỪNG nới lại.
           formatsToSupport: [
-            Html5QrcodeSupportedFormats.CODE_128,   // Daeho · KOS · Thái Lan
+            Html5QrcodeSupportedFormats.CODE_128,   // Daeho · KOS · POS-SEAH
             Html5QrcodeSupportedFormats.CODE_39,    // Nhuận Thái
             Html5QrcodeSupportedFormats.QR_CODE,    // Vĩnh Thành
-            Html5QrcodeSupportedFormats.ITF,
-            Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.CODE_93,
           ],
           verbose: false,
         });
@@ -199,31 +198,70 @@ export default function BarcodeScanButton({
             /* sang bước cắt dải */
           }
 
-          // 2) Trượt dải ngang — cách DUY NHẤT đọc được mã 1D ở đáy tem
+          // 2) Trượt dải ngang — cách DUY NHẤT đọc được mã 1D ở đáy tem.
+          //
+          // Công thức dưới đây là kết quả ĐO THẬT 28/7 trên 4 tem mẫu, mô phỏng
+          // ảnh chụp điện thoại ở nhiều mức xa/mờ (xem docs mục 4.2):
+          //   · DẢI HẸP 12% cao, chồng nhau 50% → mọi ca thành công đều rơi vào
+          //     mức này, dải 25-30% thì trượt
+          //   · dò TỪ DƯỚI LÊN — mã vạch luôn ở đáy tem nên ra rất nhanh
+          //   · NHỊ PHÂN HOÁ (đen/trắng theo ngưỡng trung bình) là biến thể cứu
+          //     được tem Daeho (nền vàng, bọc nilon bóng) mà ảnh thường thất bại
           if (!hit) {
             const bmp = await createImageBitmap(file);
             const W = bmp.width;
             const H = bmp.height;
-            const bandH = Math.max(60, Math.round(H * 0.3));
-            // Phóng để dải rộng ít nhất ~1.400 px (ảnh điện thoại thường đã đủ)
-            const scale = Math.min(3, Math.max(1, 1400 / W));
+            const bandH = Math.max(48, Math.round(H * 0.12));
+            const stepPx = Math.max(24, Math.round(bandH / 2));
+            const tops: number[] = [];
+            for (let top = H - bandH; top >= 0; top -= stepPx) tops.push(top);
+            if (tops[tops.length - 1] !== 0) tops.push(0);
+
+            const scale = Math.min(3, Math.max(1.5, 1600 / W));
             const cv = document.createElement('canvas');
-            const ctx = cv.getContext('2d');
-            const N = 6;
-            for (let i = 0; i < N && !hit; i++) {
-              const top = Math.round((H - bandH) * (i / (N - 1)));
-              cv.width = Math.round(W * scale);
-              cv.height = Math.round(bandH * scale);
-              ctx?.drawImage(bmp, 0, top, W, bandH, 0, 0, cv.width, cv.height);
+            const ctx = cv.getContext('2d', { willReadFrequently: true });
+            cv.width = Math.round(W * scale);
+            cv.height = Math.round(bandH * scale);
+
+            const toFile = async (name: string) => {
               const blob: Blob | null = await new Promise((res) =>
                 cv.toBlob((b) => res(b), 'image/png'),
               );
-              if (!blob) continue;
-              setStep(`đang dò dải ${i + 1}/${N}…`);
-              try {
-                hit = await scanOne(new File([blob], `band-${i}.png`, { type: 'image/png' }));
-              } catch {
-                /* thử dải kế tiếp */
+              return blob ? new File([blob], name, { type: 'image/png' }) : null;
+            };
+
+            // Nhị phân hoá theo ngưỡng TRUNG BÌNH của chính dải đó — tự thích ứng
+            // với tem sáng/tối, tốt hơn ngưỡng cố định.
+            const binarize = () => {
+              if (!ctx) return;
+              const im = ctx.getImageData(0, 0, cv.width, cv.height);
+              const d = im.data;
+              let sum = 0;
+              for (let i = 0; i < d.length; i += 4) {
+                sum += d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+              }
+              const mean = sum / (d.length / 4);
+              for (let i = 0; i < d.length; i += 4) {
+                const v = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114 > mean ? 255 : 0;
+                d[i] = d[i + 1] = d[i + 2] = v;
+              }
+              ctx.putImageData(im, 0, 0);
+            };
+
+            for (let k = 0; k < tops.length && !hit; k++) {
+              setStep(`đang dò ${k + 1}/${tops.length}…`);
+              // lượt 1: ảnh thường · lượt 2: nhị phân hoá (cứu tem nền vàng/bóng)
+              for (const bin of [false, true]) {
+                ctx?.drawImage(bmp, 0, tops[k], W, bandH, 0, 0, cv.width, cv.height);
+                if (bin) binarize();
+                const f = await toFile(`b${k}${bin ? 'x' : ''}.png`);
+                if (!f) continue;
+                try {
+                  hit = await scanOne(f);
+                  break;
+                } catch {
+                  /* thử biến thể / dải kế tiếp */
+                }
               }
             }
             bmp.close?.();
