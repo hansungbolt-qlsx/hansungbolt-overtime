@@ -22,6 +22,23 @@ function agentAllowed(role: string): boolean {
   return role === 'admin' || role === 'qlsx';
 }
 
+/** So sánh JSON KHÔNG phụ thuộc thứ tự khoá.
+ *  ⚠ Postgres `jsonb` sắp lại khoá khi lưu (id/no/url/type/…), còn app chính gửi
+ *  theo thứ tự của nó → JSON.stringify thẳng thì LÚC NÀO CŨNG khác nhau. */
+function canon(v: unknown): string {
+  const walk = (x: unknown): unknown => {
+    if (Array.isArray(x)) return x.map(walk);
+    if (x && typeof x === 'object') {
+      return Object.fromEntries(
+        Object.keys(x as Record<string, unknown>).sort()
+          .map((k) => [k, walk((x as Record<string, unknown>)[k])]),
+      );
+    }
+    return x;
+  };
+  return JSON.stringify(walk(v ?? null));
+}
+
 export async function GET(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
@@ -145,9 +162,9 @@ export async function POST(req: Request) {
   const same =
     cur != null &&
     cur.status === body.status &&
-    JSON.stringify(cur.main_refs ?? []) === JSON.stringify(body.main_refs ?? []) &&
+    canon(cur.main_refs ?? []) === canon(body.main_refs ?? []) &&
     (cur.reject_reason ?? null) === (body.reject_reason ?? null) &&
-    JSON.stringify(cur.line_errors ?? []) === JSON.stringify(patch.line_errors ?? cur.line_errors ?? []);
+    canon(cur.line_errors ?? []) === canon(patch.line_errors ?? cur.line_errors ?? []);
   if (!same
       && (body.status === 'approved' || body.status === 'rejected' || body.status === 'draft')) {
     await supabaseAdmin.from('nvl_slip_events').insert({
