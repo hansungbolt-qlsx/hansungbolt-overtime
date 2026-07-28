@@ -47,6 +47,9 @@ export type StockCoil = {
   size: string;
   received_at?: string | null;   // ngày nhập kho — hiện kèm vì list xếp theo Kg
   issued_at: string | null;      // ngày xuất ra line (dùng khi TRẢ kho)
+  // NCC của cuộn (app chính suy từ cuộn → phiếu nhập). Rỗng = phiếu nhập tay chưa
+  // ghi NCC. Có từ STOCK_PAYLOAD_V=3; snapshot cũ chưa có field này → undefined.
+  supplier?: string;
 };
 
 export type StockAux = {

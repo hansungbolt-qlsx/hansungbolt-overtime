@@ -47,6 +47,17 @@ const GROUP_STYLE = [
   { bg: 'bg-teal-50', chip: 'bg-teal-600' },
 ];
 
+// Nền phân biệt NHÀ CUNG CẤP (user 28/7) — chỉ bật khi mã đang chọn có từ 2 NCC.
+// Tông khác hẳn GROUP_STYLE để không lẫn với màu đợt nhập; vẫn tránh đỏ/hồng.
+const SUP_STYLE = [
+  { bg: 'bg-indigo-100', chip: 'bg-indigo-600', text: 'text-indigo-800' },
+  { bg: 'bg-lime-100', chip: 'bg-lime-700', text: 'text-lime-800' },
+  { bg: 'bg-cyan-100', chip: 'bg-cyan-700', text: 'text-cyan-800' },
+  { bg: 'bg-fuchsia-100', chip: 'bg-fuchsia-600', text: 'text-fuchsia-800' },
+  { bg: 'bg-yellow-100', chip: 'bg-yellow-700', text: 'text-yellow-800' },
+  { bg: 'bg-slate-200', chip: 'bg-slate-600', text: 'text-slate-800' },
+];
+
 function hhmmVN() {
   return new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(11, 16);
 }
@@ -280,6 +291,23 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
     }
     return out;
   }, [coilsOfPicked, dateOf, isReturn]);
+
+  // NCC của mã đang chọn. Cùng 1 mã mà có ≥2 NCC thì mỗi NCC một màu nền (user
+  // 28/7) — dữ liệu thật 28/7 có 4 mã như vậy (02200320/25/30 · 03021262).
+  // Xếp theo TÊN để màu của một NCC không nhảy khi danh sách cuộn đổi.
+  const supIndex = useMemo(() => {
+    const names = [...new Set(coilsOfPicked.map((c) => (c.supplier || '').trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, 'vi'));
+    return new Map(names.map((n, i) => [n, i]));
+  }, [coilsOfPicked]);
+  const multiSup = supIndex.size >= 2;
+  const supStyleOf = useCallback(
+    (c: StockCoil) => {
+      const i = supIndex.get((c.supplier || '').trim());
+      return i === undefined ? null : SUP_STYLE[i % SUP_STYLE.length];
+    },
+    [supIndex],
+  );
 
   function pick(code: string, name = '') {
     setPickedCode(code);
@@ -767,6 +795,28 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                 </>
               )}
             </div>
+            {/* Mã có ≥2 NCC → chú thích màu + số cuộn từng nhà, để biết đang
+                tick lẫn hàng của 2 nhà hay không (user 28/7). */}
+            {multiSup && coilsOfPicked.length > 0 && (
+              <div className="mb-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="font-bold text-brand-navy">
+                  {supIndex.size} nhà cung cấp:
+                </span>
+                {[...supIndex.keys()].map((n, i) => {
+                  const cnt = coilsOfPicked.filter((c) => (c.supplier || '').trim() === n);
+                  const st = SUP_STYLE[i % SUP_STYLE.length];
+                  return (
+                    <span
+                      key={n}
+                      className={`${st.chip} text-white rounded px-1.5 py-0.5 font-bold`}
+                    >
+                      {n} · {cnt.length} cuộn · {fmtQty(cnt.reduce((s, c) => s + c.kg, 0))} kg
+                    </span>
+                  );
+                })}
+                <span className="text-brand-navy-soft">← màu nền dòng = nhà cung cấp</span>
+              </div>
+            )}
             {coilsOfPicked.length === 0 ? (
               <p className="text-sm text-rose-600 font-semibold">
                 {isReturn
@@ -810,8 +860,13 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                       <ul className="divide-y divide-white/70">
                 {g.items.map((c) => {
                   const on = ticked[c.id] !== undefined;
+                  const sup = (c.supplier || '').trim();
+                  const ss = supStyleOf(c);
                   return (
-                    <li key={c.id} className="px-3 py-2 text-sm">
+                    <li
+                      key={c.id}
+                      className={`px-3 py-2 text-sm ${multiSup && ss ? ss.bg : ''}`}
+                    >
                       {/* Ô tích nằm CUỐI, sau số Kg — ngón tay thao tác từ phải
                           sang cho dễ (user 28/7). Cả dòng vẫn là <label> nên
                           bấm chỗ nào cũng tick được. */}
@@ -822,8 +877,22 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                             đẩy dòng xuống 2 hàng trên điện thoại.
                             Ưu tiên Lot No; cuộn không có lot (tồn đầu kỳ) thì
                             hiện số cuộn nội bộ để dòng vẫn có định danh. */}
-                        <span className="flex-1 min-w-0 font-mono break-all">
-                          {c.lot_no || c.coil_no}
+                        {/* Lot No · NCC (user 28/7): người ở kho cần biết cuộn của
+                            nhà nào trước khi mang ra máy. Cho phép xuống dòng —
+                            tên NCC dài nhất 17 ký tự nên đa số vẫn nằm 1 hàng. */}
+                        <span className="flex-1 min-w-0">
+                          <span className="font-mono break-all">
+                            {c.lot_no || c.coil_no}
+                          </span>
+                          {sup && (
+                            <span
+                              className={`ml-1.5 text-xs font-bold ${
+                                multiSup && ss ? ss.text : 'text-brand-navy-soft'
+                              }`}
+                            >
+                              · {sup}
+                            </span>
+                          )}
                         </span>
                         <span className={`${EMPH} whitespace-nowrap tabular-nums`}>
                           {fmtQty(c.kg)} kg
