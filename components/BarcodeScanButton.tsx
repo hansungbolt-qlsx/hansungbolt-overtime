@@ -38,6 +38,7 @@ export default function BarcodeScanButton({
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [secs, setSecs] = useState(0);
+  const [step, setStep] = useState('');   // tiến trình đọc ảnh
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const scannerRef = useRef<any>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -143,39 +144,90 @@ export default function BarcodeScanButton({
     };
   }, [open, onScan, stop]);
 
-  /** Giải mã từ ẢNH chụp bằng camera gốc của máy — nét hơn luồng video rất nhiều. */
+  /** Giải mã từ ẢNH chụp bằng camera gốc của máy.
+   *
+   * 🔴 NGUYÊN NHÂN GỐC tìm được 28/7 (giải mã thử 5 tem mẫu bằng chính ZXing):
+   * bộ đọc mã 1D của ZXing CHỈ dò một số DÒNG NGANG QUANH GIỮA ảnh. Mã vạch trên
+   * tem cuộn NVL luôn nằm ở ĐÁY tem (Daeho, KOS, Nhuận Thái, Thái Lan, Vĩnh
+   * Thành — cả 5 đều vậy) nên không bao giờ được dò tới ⇒ ảnh nguyên tấm LUÔN
+   * thất bại, dù ảnh nét. Cắt thành dải ngang + phóng to lên thì cả 5 đọc được
+   * ngay (CODE_128 ×3, CODE_39 ×1, QR ×1).
+   *
+   * Vì vậy: thử ảnh nguyên trước (nhanh, bắt QR), rồi TRƯỢT 6 DẢI NGANG từ trên
+   * xuống, mỗi dải cao 30% ảnh và phóng về tối thiểu ~1.400 px ngang.
+   */
   const onFile = useCallback(
     async (file: File | undefined) => {
       if (!file) return;
       setBusy(true);
       setErr('');
+      setStep('');
       await stop();
       try {
         const mod = await import('html5-qrcode');
         const { Html5Qrcode, Html5QrcodeSupportedFormats } = mod;
         const s = new Html5Qrcode(FILE_BOX_ID, {
           formatsToSupport: [
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.QR_CODE,
+            Html5QrcodeSupportedFormats.CODE_128,   // Daeho · KOS · Thái Lan
+            Html5QrcodeSupportedFormats.CODE_39,    // Nhuận Thái
+            Html5QrcodeSupportedFormats.QR_CODE,    // Vĩnh Thành
             Html5QrcodeSupportedFormats.ITF,
             Html5QrcodeSupportedFormats.EAN_13,
             Html5QrcodeSupportedFormats.CODE_93,
           ],
           verbose: false,
         });
-        try {
-          // scanFileV2 trả kèm loại mã; bản cũ chỉ có scanFile trả chuỗi
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const anyS = s as any;
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const anyS = s as any;
+        const scanOne = async (f: File) => {
           if (typeof anyS.scanFileV2 === 'function') {
-            const res = await anyS.scanFileV2(file, false);
-            onScan(String(res.decodedText).trim(), fmtOf(res));
-          } else {
-            const text = await s.scanFile(file, false);
-            onScan(String(text).trim(), 'ảnh');
+            const res = await anyS.scanFileV2(f, false);
+            return { text: String(res.decodedText).trim(), fmt: fmtOf(res) };
           }
-          setOpen(false);
+          const text = await s.scanFile(f, false);
+          return { text: String(text).trim(), fmt: undefined };
+        };
+
+        let hit: { text: string; fmt?: string } | null = null;
+        try {
+          // 1) Ảnh nguyên tấm — bắt QR rất nhanh
+          setStep('đang đọc ảnh…');
+          try {
+            hit = await scanOne(file);
+          } catch {
+            /* sang bước cắt dải */
+          }
+
+          // 2) Trượt dải ngang — cách DUY NHẤT đọc được mã 1D ở đáy tem
+          if (!hit) {
+            const bmp = await createImageBitmap(file);
+            const W = bmp.width;
+            const H = bmp.height;
+            const bandH = Math.max(60, Math.round(H * 0.3));
+            // Phóng để dải rộng ít nhất ~1.400 px (ảnh điện thoại thường đã đủ)
+            const scale = Math.min(3, Math.max(1, 1400 / W));
+            const cv = document.createElement('canvas');
+            const ctx = cv.getContext('2d');
+            const N = 6;
+            for (let i = 0; i < N && !hit; i++) {
+              const top = Math.round((H - bandH) * (i / (N - 1)));
+              cv.width = Math.round(W * scale);
+              cv.height = Math.round(bandH * scale);
+              ctx?.drawImage(bmp, 0, top, W, bandH, 0, 0, cv.width, cv.height);
+              const blob: Blob | null = await new Promise((res) =>
+                cv.toBlob((b) => res(b), 'image/png'),
+              );
+              if (!blob) continue;
+              setStep(`đang dò dải ${i + 1}/${N}…`);
+              try {
+                hit = await scanOne(new File([blob], `band-${i}.png`, { type: 'image/png' }));
+              } catch {
+                /* thử dải kế tiếp */
+              }
+            }
+            bmp.close?.();
+          }
         } finally {
           try {
             s.clear();
@@ -183,13 +235,18 @@ export default function BarcodeScanButton({
             /* ignore */
           }
         }
+
+        if (!hit) throw new Error('no-code');
+        onScan(hit.text, hit.fmt || 'ảnh');
+        setOpen(false);
       } catch {
         setErr(
-          'Ảnh này chưa đọc được mã vạch. Chụp lại gần hơn, mã vạch nằm ngang ' +
-            'và chiếm gần hết chiều ngang ảnh, bật đèn nếu tối.',
+          'Chưa đọc được mã vạch trong ảnh. Chụp lại sao cho MÃ VẠCH nằm ngang, ' +
+            'chiếm gần hết chiều ngang ảnh, không bị nhăn/bóng, bật đèn nếu tối.',
         );
       } finally {
         setBusy(false);
+        setStep('');
         if (fileRef.current) fileRef.current.value = '';
       }
     },
@@ -269,7 +326,7 @@ export default function BarcodeScanButton({
                 onClick={() => fileRef.current?.click()}
                 className="w-full py-3 rounded-xl bg-brand-teal text-white font-bold disabled:opacity-50"
               >
-                {busy ? 'Đang đọc ảnh…' : '📸 Chụp ảnh tem (nét hơn)'}
+                {busy ? (step || 'Đang đọc ảnh…') : '📸 Chụp ảnh tem (nét hơn)'}
               </button>
               {/* Nút huỷ thứ 2 ở chân — ngón tay ở dưới màn hình dễ với hơn */}
               <button
