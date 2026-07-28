@@ -322,6 +322,7 @@ let lastHeavyAt = 0;
 let lastHeavyVer = null;
 let sweptToday = '';                 // 'YYYY-MM-DD' đã vét rồi thì thôi
 let sweepOnStartDone = false;        // sáng bật PC: vét 1 lần
+const nvlPushed = new Map();         // uid → dấu vân tay trạng thái đã đẩy về OT
 
 function vnNow() {
   return new Date(Date.now() + 7 * 3600 * 1000);
@@ -456,18 +457,35 @@ async function pushNvlSlips(sweep) {
 async function pullNvlStatuses() {
   const { slips } = await mainGet('/api/ot/slips?days=7');
   for (const s of slips ?? []) {
-    if (s.status !== 'approved' && s.status !== 'rejected') continue;
-    await otFetch('/api/nvl-slips/sync', {
-      method: 'POST',
-      body: JSON.stringify({
-        uid: s.uid,
-        status: s.status,
-        main_refs: s.refs ?? [],
-        reject_reason: s.reject_reason ?? null,
-        approved_at: s.approved_at,
-        approved_by: s.approved_by,
-      }),
-    }).catch(() => {});   // phiếu tạo thẳng bên app chính thì không có bên OT
+    // 'draft' = app chính đã XOÁ phiếu thật → phiếu quay về "như chưa gửi"
+    if (!['approved', 'rejected', 'draft'].includes(s.status)) continue;
+    // Chỉ đẩy khi TRẠNG THÁI ĐỔI — không thì mỗi 60 giây lại ghi đè y nguyên cho
+    // mọi phiếu 7 ngày gần đây (đúng lỗi đã dính hôm nay ở chiều ngược lại).
+    const mark = [s.status, s.reject_reason || '', s.sys_note || '',
+                  (s.refs ?? []).map((r) => r.no).join(',')].join('|');
+    if (nvlPushed.get(s.uid) === mark) continue;
+    try {
+      await otFetch('/api/nvl-slips/sync', {
+        method: 'POST',
+        body: JSON.stringify({
+          uid: s.uid,
+          status: s.status,
+          main_refs: s.refs ?? [],
+          reject_reason: s.reject_reason ?? null,
+          // Cảnh báo hệ thống (phiếu thật bị xoá/sửa) → hiện đỏ trên điện thoại
+          sys_note: s.sys_note ?? null,
+          approved_at: s.approved_at,
+          approved_by: s.approved_by,
+        }),
+      });
+      nvlPushed.set(s.uid, mark);
+      console.log(
+        `[${new Date().toISOString()}] Trạng thái ${s.uid} → app tăng ca: ${s.status}` +
+          (s.sys_note ? ' (kèm cảnh báo)' : ''),
+      );
+    } catch {
+      /* phiếu tạo thẳng bên app chính thì không có bên OT — bỏ qua */
+    }
   }
 }
 

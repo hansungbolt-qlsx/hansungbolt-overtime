@@ -48,8 +48,14 @@ export async function GET(req: Request) {
   let slips = fresh ?? [];
   if (sweep) {
     // Vét 16:15 + sáng bật PC: gom cả phiếu nhân viên quên bấm Gửi
+    // ⚠ CHỈ vét phiếu draft CHƯA TỪNG ĐẨY (synced_at IS NULL). Phiếu quay về
+    // draft vì app chính XOÁ phiếu thật thì `synced_at` vẫn còn → agent KHÔNG tự
+    // gửi lại. Bắt buộc có người bấm Gửi (lúc đó POST /api/nvl-slips xoá
+    // synced_at). Thiếu chốt này thì 16:15 agent tự gửi lại phiếu vừa bị xoá và
+    // tồn có thể bị trừ LẦN HAI.
     const { data: drafts, error: dErr } = await base()
-      .eq('status', 'draft').order('slip_date').order('seq');
+      .eq('status', 'draft').is('synced_at', null)
+      .order('slip_date').order('seq');
     if (dErr) return NextResponse.json({ error: dErr.message }, { status: 500 });
     slips = [...slips, ...(drafts ?? [])];
   }
@@ -103,13 +109,20 @@ export async function POST(req: Request) {
     synced_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
-  const ALLOWED = ['pending', 'approved', 'rejected'];
+  // 'draft' = app chính đã XOÁ phiếu thật → phiếu quay về "như chưa gửi" để nhân
+  // viên kho kiểm lại rồi gửi lại (user chốt 28/7).
+  const ALLOWED = ['draft', 'pending', 'approved', 'rejected'];
   if (typeof body.status === 'string' && ALLOWED.includes(body.status)) {
     patch.status = body.status;
   }
   if (Array.isArray(body.line_errors)) patch.line_errors = body.line_errors;
   if (Array.isArray(body.main_refs)) patch.main_refs = body.main_refs;
   if (body.reject_reason !== undefined) patch.reject_reason = body.reject_reason;
+  // Cảnh báo hệ thống từ app chính (phiếu thật bị xoá/sửa) → hiện đỏ trên điện
+  // thoại qua line_errors, khỏi phải thêm cột mới bên Supabase.
+  if (typeof body.sys_note === 'string' && body.sys_note) {
+    patch.line_errors = [{ seq: 0, error: body.sys_note }];
+  }
   if (body.approved_at !== undefined) patch.approved_at = body.approved_at;
   if (body.approved_by !== undefined) patch.approved_by = body.approved_by;
   if (body.sent_at !== undefined) patch.sent_at = body.sent_at;
@@ -119,7 +132,7 @@ export async function POST(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   // Chỉ ghi nhật ký khi app chính CHỐT (duyệt / từ chối) — tránh spam mỗi vòng poll
-  if (body.status === 'approved' || body.status === 'rejected') {
+  if (body.status === 'approved' || body.status === 'rejected' || body.status === 'draft') {
     await supabaseAdmin.from('nvl_slip_events').insert({
       slip_id: data.id,
       slip_uid: uid,
