@@ -668,9 +668,14 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                           sang cho dễ (user 28/7). Cả dòng vẫn là <label> nên
                           bấm chỗ nào cũng tick được. */}
                       <label className="flex items-center gap-2">
-                        <span className="flex-1 min-w-0">
-                          <span className="font-mono">{c.coil_no}</span>
-                          {c.lot_no && <span className="text-brand-navy-soft"> · {c.lot_no}</span>}
+                        {/* CHỈ 1 cột định danh (user 28/7): với phần lớn cuộn
+                            NCC thì coil_no TRÙNG Y HỆT lot_no (vd Daeho
+                            B8CS02-60400-10) nên hiện cả hai là lặp vô ích và
+                            đẩy dòng xuống 2 hàng trên điện thoại.
+                            Ưu tiên Lot No; cuộn không có lot (tồn đầu kỳ) thì
+                            hiện số cuộn nội bộ để dòng vẫn có định danh. */}
+                        <span className="flex-1 min-w-0 font-mono break-all">
+                          {c.lot_no || c.coil_no}
                         </span>
                         <span className={`${EMPH} whitespace-nowrap tabular-nums`}>
                           {fmtQty(c.kg)} kg
