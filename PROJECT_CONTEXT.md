@@ -88,7 +88,7 @@
 ### 4.7. Print server remote (tất cả role)
 - Kiến trúc: điện thoại 4G → Vercel (queue job) → máy tính admin chạy agent Node.js poll job → puppeteer render PDF → in ApeosPort-VI C4471 qua LAN.
 - Bảng `print_jobs` (id, type, ref_id, requested_by, status). Type: `registration` / `labels_day` / `overtime_summary`.
-- `AGENT_SECRET` env var Vercel. Agent login `qlsx` (password `qlsx123`) để có session render view page.
+- `AGENT_SECRET` env var Vercel. Agent login bằng tài khoản `qlsx` (mật khẩu lấy ở `print-agent/.env` — không ghi giá trị vào tài liệu) để có session render view page.
 - Nhận lệnh in CẢ NGÀY (bỏ chặn giờ 22/7 — PC in tắt thì job hết TTL, nút In tự cảnh báo). API validate quyền: leader chỉ in dept mình; leader HD mới in tem.
 - Folder `print-agent/` trong repo: `agent.js` + `install.bat` + `start.bat` + `README.md`. User đã cài trên máy admin.
 - Nút "In phiếu" (registration + overtime_summary) và "In tem" (labels_day) hiện cho leader/worker. Admin có thêm nút Xem + In/Xuất browser trong tổng hợp giờ.
@@ -109,8 +109,38 @@ Migrations đã chạy (tất cả thuần additive — `IF NOT EXISTS` hoặc D
 10. `10-plan-files.sql` — bảng `plan_files` lưu metadata file Excel kế hoạch đã upload (giữ 3 file gần nhất trong Supabase Storage `plan-files`).
 11. `11-print-jobs.sql` — bảng `print_jobs` queue lệnh in cho agent Node.js.
 12. `12-print-jobs-overtime-summary.sql` — mở rộng CHECK constraint `print_jobs.type` thêm `overtime_summary`.
+13. `13-print-jobs-khsx-dccd.sql` · `14-print-jobs-overtime-sheets.sql` — mở rộng thêm type in.
+14. `15-machine-stop-reasons.sql` · `16-stop-reasons-st-dismissed.sql` — máy dừng.
+15. **`17-nvl-slips.sql` (28/07/2026)** — Xuất / Trả kho nguyên phụ liệu:
+    `nvl_day_slips` (phiếu ngày, `uid` unique = khoá gửi app chính) ·
+    `nvl_slip_lines` (dòng, có cuộn/lot cho NVL) ·
+    `nvl_stock_snapshot` (tồn app chính đẩy xuống, ghi đè theo `part`) ·
+    `nvl_slip_events` (nhật ký sửa — vì bên app chính người duyệt CHỈ XEM).
+    ⚠ Phải chạy trên Supabase SQL Editor TRƯỚC khi dùng 2 tab Xuất/Trả kho.
 
 Bảng `equipments` hiện ~84 rows (42 HD + 38 RL + RL-24 + HD-1A + có thể có CVK-HD/CVK-RL từ Công việc khác).
+
+## 5b. Xuất / Trả kho nguyên phụ liệu (28/07/2026)
+
+Nhân viên kho (`phamvancuong`, role `qlsx`) ghi phiếu trên điện thoại → agent trên PC
+đẩy sang **app chính** → phiếu nằm ở "Chờ duyệt" → người duyệt bấm Duyệt thì tồn mới đổi.
+
+**App chính là CHỦ KHO DUY NHẤT** — app này không bao giờ tự trừ/cộng tồn.
+
+| Thành phần | Chỗ |
+|---|---|
+| UI điện thoại | `components/WarehouseSlipView.tsx` (1 component cho cả Xuất lẫn Trả) |
+| Quét tem | `components/BarcodeScanButton.tsx` — html5-qrcode BUNDLE, **cấm BarcodeDetector** (iOS Safari không có) |
+| API điện thoại | `app/api/nvl-slips` (GET/POST) · `app/api/nvl-stock` (GET) |
+| API cho agent | `app/api/nvl-slips/sync` (GET lấy phiếu · POST ghi ngược trạng thái) · `app/api/nvl-stock` (POST) |
+| Agent | `print-agent/agent.js` → `syncNvlOnce()` mỗi 60s |
+| Dùng chung | `lib/nvl-slips.ts` (uid, bộ phận mặc định, kiểu dữ liệu) |
+| Spec đầy đủ | app chính: `hsb-material-app/docs/SPEC_OT_XUAT_TRA_KHO.md` |
+
+Quy tắc đã cài: mỗi ngày 1 phiếu tổng / loại / nhánh, ghi nhiều đợt · gửi lại = ghi đè
+bản chờ duyệt · đã duyệt rồi thì tự mở phiếu mới · agent **vét 16:15** + sáng bật PC
+cho phiếu quên bấm Gửi · chỉ 2 bộ phận Heading/Rolling (dầu 46HS·527V → Heading,
+322 → Rolling) · phụ liệu hết tồn thì chặn ngay trên điện thoại.
 
 ## 6. Convention quan trọng
 
@@ -232,7 +262,7 @@ Session lớn — hoàn thiện **print server remote** cho tổ trưởng ở x
 - **Kế hoạch đã tải lên**: card trong Dashboard Tổng quan, giữ 3 file Excel gốc gần nhất trong Supabase Storage `plan-files`. Nút Upload có drag-and-drop bypass Windows "file in use" lock (migration 10).
 - **Print server remote** cho tổ trưởng 4G:
   * Bảng `print_jobs` queue (migration 11 + 12).
-  * Agent Node.js trong folder `print-agent/` chạy trên máy admin. Login `qlsx/qlsx123` → puppeteer render PDF → in ApeosPort qua LAN.
+  * Agent Node.js trong folder `print-agent/` chạy trên máy admin. Login bằng `qlsx` (mật khẩu ở `print-agent/.env`) → puppeteer render PDF → in ApeosPort qua LAN.
   * `AGENT_SECRET=k7hf9x3nB8mp1WQ4Z2yLtG6cVsA5rDe` đã set trên Vercel + `.env` của agent.
   * 3 loại print: `registration` (phiếu tăng ca) / `labels_day` (tem NVL) / `overtime_summary` (tổng hợp giờ, A4 landscape).
   * Nhận lệnh in cả ngày (bỏ chặn giờ 22/7). API validate quyền dept.
@@ -247,14 +277,85 @@ Session lớn — hoàn thiện **print server remote** cho tổ trưởng ở x
 
 **Việc chưa hoàn thành:**
 - Phiếu in QLSX có thể vẫn hiển thị cột thiết bị/SL lệch (layout HD/RL). Cần test thử.
-- Agent chưa được cài auto-start Windows Task Scheduler — user vẫn phải double-click `start.bat` sau khi reboot. Xem `print-agent/README.md` mục "Auto-start khi Windows boot".
+- ~~Agent chưa được cài auto-start Windows Task Scheduler~~ — **ĐÃ CÓ** (đính chính 27/07/2026): task `HansungbolPrintAgent` chạy watchdog 5 phút/lần, tự bật lại agent nếu chết. Không phải double-click `start.bat` nữa.
 
 **Lưu ý cho phiên sau:**
-- Print agent chạy nền trên máy admin: kiểm tra bằng `taskkill //F //IM node.exe` xong `cd print-agent && node agent.js` (background). Trong session Claude Code, dùng `run_in_background: true`.
+- Print agent chạy nền trên máy admin. **⛔ TUYỆT ĐỐI KHÔNG khởi động agent từ phiên Claude Code** (kể cả `run_in_background: true`) — tiến trình con chết theo phiên, agent tắt âm thầm. Cách đúng: `Start-ScheduledTask -TaskName 'HansungbolPrintAgent'` để Task Scheduler làm cha tiến trình. Kiểm tra sống: `print-agent/agent-out.log` phải có `Login OK` + `Catalog DCCD: N chỉ thị`, còn `agent-err.log` rỗng.
 - `AGENT_SECRET` là `k7hf9x3nB8mp1WQ4Z2yLtG6cVsA5rDe`. Nếu leak → sinh mới, update Vercel env + agent `.env` + Redeploy Vercel.
-- Password admin `qlsx` là `qlsx123` — lưu trong `print-agent/.env` (không commit, đã gitignored).
+- Mật khẩu admin `qlsx`: **KHÔNG ghi giá trị vào tài liệu nữa** (trước ghi `qlsx123`, sau sự cố 25/07 đã lệch thực tế → gây hiểu nhầm). Nguồn duy nhất = `print-agent/.env` (gitignored). Đọc mục "SỰ CỐ 25-27/07" cuối file trước khi đổi mật khẩu này.
 - Quy tắc data safety đã củng cố: code phụ thuộc migration phải forward-compat (`SELECT *`). Đã có sự cố commit 9440f0b → hotfix 7919ca6 từ session trước.
 - Khi cần chạy migration: viết file `docs/sql/NN-...sql`, gửi user paste vào Supabase Dashboard SQL Editor (nhắc rõ **New Query tab MỚI TRỐNG**). Verify bằng script Node trước khi báo "đã xong".
+
+---
+
+## 🚨 SỰ CỐ 25-27/07/2026 — Reset mật khẩu `qlsx` làm đứt 4 luồng nối app chính
+
+**ĐỌC MỤC NÀY TRƯỚC KHI ĐỘNG VÀO TÀI KHOẢN `qlsx` HOẶC MÀN QUẢN LÝ NHÂN VIÊN.**
+
+### Chuyện gì xảy ra
+
+Ngày 25/07 (sáng, trong lúc làm vai trò QLSX + tạo tài khoản `phamvancuong`), có
+người bấm nút **"Reset MK"** trên dòng `qlsx` ở Dashboard → Quản lý nhân viên.
+Endpoint `POST /api/users/[id]/reset-password` **luôn** set về hằng số `hd123`.
+
+Vấn đề: **`qlsx` là tài khoản DUY NHẤT chưa bao giờ dùng `hd123`.**
+- `scripts/seed-reference-data.ts` tạo nó với mật khẩu khác
+- `docs/sql/05-simple-password.sql` reset toàn bộ về `hd123` nhưng có
+  `WHERE role <> 'admin'` → **cố tình chừa nó ra**
+
+⇒ Với 25 tài khoản còn lại, nút đó là "khôi phục mặc định" (vô hại — bấm nhầm
+cũng không sao). Riêng dòng `qlsx`, nó là "**đổi mật khẩu**".
+
+### Vì sao 1 cú bấm làm sập 4 luồng
+
+`qlsx` không chỉ là tài khoản của người — **2 máy chủ dùng nó để đăng nhập**:
+
+| Nơi giữ mật khẩu | Reset có sửa? | Luồng chết khi lệch |
+|---|---|---|
+| DB Supabase (app này) | ✔ | — |
+| `C:\ProgramData\HSB-Material\overtime_sync.cfg` (app chính) | ✘ | đẩy KHSX sang app này · kéo lý do dừng máy về TV · prefill máy ngưng |
+| `C:\hansungbolt-overtime\print-agent\.env` | ✘ | **in phiếu DCCD từ điện thoại** |
+
+### Vì sao ẩn được 2 ngày, triệu chứng lệch nhau
+
+Phiên đăng nhập là **JWT ký sẵn** (`lib/auth.ts`, HS256, 90 ngày), **không có
+bảng session trên server** ⇒ đổi mật khẩu **KHÔNG hủy được phiên đang mở**:
+
+- **Poller app chính** login mới mỗi lượt (4 lượt/ngày) → chết ngay 25/07 16:00
+- **Print agent** login 1 lần lúc khởi động rồi giữ cookie → vẫn in bình thường
+  tới 15:15 ngày 25/07, chỉ chết sáng 27/07 khi PC reboot buộc login lại
+- **Người dùng** (tổ trưởng, điện thoại): **không ai bị đá ra, không ai thấy gì**
+
+Không có bảng audit nào trong 14 bảng Supabase, log Vercel/Supabase gói Free chỉ
+giữ ~1 ngày ⇒ **không truy được ai bấm, lúc nào**.
+
+### Chẩn đoán nhanh lần sau
+
+1. `POST /api/auth/login` bằng cfg → **401** = sai mật khẩu · **403** = tài khoản bị khoá
+2. `users.password_plain` của `qlsx` = `hd123` ⇒ đã bị Reset MK
+3. `machine_stop_reasons` không có dòng `created_by_name='KHSX tự động'` hôm nay
+   ⇒ prefill chết ⇒ cầu nối đứt
+4. `print-agent/agent-err.log` → `Login failed HTTP 401`
+
+### Quy tắc bắt buộc
+
+**Đổi mật khẩu `qlsx` = phải sửa ĐỦ 2 file cfg + khởi động lại print agent**
+(`Start-ScheduledTask -TaskName 'HansungbolPrintAgent'`). Sửa `overtime_sync.cfg`
+có tác dụng ngay (app chính đọc lại mỗi lần gọi); sửa `.env` thì **bắt buộc**
+khởi động lại agent. Quét toàn máy 27/07 xác nhận chỉ 2 chỗ đó giữ mật khẩu sống.
+
+### Lỗ hổng chưa vá (user biết, chưa ưu tiên)
+
+| | Vấn đề | Đề xuất |
+|---|---|---|
+| 1 | Nút "Reset MK" **cố ý bật cho cả dòng admin** (`UserManagementCard.tsx`: `u.role === 'admin' \|\| !inactive`), và nhóm QLSX nằm ngay dưới nhóm Admin nên 2 nút sát nhau | Tách tài khoản service `svc-appchinh` (role admin, ẩn khỏi lưới nhân viên, không có nút Reset) → `qlsx` trở lại thuần tài khoản người |
+| 2 | Cột `users.password_plain` lưu mật khẩu chữ thường | Bỏ, hoặc chỉ hiện cho admin qua endpoint riêng |
+| 3 | Bảng `users` không có `updated_at`, không có bảng nhật ký thao tác tài khoản | Thêm để lần sau truy được ai/lúc nào |
+| 4 | App chính không có báo động khi cầu nối 401 — chỉ ghi 1 dòng `log.warning` | Telegram khi sync trả `ok=False` |
+
+**Trạng thái 27/07:** cả 3 nơi đã đồng bộ `hd123`, 4 luồng chạy lại bình thường.
+User chốt **giữ nguyên `hd123`** — hệ quả tích cực: bấm nhầm Reset MK lên `qlsx`
+giờ vô hại (hd123 → hd123); đánh đổi: admin dùng mật khẩu mặc định ai cũng biết.
 
 ---
 

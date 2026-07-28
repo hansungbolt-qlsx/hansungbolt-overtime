@@ -8,6 +8,7 @@ import DepartmentRegistrationsList from './DepartmentRegistrationsList';
 import TodayOvertimeCard from './TodayOvertimeCard';
 import PlanView from './PlanView';
 import StopReasonsView from './StopReasonsView';
+import WarehouseSlipView from './WarehouseSlipView';
 
 const todayISO = () => {
   const d = new Date();
@@ -17,7 +18,7 @@ const todayISO = () => {
   return `${y}-${m}-${day}`;
 };
 
-type Tab = 'overtime' | 'labels' | 'summary' | 'today' | 'plan' | 'stops';
+type Tab = 'overtime' | 'labels' | 'summary' | 'today' | 'plan' | 'stops' | 'wh_out' | 'wh_in';
 
 function OvertimeView({ department, isLeader }: { department: string; isLeader: boolean }) {
   return (
@@ -78,6 +79,9 @@ export default function RegisterLayout({
   const showTodayTab = true;
   const showPlanTab = isLeader || isQlsx;   // KHSX: tổ trưởng xem + in (user 13/7)
   const showStopsTab = isLeader || isQlsx;  // Máy dừng: tổ trưởng ghi; qlsx xem (24/7)
+  // Xuất/Trả kho NPL (user 28/7): nhân viên kho dùng role qlsx. App chính là chủ
+  // kho — 2 tab này chỉ GỬI YÊU CẦU, duyệt bên app chính mới trừ/cộng tồn.
+  const showWarehouseTabs = isQlsx;
   const defaultTab: Tab = showOvertimeTab
     ? 'overtime'
     : isQlsx
@@ -96,6 +100,10 @@ export default function RegisterLayout({
   if (showTodayTab) tabs.push({ key: 'today', label: 'Tăng ca hôm nay', color: 'green' });
   if (showPlanTab) tabs.push({ key: 'plan', label: 'Kế hoạch SX', color: 'navy' });
   if (showStopsTab) tabs.push({ key: 'stops', label: 'Máy dừng hôm nay', color: 'red' });
+  if (showWarehouseTabs) {
+    tabs.push({ key: 'wh_out', label: '📤 Xuất kho', color: 'teal' });
+    tabs.push({ key: 'wh_in', label: '📥 Trả kho', color: 'green' });
+  }
 
   // Chỉ 1 tab → bỏ tab bar, render trực tiếp
   if (tabs.length === 1) {
@@ -178,6 +186,9 @@ export default function RegisterLayout({
       )}
 
       {activeTab === 'stops' && <StopReasonsView readOnly={isQlsx} />}
+
+      {activeTab === 'wh_out' && <WarehouseSlipView kind="issue" />}
+      {activeTab === 'wh_in' && <WarehouseSlipView kind="return" />}
     </>
   );
 }

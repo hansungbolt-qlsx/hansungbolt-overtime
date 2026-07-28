@@ -300,6 +300,185 @@ async function pushDccdCatalog() {
 }
 
 // -----------------------------------------------------------
+// XUẤT / TRẢ KHO NPL (28/7) — cầu nối 2 chiều app tăng ca ↔ app chính.
+//
+//   ① đẩy TỒN app chính → app tăng ca (chỉ khi tồn ĐỔI, so bằng stock-version)
+//   ② kéo PHIẾU app tăng ca → app chính (thành phiếu chờ duyệt)
+//   ③ kéo TRẠNG THÁI app chính → app tăng ca (đã duyệt / bị từ chối + lý do)
+//
+// ⚠ Agent KHÔNG bao giờ tự trừ tồn. Tồn chỉ đổi khi người bấm Duyệt trên app
+// chính. Spec: hsb-material-app/docs/SPEC_OT_XUAT_TRA_KHO.md
+// -----------------------------------------------------------
+const NVL_SYNC_MS = 60_000;          // nhịp kiểm tra phiếu + trạng thái
+const NVL_HEAVY_MS = 6 * 3600_000;   // phần nặng (cuộn ở line + master) — 6 giờ/lần
+const SWEEP_AT = '16:15';            // giờ VÉT phiếu nhân viên quên bấm Gửi
+let lastNvlSyncAt = 0;
+let lastStockVersion = null;
+let lastHeavyAt = 0;
+let sweptToday = '';                 // 'YYYY-MM-DD' đã vét rồi thì thôi
+let sweepOnStartDone = false;        // sáng bật PC: vét 1 lần
+
+function vnNow() {
+  return new Date(Date.now() + 7 * 3600 * 1000);
+}
+function vnDate() {
+  return vnNow().toISOString().slice(0, 10);
+}
+function vnHHMM() {
+  return vnNow().toISOString().slice(11, 16);
+}
+
+async function mainGet(path) {
+  const res = await fetch(`${MAIN_APP_URL}${path}`, {
+    headers: { 'X-Agent-Token': MAIN_APP_TOKEN },
+  });
+  if (!res.ok) throw new Error(`app chính ${path} HTTP ${res.status}`);
+  return res.json();
+}
+
+async function otFetch(path, init = {}) {
+  const doIt = () =>
+    fetch(`${APP_URL}${path}`, {
+      ...init,
+      headers: {
+        ...(init.headers || {}),
+        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        Cookie: `session=${sessionCookie}`,
+      },
+    });
+  let res = await doIt();
+  if (res.status === 401) {
+    await login();
+    res = await doIt();
+  }
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    throw new Error(`app tăng ca ${path} HTTP ${res.status} ${t.slice(0, 120)}`);
+  }
+  return res.json();
+}
+
+/** ① Đẩy tồn — phần nhẹ (cuộn kho Main + phụ liệu) mỗi khi tồn đổi;
+ *  phần nặng (cuộn đang ở line + master NVL) thưa hơn vì gần như không đổi. */
+async function pushNvlStock(force = false) {
+  const { version } = await mainGet('/api/ot/stock-version');
+  const heavyDue = force || Date.now() - lastHeavyAt > NVL_HEAVY_MS;
+  if (version === lastStockVersion && !heavyDue) return;
+
+  const light = await mainGet('/api/ot/stock?include=main');
+  await otFetch('/api/nvl-stock', {
+    method: 'POST',
+    body: JSON.stringify({ part: 'nvl_main', payload: light.nvl.coils, n: light.nvl.n_main }),
+  });
+  const aux = await mainGet('/api/ot/stock?branch=aux');
+  await otFetch('/api/nvl-stock', {
+    method: 'POST',
+    body: JSON.stringify({ part: 'aux', payload: aux.aux.materials, n: aux.aux.n }),
+  });
+  let extra = '';
+  if (heavyDue) {
+    const heavy = await mainGet('/api/ot/stock?branch=nvl&include=line,master');
+    await otFetch('/api/nvl-stock', {
+      method: 'POST',
+      body: JSON.stringify({ part: 'nvl_line', payload: heavy.nvl.line_coils, n: heavy.nvl.n_line }),
+    });
+    await otFetch('/api/nvl-stock', {
+      method: 'POST',
+      body: JSON.stringify({ part: 'nvl_master', payload: heavy.nvl.materials, n: heavy.nvl.materials.length }),
+    });
+    lastHeavyAt = Date.now();
+    extra = ` + ${heavy.nvl.n_line} cuộn ở line + ${heavy.nvl.materials.length} mã master`;
+  }
+  lastStockVersion = version;
+  console.log(
+    `[${new Date().toISOString()}] Tồn → app tăng ca: ${light.nvl.n_main} cuộn main` +
+      ` + ${aux.aux.n} mã PL${extra}`,
+  );
+}
+
+/** ② Kéo phiếu lên app chính. sweep = lấy cả phiếu 'draft' nhân viên quên gửi. */
+async function pushNvlSlips(sweep) {
+  const { slips } = await otFetch(`/api/nvl-slips/sync${sweep ? '?sweep=1' : ''}`);
+  if (!slips || slips.length === 0) return;
+  for (const s of slips) {
+    if (!s.lines || s.lines.length === 0) continue;
+    const res = await fetch(`${MAIN_APP_URL}/api/ot/slip`, {
+      method: 'POST',
+      headers: { 'X-Agent-Token': MAIN_APP_TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        uid: s.uid,
+        slip_date: s.slip_date,
+        kind: s.kind,
+        branch: s.branch,
+        seq: s.seq,
+        sender: s.created_by_name,
+        sent_at: s.sent_at,
+        note: s.note,
+        lines: s.lines.map((l) => ({ ...l, qty: l.qty })),
+      }),
+    });
+    const d = await res.json().catch(() => null);
+    if (!res.ok || !d?.ok) {
+      // 422 = phiếu sai (vd đã duyệt rồi) → ghi ngược lý do để nhân viên thấy
+      const detail = d?.detail || `app chính HTTP ${res.status}`;
+      await otFetch('/api/nvl-slips/sync', {
+        method: 'POST',
+        body: JSON.stringify({ uid: s.uid, line_errors: [{ seq: 0, error: detail }] }),
+      });
+      console.error(`[${new Date().toISOString()}] Phiếu ${s.uid} bị từ chối nhận: ${detail}`);
+      continue;
+    }
+    await otFetch('/api/nvl-slips/sync', {
+      method: 'POST',
+      body: JSON.stringify({
+        uid: s.uid,
+        status: 'pending',
+        sent_at: new Date().toISOString(),
+        line_errors: d.line_errors ?? [],
+      }),
+    });
+    console.log(
+      `[${new Date().toISOString()}] Phiếu ${s.uid} → app chính: ${d.n_lines} dòng` +
+        (d.n_err ? `, ${d.n_err} dòng lỗi` : ''),
+    );
+  }
+}
+
+/** ③ Trạng thái app chính → app tăng ca (đã duyệt / từ chối + số phiếu thật). */
+async function pullNvlStatuses() {
+  const { slips } = await mainGet('/api/ot/slips?days=7');
+  for (const s of slips ?? []) {
+    if (s.status !== 'approved' && s.status !== 'rejected') continue;
+    await otFetch('/api/nvl-slips/sync', {
+      method: 'POST',
+      body: JSON.stringify({
+        uid: s.uid,
+        status: s.status,
+        main_refs: s.refs ?? [],
+        reject_reason: s.reject_reason ?? null,
+        approved_at: s.approved_at,
+        approved_by: s.approved_by,
+      }),
+    }).catch(() => {});   // phiếu tạo thẳng bên app chính thì không có bên OT
+  }
+}
+
+async function syncNvlOnce() {
+  if (!MAIN_APP_URL || !MAIN_APP_TOKEN) return;
+  const today = vnDate();
+  // Vét: 1 lần khi agent khởi động (sáng bật PC) + 1 lần lúc 16:15
+  const sweep = !sweepOnStartDone || (vnHHMM() >= SWEEP_AT && sweptToday !== today);
+  if (sweep) {
+    if (vnHHMM() >= SWEEP_AT) sweptToday = today;
+    sweepOnStartDone = true;
+    console.log(`[${new Date().toISOString()}] Vét phiếu chưa gửi (sweep)`);
+  }
+  await pushNvlStock(sweep);
+  await pushNvlSlips(sweep);
+  await pullNvlStatuses();
+}
+
+// -----------------------------------------------------------
 // Phiếu tăng ca GỘP THEO NGÀY (user 15/7): 1 lệnh in = mọi phiếu của ngày
 // (HD trước RL). Render TỪNG phiếu bằng đúng trang /registrations/{id}/view
 // (bản in y hệt in lẻ) rồi gửi máy in liên tiếp.
@@ -381,6 +560,15 @@ async function pollLoop() {
         console.error(`[${new Date().toISOString()}] Catalog lỗi: ${e.message}`);
         lastCatalogAt = Date.now() - CATALOG_MS + 60_000;
       }
+    }
+    // Xuất/Trả kho NPL mỗi 60" — lỗi KHÔNG được làm chết vòng in
+    if (Date.now() - lastNvlSyncAt > NVL_SYNC_MS) {
+      try {
+        await syncNvlOnce();
+      } catch (e) {
+        console.error(`[${new Date().toISOString()}] Sync kho NPL lỗi: ${e.message}`);
+      }
+      lastNvlSyncAt = Date.now();
     }
     try {
       const jobs = await pollPendingJobs();
