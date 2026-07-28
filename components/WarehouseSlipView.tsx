@@ -33,6 +33,10 @@ type SlipEvent = { at: string; actor: string | null; action: string; detail: Rec
 const fmtQty = (n: number) =>
   n.toLocaleString('vi-VN', { maximumFractionDigits: 3 });
 
+// Nhấn mạnh thông tin người dùng cần đọc nhanh nhất khi đứng ở kho (user 28/7):
+// Loại NVL · size/quy cách · số Kg từng cuộn → đậm, màu cam.
+const EMPH = 'font-bold text-orange-600';
+
 function hhmmVN() {
   return new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(11, 16);
 }
@@ -508,8 +512,11 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                         onClick={() => pick(o.code, o.name)}
                         className="w-full text-left px-3 py-2 text-sm active:bg-brand-teal/10"
                       >
-                        <span className="font-mono font-semibold">{o.code}</span> — {o.name}
-                        {o.size && ` — ${o.size}`}
+                        <span className="font-mono font-semibold">{o.code}</span>
+                        {' — '}
+                        {/* Loại NVL + size in ĐẬM MÀU CAM cho dễ nhận (user 28/7) */}
+                        <span className={EMPH}>{o.name}</span>
+                        {o.size && <> — <span className={EMPH}>{o.size}</span></>}
                         <span className={o.n ? 'text-brand-navy-soft' : 'text-rose-600 font-semibold'}>
                           {' '}— {o.n ? `${o.n} cuộn / ${fmtQty(o.kg)} kg` : 'hết tồn'}
                         </span>
@@ -523,9 +530,11 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                         onClick={() => pick(m.code, m.name)}
                         className="w-full text-left px-3 py-2 text-sm active:bg-brand-teal/10"
                       >
-                        <span className="font-mono font-semibold">{m.code}</span> — {m.name}
-                        {m.material && ` — ${m.material}`}
-                        {m.spec && ` — ${m.spec}`}
+                        <span className="font-mono font-semibold">{m.code}</span>
+                        {' — '}
+                        <span className={EMPH}>{m.name}</span>
+                        {m.material && <> — <span className={EMPH}>{m.material}</span></>}
+                        {m.spec && <> — <span className={EMPH}>{m.spec}</span></>}
                         <span className={m.stock > 0 ? 'text-brand-navy-soft' : 'text-rose-600 font-semibold'}>
                           {' '}— {m.stock > 0 ? `tồn ${fmtQty(m.stock)} ${m.unit}` : 'hết tồn kho'}
                         </span>
@@ -539,8 +548,19 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
         {/* Nguyên liệu: tick cuộn */}
         {isNvl && pickedCode && (
           <div>
+            {/* Ô nhập chỉ còn hiện MÃ sau khi chọn → nhắc lại Loại NVL + size ở
+                đây, đậm màu cam, để người ở kho không phải mở lại danh sách. */}
             <div className="text-sm font-semibold text-brand-navy mb-1">
-              Chọn cuộn {pickedNvl ? `(${coilsOfPicked.length} cuộn)` : ''}
+              Chọn cuộn
+              {pickedNvl && (
+                <>
+                  {' — '}<span className={EMPH}>{pickedNvl.name}</span>
+                  {pickedNvl.size && <> · <span className={EMPH}>{pickedNvl.size}</span></>}
+                  <span className="font-normal text-brand-navy-soft">
+                    {' '}({coilsOfPicked.length} cuộn)
+                  </span>
+                </>
+              )}
             </div>
             {coilsOfPicked.length === 0 ? (
               <p className="text-sm text-rose-600 font-semibold">
@@ -554,7 +574,17 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                   const on = ticked[c.id] !== undefined;
                   return (
                     <li key={c.id} className="px-3 py-2 text-sm">
+                      {/* Ô tích nằm CUỐI, sau số Kg — ngón tay thao tác từ phải
+                          sang cho dễ (user 28/7). Cả dòng vẫn là <label> nên
+                          bấm chỗ nào cũng tick được. */}
                       <label className="flex items-center gap-2">
+                        <span className="flex-1 min-w-0">
+                          <span className="font-mono">{c.coil_no}</span>
+                          {c.lot_no && <span className="text-brand-navy-soft"> · {c.lot_no}</span>}
+                        </span>
+                        <span className={`${EMPH} whitespace-nowrap tabular-nums`}>
+                          {fmtQty(c.kg)} kg
+                        </span>
                         <input
                           type="checkbox"
                           checked={on}
@@ -566,13 +596,8 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                               return n;
                             })
                           }
-                          className="w-5 h-5"
+                          className="w-6 h-6 shrink-0"
                         />
-                        <span className="flex-1">
-                          <span className="font-mono">{c.coil_no}</span>
-                          {c.lot_no && <span className="text-brand-navy-soft"> · {c.lot_no}</span>}
-                          <span className="text-brand-navy-soft"> · {fmtQty(c.kg)} kg</span>
-                        </span>
                       </label>
                       {/* Trả kho: sửa được Kg cân thực khi trả cuộn dở */}
                       {on && isReturn && (
@@ -603,7 +628,12 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
         {!isNvl && pickedAux && (
           <div>
             <label className="block text-sm font-semibold text-brand-navy mb-1">
-              Số lượng ({pickedAux.unit}) — tồn {fmtQty(pickedAux.stock)}
+              <span className={EMPH}>{pickedAux.name}</span>
+              {pickedAux.material && <> · <span className={EMPH}>{pickedAux.material}</span></>}
+              {pickedAux.spec && <> · <span className={EMPH}>{pickedAux.spec}</span></>}
+              <br />
+              Số lượng ({pickedAux.unit}) — tồn{' '}
+              <span className={EMPH}>{fmtQty(pickedAux.stock)}</span>
             </label>
             <input
               inputMode="decimal"
