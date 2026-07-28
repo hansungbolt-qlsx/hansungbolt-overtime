@@ -17,7 +17,9 @@ export default function BarcodeScanButton({
   onScan,
   label = '📷 Quét tem',
 }: {
-  onScan: (text: string) => void;
+  /** `format` = tên chuẩn mã (CODE_39 / CODE_128 / QR_CODE…) — cần cho chẩn đoán
+   *  vì mỗi NCC in một kiểu tem và 4/5 tem KHÔNG in giá trị mã vạch. */
+  onScan: (text: string, format?: string) => void;
   label?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -65,11 +67,15 @@ export default function BarcodeScanButton({
         await scanner.start(
           { facingMode: 'environment' },
           { fps: 10, qrbox: { width: 260, height: 140 } },
-          (text: string) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (text: string, result: any) => {
             // Quét trúng → trả về rồi đóng ngay, tránh bắn trùng nhiều lần
             void stop();
             setOpen(false);
-            onScan(String(text).trim());
+            const fmt = result?.result?.format?.formatName
+              ?? result?.result?.format?.format
+              ?? undefined;
+            onScan(String(text).trim(), fmt ? String(fmt) : undefined);
           },
           () => {
             /* mỗi khung hình không đọc được — im lặng */

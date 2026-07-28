@@ -70,6 +70,11 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
   const [lineNote, setLineNote] = useState('');
   const [auxQty, setAuxQty] = useState('');
   const [ticked, setTicked] = useState<Record<number, string>>({});   // coil_id → Kg (chuỗi)
+  // Kết quả lần quét gần nhất — để BIẾT tem mỗi NCC chứa gì (khảo sát 28/7:
+  // 4/5 tem không in giá trị mã vạch nên phải quét thật mới rõ)
+  const [scan, setScan] = useState<{
+    raw: string; format: string; exact: number; fuzzy: string[]; nFuzzy: number;
+  } | null>(null);
 
   const isNvl = branch === 'nvl';
   const isReturn = kind === 'return';
@@ -78,6 +83,7 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
 
   const resetForm = useCallback(() => {
     setQ(''); setPickedCode(''); setLineNote(''); setAuxQty(''); setTicked({});
+    setScan(null);
   }, []);
 
   const loadSlip = useCallback(async () => {
@@ -187,30 +193,60 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
     setDept(defaultDepartment(branch, code, name));
   }
 
-  // Quét tem → tìm cuộn theo Lot No (hoặc số cuộn) rồi tự tick
+  // Quét tem → tìm cuộn theo Lot No (hoặc số cuộn) rồi tự tick.
+  //
+  // ⚠ Khảo sát tem thật 28/7: mỗi NCC in MỘT KIỂU và 4/5 tem KHÔNG in giá trị
+  // mã vạch, nên chưa biết chắc mã vạch chứa gì. Vì vậy:
+  //   · khớp CHÍNH XÁC thì mới tự tick (khớp sai cuộn = trừ sai tồn)
+  //   · khớp mờ (bỏ gạch/khoảng trắng, hoặc chuỗi lồng nhau) chỉ GỢI Ý, không tự tick
+  //   · luôn hiện chuỗi thô + loại mã ra màn hình để còn biết tem chứa gì
   const onScan = useCallback(
-    (text: string) => {
-      const s = text.trim().toUpperCase();
-      const hit = coils.filter(
-        (c) =>
-          !usedCoilIds.has(c.id) &&
-          ((c.lot_no || '').toUpperCase() === s || (c.coil_no || '').toUpperCase() === s),
+    (text: string, format?: string) => {
+      const raw = text.trim();
+      const s = raw.toUpperCase();
+      const norm = (x: string) => x.toUpperCase().replace(/[\s\-._/]/g, '');
+      const sn = norm(raw);
+
+      const free = coils.filter((c) => !usedCoilIds.has(c.id));
+      const exact = free.filter(
+        (c) => (c.lot_no || '').toUpperCase() === s || (c.coil_no || '').toUpperCase() === s,
       );
-      if (hit.length === 0) {
-        setErr(`Lot "${text}" không có trong tồn`);
-        return;
+      // Gợi ý: bỏ ký tự phân cách, hoặc lot nằm trong chuỗi quét / ngược lại
+      const fuzzy = exact.length
+        ? []
+        : free.filter((c) => {
+            const l = norm(c.lot_no || '');
+            const n = norm(c.coil_no || '');
+            if (!l && !n) return false;
+            return (
+              (!!l && (l === sn || (l.length >= 5 && (sn.includes(l) || l.includes(sn))))) ||
+              (!!n && (n === sn || (n.length >= 5 && (sn.includes(n) || n.includes(sn)))))
+            );
+          });
+
+      setScan({
+        raw,
+        format: format || '?',
+        exact: exact.length,
+        fuzzy: fuzzy.slice(0, 5).map((c) => `${c.coil_no} · lot ${c.lot_no || '(rỗng)'} · ${c.code}`),
+        nFuzzy: fuzzy.length,
+      });
+
+      if (exact.length === 0) {
+        setErr('');
+        setMsg('');
+        return;   // panel chẩn đoán bên dưới đã nói rõ, không tick gì
       }
       setErr('');
-      // Nhảy sang mã của cuộn quét được rồi tick
-      const code = hit[0].code;
+      const code = exact[0].code;
       setPickedCode(code);
       setQ(code);
-      setDept(defaultDepartment(branch, code, hit[0].name));
-      if (hit.length === 1) {
-        setTicked((t) => ({ ...t, [hit[0].id]: String(hit[0].kg) }));
-        setMsg(`Đã tick cuộn ${hit[0].coil_no}`);
+      setDept(defaultDepartment(branch, code, exact[0].name));
+      if (exact.length === 1) {
+        setTicked((t) => ({ ...t, [exact[0].id]: String(exact[0].kg) }));
+        setMsg(`Đã tick cuộn ${exact[0].coil_no}`);
       } else {
-        setMsg(`${hit.length} cuộn cùng Lot ${s} — tick cuộn đúng bên dưới`);
+        setMsg(`${exact.length} cuộn cùng Lot ${s} — tick cuộn đúng bên dưới`);
       }
     },
     [coils, usedCoilIds, branch],
@@ -416,6 +452,51 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
             />
             {isNvl && <BarcodeScanButton onScan={onScan} />}
           </div>
+
+          {/* Chẩn đoán quét tem — hiện chuỗi THÔ để biết mã vạch từng NCC chứa gì */}
+          {isNvl && scan && (
+            <div
+              className={`mt-2 rounded-lg border p-2.5 text-sm ${
+                scan.exact
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                  : 'bg-amber-50 border-amber-300 text-amber-900'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <b>🔎 Kết quả quét</b>
+                <button
+                  type="button"
+                  onClick={() => setScan(null)}
+                  className="text-xs font-semibold opacity-70"
+                >
+                  Ẩn
+                </button>
+              </div>
+              <div className="mt-1 font-mono break-all bg-white/70 rounded px-2 py-1">
+                {scan.raw || '(rỗng)'}
+              </div>
+              <div className="mt-1 text-xs">
+                Loại mã: <b>{scan.format}</b> · {scan.raw.length} ký tự
+              </div>
+              {scan.exact > 0 ? (
+                <div className="mt-1">✅ Khớp chính xác {scan.exact} cuộn — đã tick giúp anh.</div>
+              ) : scan.nFuzzy > 0 ? (
+                <div className="mt-1">
+                  ⚠ <b>Không khớp chính xác</b>, nhưng gần giống {scan.nFuzzy} cuộn — em
+                  KHÔNG tự tick để tránh trừ sai tồn:
+                  <ul className="list-disc pl-5 mt-0.5 font-mono text-xs">
+                    {scan.fuzzy.map((f, i) => <li key={i}>{f}</li>)}
+                  </ul>
+                  Hãy chọn cuộn bằng tay bên dưới.
+                </div>
+              ) : (
+                <div className="mt-1">
+                  ❌ Không có cuộn nào trong tồn khớp chuỗi này. Chụp lại màn hình này
+                  kèm ảnh tem để đối chiếu — rồi chọn cuộn bằng tay.
+                </div>
+              )}
+            </div>
+          )}
 
           {filtered.length > 0 && !pickedCode && (
             <ul className="mt-1 border border-gray-200 rounded-md divide-y max-h-64 overflow-auto">
