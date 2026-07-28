@@ -37,6 +37,16 @@ const fmtQty = (n: number) =>
 // Loại NVL · size/quy cách · số Kg từng cuộn → đậm, màu cam.
 const EMPH = 'font-bold text-orange-600';
 
+// Nền phân biệt từng ĐỢT NHẬP KHO (user 28/7) — cuộn cùng ngày về cùng một màu.
+// Xoay vòng 5 tông nhạt; KHÔNG dùng tông đỏ/hồng vì đã dành cho lỗi & hết tồn.
+const GROUP_STYLE = [
+  { bg: 'bg-sky-50', chip: 'bg-sky-600' },
+  { bg: 'bg-emerald-50', chip: 'bg-emerald-600' },
+  { bg: 'bg-amber-50', chip: 'bg-amber-600' },
+  { bg: 'bg-violet-50', chip: 'bg-violet-600' },
+  { bg: 'bg-teal-50', chip: 'bg-teal-600' },
+];
+
 function hhmmVN() {
   return new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(11, 16);
 }
@@ -190,19 +200,38 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
     () => new Set(lines.map((l) => l.coil_id).filter(Boolean) as number[]),
     [lines],
   );
-  // Xếp theo Kg TĂNG DẦN (user chốt 28/7) — cuộn nhỏ/lẻ lên trước để dùng hết
-  // trước, khỏi để cuộn dở nằm lại kho. App chính trả về theo ngày nhập (FIFO)
-  // nên phải xếp lại ở đây; ngày nhập vẫn hiện trên từng dòng để không mất tín
-  // hiệu cuộn cũ. Kg bằng nhau → giữ nguyên thứ tự cũ (tức cuộn nhập trước lên trước).
-  const coilsOfPicked = useMemo(
-    () =>
-      coils
-        .filter((c) => c.code === pickedCode && !usedCoilIds.has(c.id))
-        .map((c, i) => ({ c, i }))
-        .sort((a, b) => (a.c.kg - b.c.kg) || (a.i - b.i))
-        .map((x) => x.c),
-    [coils, pickedCode, usedCoilIds],
+  // FIFO (user chốt lại 28/7 — bỏ phương án xếp theo Kg): cuộn NHẬP TRƯỚC lên
+  // trước. Cùng ngày thì theo id (thứ tự nhập trong phiếu). Cuộn thiếu ngày
+  // xuống cuối.
+  //   · XUẤT kho: nhóm theo NGÀY NHẬP, cũ nhất lên đầu → đúng tinh thần FIFO.
+  //   · TRẢ kho : nhóm theo NGÀY XUẤT RA LINE, MỚI NHẤT lên đầu — cuộn vừa mang
+  //     ra line mới là cuộn hay bị trả lại, cuộn ra từ 3 tháng trước thì không.
+  const dateOf = useCallback(
+    (c: StockCoil) => (isReturn ? c.issued_at : c.received_at) || '',
+    [isReturn],
   );
+
+  const coilsOfPicked = useMemo(() => {
+    const list = coils.filter((c) => c.code === pickedCode && !usedCoilIds.has(c.id));
+    const k = (c: StockCoil) => dateOf(c) || '9999-99-99';   // thiếu ngày → cuối
+    return list.sort((a, b) => {
+      const ka = k(a), kb = k(b);
+      if (ka !== kb) return isReturn ? (ka < kb ? 1 : -1) : (ka < kb ? -1 : 1);
+      return a.id - b.id;
+    });
+  }, [coils, pickedCode, usedCoilIds, dateOf, isReturn]);
+
+  // Gom thành từng ĐỢT theo ngày để tô nền phân biệt (user 28/7): 9 cuộn về 3
+  // đợt → 3 khối màu khác nhau, nhìn là biết nhóm nào cũ.
+  const coilGroups = useMemo(() => {
+    const out: Array<{ date: string; items: StockCoil[] }> = [];
+    for (const c of coilsOfPicked) {
+      const d = dateOf(c);
+      if (!out.length || out[out.length - 1].date !== d) out.push({ date: d, items: [] });
+      out[out.length - 1].items.push(c);
+    }
+    return out;
+  }, [coilsOfPicked, dateOf]);
 
   function pick(code: string, name = '') {
     setPickedCode(code);
@@ -584,8 +613,28 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                   : 'Mã này hết tồn kho — không xuất được'}
               </p>
             ) : (
-              <ul className="border border-gray-200 rounded-md divide-y max-h-72 overflow-auto">
-                {coilsOfPicked.map((c) => {
+              <div className="border border-gray-200 rounded-md max-h-80 overflow-auto">
+                {coilGroups.map((g, gi) => {
+                  const st = GROUP_STYLE[gi % GROUP_STYLE.length];
+                  const totalKg = g.items.reduce((s, x) => s + x.kg, 0);
+                  return (
+                    <div key={`${g.date}-${gi}`} className={st.bg}>
+                      {/* Đầu mỗi đợt: ngày + số cuộn. Có nhãn chữ chứ không chỉ
+                          dựa vào màu — để người phân biệt màu kém vẫn đọc được. */}
+                      <div className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-brand-navy border-y border-white/70">
+                        <span className={`${st.chip} text-white rounded px-1.5 py-0.5`}>
+                          Đợt {gi + 1}
+                        </span>
+                        <span>
+                          {isReturn ? 'xuất line ' : 'nhập kho '}
+                          {g.date ? ddmm(g.date) : 'chưa rõ ngày'}
+                        </span>
+                        <span className="ml-auto font-normal text-brand-navy-soft">
+                          {g.items.length} cuộn · {fmtQty(totalKg)} kg
+                        </span>
+                      </div>
+                      <ul className="divide-y divide-white/70">
+                {g.items.map((c) => {
                   const on = ticked[c.id] !== undefined;
                   return (
                     <li key={c.id} className="px-3 py-2 text-sm">
@@ -596,14 +645,6 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                         <span className="flex-1 min-w-0">
                           <span className="font-mono">{c.coil_no}</span>
                           {c.lot_no && <span className="text-brand-navy-soft"> · {c.lot_no}</span>}
-                          {/* Ngày (nhập kho khi xuất · xuất ra line khi trả) —
-                              giữ tín hiệu cuộn cũ vì list đã xếp theo Kg */}
-                          {(isReturn ? c.issued_at : c.received_at) && (
-                            <span className="block text-xs text-brand-navy-soft">
-                              {isReturn ? 'xuất ' : 'nhập '}
-                              {ddmm(isReturn ? c.issued_at : c.received_at)}
-                            </span>
-                          )}
                         </span>
                         <span className={`${EMPH} whitespace-nowrap tabular-nums`}>
                           {fmtQty(c.kg)} kg
@@ -642,7 +683,11 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                     </li>
                   );
                 })}
-              </ul>
+                      </ul>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         )}
