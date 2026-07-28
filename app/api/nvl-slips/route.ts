@@ -156,6 +156,9 @@ export async function POST(req: Request) {
     created_by: session.userId,
     created_by_name: session.fullName || session.username,
     sent_at: send ? new Date().toISOString() : null,
+    // Xoá dấu đã-đồng-bộ → agent nhặt lại phiếu này ở vòng poll kế tiếp.
+    // (Có cái này thì /sync mới lọc được phiếu đã đẩy, khỏi đẩy lại mỗi 60s.)
+    synced_at: null,
     // Gửi lại = xoá kết quả cũ, chờ app chính chấm lại
     reject_reason: null,
     approved_at: null,

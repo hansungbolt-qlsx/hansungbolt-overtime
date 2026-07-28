@@ -29,15 +29,30 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   }
   const sweep = new URL(req.url).searchParams.get('sweep') === '1';
-  const statuses = sweep ? ['pending', 'draft'] : ['pending'];
 
-  const { data: slips, error } = await supabaseAdmin
-    .from('nvl_day_slips')
-    .select('id, uid, slip_date, kind, branch, seq, status, note, created_by_name, sent_at')
-    .in('status', statuses)
-    .order('slip_date')
-    .order('seq');
+  // CHỈ trả phiếu CHƯA đẩy sang app chính (`synced_at IS NULL`).
+  // Nếu không lọc, agent sẽ đẩy lại cùng 1 phiếu MỖI 60 GIÂY suốt thời gian nó
+  // nằm chờ duyệt (đo thực tế 28/7: 1.440 lần/ngày) — tốn egress vô ích và ghi
+  // đè liên tục bên app chính. Nhân viên sửa rồi lưu lại thì POST /api/nvl-slips
+  // xoá `synced_at` → phiếu tự quay lại hàng đợi.
+  const base = () =>
+    supabaseAdmin
+      .from('nvl_day_slips')
+      .select('id, uid, slip_date, kind, branch, seq, status, note, created_by_name, sent_at');
+
+  const { data: fresh, error } = await base()
+    .eq('status', 'pending').is('synced_at', null)
+    .order('slip_date').order('seq');
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  let slips = fresh ?? [];
+  if (sweep) {
+    // Vét 16:15 + sáng bật PC: gom cả phiếu nhân viên quên bấm Gửi
+    const { data: drafts, error: dErr } = await base()
+      .eq('status', 'draft').order('slip_date').order('seq');
+    if (dErr) return NextResponse.json({ error: dErr.message }, { status: 500 });
+    slips = [...slips, ...(drafts ?? [])];
+  }
   if (!slips || slips.length === 0) return NextResponse.json({ ok: true, slips: [] });
 
   const { data: lines, error: lErr } = await supabaseAdmin
