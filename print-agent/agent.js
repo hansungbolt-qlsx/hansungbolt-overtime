@@ -315,6 +315,11 @@ const SWEEP_AT = '16:15';            // giờ VÉT phiếu nhân viên quên b�
 let lastNvlSyncAt = 0;
 let lastStockVersion = null;
 let lastHeavyAt = 0;
+// Phiên bản CẤU TRÚC payload lần cuối đã đẩy phần nặng (chuỗi 'vN' đầu
+// stock-version). Đổi cấu trúc payload thì phần nặng cũng phải đẩy lại NGAY,
+// không chờ hết 6 giờ — nếu không tab Trả kho vẫn dùng dữ liệu cũ thiếu field
+// (đã dính 28/7: nvl_main có received_at mà nvl_line thì không).
+let lastHeavyVer = null;
 let sweptToday = '';                 // 'YYYY-MM-DD' đã vét rồi thì thôi
 let sweepOnStartDone = false;        // sáng bật PC: vét 1 lần
 
@@ -362,7 +367,9 @@ async function otFetch(path, init = {}) {
  *  phần nặng (cuộn đang ở line + master NVL) thưa hơn vì gần như không đổi. */
 async function pushNvlStock(force = false) {
   const { version } = await mainGet('/api/ot/stock-version');
-  const heavyDue = force || Date.now() - lastHeavyAt > NVL_HEAVY_MS;
+  const payloadVer = String(version || '').split('|')[0];   // 'v2'
+  const heavyDue =
+    force || payloadVer !== lastHeavyVer || Date.now() - lastHeavyAt > NVL_HEAVY_MS;
   if (version === lastStockVersion && !heavyDue) return;
 
   const light = await mainGet('/api/ot/stock?include=main');
@@ -387,6 +394,7 @@ async function pushNvlStock(force = false) {
       body: JSON.stringify({ part: 'nvl_master', payload: heavy.nvl.materials, n: heavy.nvl.materials.length }),
     });
     lastHeavyAt = Date.now();
+    lastHeavyVer = payloadVer;
     extra = ` + ${heavy.nvl.n_line} cuộn ở line + ${heavy.nvl.materials.length} mã master`;
   }
   lastStockVersion = version;
