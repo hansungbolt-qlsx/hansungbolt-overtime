@@ -73,6 +73,8 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
   const [err, setErr] = useState('');
 
   const [slip, setSlip] = useState<Slip | null>(null);
+  // Phiếu ĐÃ DUYỆT trong ngày — chỉ để xem lại, tách hẳn khỏi phần đang soạn
+  const [done, setDone] = useState<{ slip: Slip; lines: SlipLine[] } | null>(null);
   const [lines, setLines] = useState<SlipLine[]>([]);
   const [events, setEvents] = useState<SlipEvent[]>([]);
   const [slipNote, setSlipNote] = useState('');
@@ -112,13 +114,25 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
       const r = await fetch(`/api/nvl-slips?kind=${kind}&branch=${branch}`);
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Không tải được phiếu');
-      setSlip(d.slip);
-      setSlipNote(d.slip?.note ?? '');
-      setLines(
-        (d.lines ?? []).map((l: SlipLine & { qty: string | number }) => ({
-          ...l, qty: Number(l.qty),
-        })),
-      );
+      const mapped = (d.lines ?? []).map((l: SlipLine & { qty: string | number }) => ({
+        ...l, qty: Number(l.qty),
+      }));
+      // ⚠ Phiếu ĐÃ DUYỆT phải tách hẳn ra khỏi phần đang ghi (user 28/7).
+      // Trước đây giữ chung: 23 dòng đã duyệt vẫn nằm trong ô soạn và nút "Gửi
+      // lên app chính" vẫn bấm được → bấm là tạo phiếu MỚI với Y NGUYÊN 23 dòng
+      // đó → duyệt tiếp là TRỪ TỒN LẦN HAI. Giờ nó thành khối lịch sử chỉ đọc,
+      // còn ô soạn bắt đầu TRỐNG cho đợt mới trong ngày.
+      if (d.slip && d.slip.status === 'approved') {
+        setDone({ slip: d.slip, lines: mapped });
+        setSlip(null);
+        setLines([]);
+        setSlipNote('');
+      } else {
+        setDone(null);
+        setSlip(d.slip);
+        setSlipNote(d.slip?.note ?? '');
+        setLines(mapped);
+      }
       setEvents(d.events ?? []);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Lỗi tải phiếu');
@@ -196,9 +210,14 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
   );
 
   // Cuộn của mã đang chọn, trừ cuộn đã nằm trong phiếu
+  // Gồm cả cuộn của phiếu ĐÃ DUYỆT hôm nay: snapshot tồn có thể chưa kịp làm mới
+  // (agent đẩy sau ~60s) nên cuộn vừa xuất vẫn còn trong danh sách — chặn tick lại.
   const usedCoilIds = useMemo(
-    () => new Set(lines.map((l) => l.coil_id).filter(Boolean) as number[]),
-    [lines],
+    () => new Set([
+      ...lines.map((l) => l.coil_id),
+      ...(done?.lines ?? []).map((l) => l.coil_id),
+    ].filter(Boolean) as number[]),
+    [lines, done],
   );
   // FIFO (user chốt lại 28/7 — bỏ phương án xếp theo Kg): cuộn NHẬP TRƯỚC lên
   // trước. Cùng ngày thì theo id (thứ tự nhập trong phiếu). Cuộn thiếu ngày
@@ -404,7 +423,6 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
   // Bảng chưa tạo (chưa chạy migration 17) → Postgres báo 'relation ... does not exist'
   const needMigration = /does not exist|schema cache|relation/i.test(err);
   const st = slip ? STATUS_UI[slip.status] ?? STATUS_UI.draft : null;
-  const locked = slip?.status === 'approved';
   const batches = useMemo(() => {
     const m = new Map<number, SlipLine[]>();
     lines.forEach((l) => {
@@ -436,7 +454,44 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
 
       {loading && <p className="text-sm text-brand-navy-soft">Đang tải…</p>}
 
-      {/* Trạng thái phiếu */}
+      {/* Phiếu ĐÃ DUYỆT trong ngày — THU GỌN, chỉ đọc. Bấm mới mở chi tiết.
+          Tách hẳn khỏi phần soạn bên dưới để không thể gửi lại nhầm. */}
+      {done && (
+        <details className="rounded-xl border border-emerald-300 bg-emerald-50 overflow-hidden">
+          <summary className="cursor-pointer p-3 text-sm">
+            <span className="font-bold text-emerald-800">✅ Đã duyệt — tồn đã trừ</span>
+            <span className="text-emerald-900">
+              {' · '}{done.lines.length} dòng · {fmtQty(done.lines.reduce((s, l) => s + l.qty, 0))}{' '}
+              {done.lines[0]?.unit ?? ''}
+              {done.slip.seq > 1 && ` · phiếu #${done.slip.seq}`}
+            </span>
+            {done.slip.main_refs?.length > 0 && (
+              <span className="block text-xs text-emerald-900 mt-0.5">
+                Phiếu đã tạo: {done.slip.main_refs.map((r) => `${r.no} (${r.department})`).join(' · ')}
+              </span>
+            )}
+            <span className="block text-xs text-emerald-700 mt-0.5">
+              Bấm để xem lại · ghi thêm trong ngày sẽ tự mở phiếu mới bên dưới
+            </span>
+          </summary>
+          <ul className="divide-y divide-white bg-white/60">
+            {done.lines.map((l, i) => (
+              <li key={i} className="px-3 py-1.5 text-sm flex items-start gap-2">
+                <span className="flex-1 min-w-0">
+                  <span className="font-mono font-semibold">{l.material_code}</span>
+                  <span className="text-brand-navy-soft"> · {l.department}</span>
+                  <span className="block text-xs text-brand-navy-soft truncate">
+                    {l.material_name}{l.lot_no ? ` · ${l.lot_no}` : ''}
+                  </span>
+                </span>
+                <span className={`${EMPH} whitespace-nowrap`}>{fmtQty(l.qty)} {l.unit}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+
+      {/* Trạng thái phiếu ĐANG SOẠN / chờ duyệt / bị từ chối */}
       {slip && st && (
         <div className={`rounded-xl border p-3 text-sm ${st.cls}`}>
           <div className="font-bold">{st.label}</div>
@@ -481,11 +536,6 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
         </div>
       )}
 
-      {locked && (
-        <div className="rounded-lg bg-slate-50 border border-slate-200 text-slate-700 text-sm p-2.5">
-          Phiếu này đã duyệt. Ghi thêm trong ngày sẽ tự mở phiếu mới.
-        </div>
-      )}
 
       {/* Thêm dòng */}
       <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-4 space-y-3">
@@ -813,7 +863,7 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
       {/* Dòng đã có */}
       <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-4">
         <h3 className="font-bold text-brand-navy mb-2">
-          Phiếu hôm nay — {lines.length} dòng
+          {done ? 'Phiếu mới trong ngày' : 'Phiếu hôm nay'} — {lines.length} dòng
           {lines.length > 0 && ` · ${fmtQty(lines.reduce((s, l) => s + l.qty, 0))} ${lines[0].unit}`}
         </h3>
         {lines.length === 0 ? (
@@ -843,7 +893,7 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                       </div>
                       <div className="text-right whitespace-nowrap">
                         <div className="font-semibold">{fmtQty(l.qty)} {l.unit}</div>
-                        {!locked && (
+                        {(
                           <button
                             type="button"
                             onClick={() => removeLine(i)}
