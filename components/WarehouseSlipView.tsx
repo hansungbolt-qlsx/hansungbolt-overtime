@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import BarcodeScanButton from './BarcodeScanButton';
 import {
-  BRANCH_LABEL, DEPARTMENTS, KIND_LABEL, defaultDepartment,
+  BRANCH_LABEL, DEPARTMENTS, KIND_LABEL, defaultDepartment, supShort,
   type Branch, type Department, type Kind, type SlipLine,
   type StockAux, type StockCoil,
 } from '@/lib/nvl-slips';
@@ -810,11 +810,21 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                       key={n}
                       className={`${st.chip} text-white rounded px-1.5 py-0.5 font-bold`}
                     >
-                      {n} · {cnt.length} cuộn · {fmtQty(cnt.reduce((s, c) => s + c.kg, 0))} kg
+                      {supShort(n)} = {n} · {cnt.length} cuộn ·{' '}
+                      {fmtQty(cnt.reduce((s, c) => s + c.kg, 0))} kg
                     </span>
                   );
                 })}
                 <span className="text-brand-navy-soft">← màu nền dòng = nhà cung cấp</span>
+              </div>
+            )}
+            {/* Chỉ 1 NCC → ghi tên đầy đủ 1 lần ở đây, các dòng dưới chỉ cần viết tắt */}
+            {!multiSup && supIndex.size === 1 && (
+              <div className="mb-1.5 text-xs text-brand-navy-soft">
+                Nhà cung cấp:{' '}
+                <span className="font-bold text-brand-navy">
+                  {supShort([...supIndex.keys()][0])} = {[...supIndex.keys()][0]}
+                </span>
               </div>
             )}
             {coilsOfPicked.length === 0 ? (
@@ -877,20 +887,26 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                             đẩy dòng xuống 2 hàng trên điện thoại.
                             Ưu tiên Lot No; cuộn không có lot (tồn đầu kỳ) thì
                             hiện số cuộn nội bộ để dòng vẫn có định danh. */}
-                        {/* Lot No · NCC (user 28/7): người ở kho cần biết cuộn của
-                            nhà nào trước khi mang ra máy. Cho phép xuống dòng —
-                            tên NCC dài nhất 17 ký tự nên đa số vẫn nằm 1 hàng. */}
+                        {/* Lot No · NCC viết tắt (user 28/7): 1 cuộn PHẢI gọn 1
+                            dòng, nên NCC dùng nhãn ngắn (DH/VT/NT/KOS/Korea) và
+                            lot dài >16 ký tự thì hạ 1 cỡ chữ. Lot dài nhất trong
+                            DB thật là 20 ký tự (20260716-02-N-MAN-19). */}
                         <span className="flex-1 min-w-0">
-                          <span className="font-mono break-all">
+                          <span
+                            className={`font-mono break-all ${
+                              (c.lot_no || c.coil_no || '').length > 16 ? 'text-xs' : ''
+                            }`}
+                          >
                             {c.lot_no || c.coil_no}
                           </span>
                           {sup && (
                             <span
-                              className={`ml-1.5 text-xs font-bold ${
+                              className={`ml-1 text-xs font-bold whitespace-nowrap ${
                                 multiSup && ss ? ss.text : 'text-brand-navy-soft'
                               }`}
+                              title={sup}
                             >
-                              · {sup}
+                              · {supShort(sup)}
                             </span>
                           )}
                         </span>

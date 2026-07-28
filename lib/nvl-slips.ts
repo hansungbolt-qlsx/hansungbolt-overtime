@@ -52,6 +52,29 @@ export type StockCoil = {
   supplier?: string;
 };
 
+// Viết tắt NCC — user quy ước 28/7 để mỗi cuộn LUÔN nằm gọn 1 dòng trên điện
+// thoại ("DAEHO  STEEL" dài 12 ký tự làm dòng xuống hàng).
+// So khớp sau khi bỏ dấu tiếng Việt nên không phụ thuộc cách ERP gõ dấu.
+const SUP_SHORT: Array<[RegExp, string]> = [
+  [/DAEHO/, 'DH'],                    // DAEHO  STEEL
+  [/VINH\s*THANH/, 'VT'],             // VĨNH THÀNH
+  [/NHUAN\s*THAI/, 'NT'],             // NHUẬN THÁI
+  [/KOS/, 'KOS'],                     // KOS VIỆT NAM
+  [/HANSUNGBOLT|HANSUNG/, 'Korea'],   // HANSUNGBOLT KOREA
+  [/DONG\s*BANG/, 'DB'],              // DONG BANG
+  [/POS[\s-]*SEAH/, 'POS'],           // POS-SEAH
+];
+
+/** Tên NCC → nhãn ngắn hiện trên dòng cuộn. NCC mới chưa quy ước → chữ đầu mỗi từ. */
+export function supShort(name?: string | null): string {
+  const s = (name || '').trim();
+  if (!s) return '';
+  const plain = s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/gi, 'd').toUpperCase();
+  for (const [re, short] of SUP_SHORT) if (re.test(plain)) return short;
+  const w = plain.split(/[\s.\-_/]+/).filter(Boolean);
+  return (w.length > 1 ? w.map((x) => x[0]).join('') : plain).slice(0, 5);
+}
+
 export type StockAux = {
   id: number;
   code: string;
