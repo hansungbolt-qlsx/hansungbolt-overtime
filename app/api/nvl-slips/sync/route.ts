@@ -105,6 +105,15 @@ export async function POST(req: Request) {
   const uid = String(body?.uid || '').trim();
   if (!uid) return NextResponse.json({ error: 'Thiếu uid' }, { status: 400 });
 
+  // Trạng thái HIỆN TẠI bên này — để bỏ qua lượt đẩy KHÔNG ĐỔI GÌ.
+  // Bộ nhớ chống-trùng của agent nằm trong RAM nên cứ khởi động lại là nó đẩy
+  // lại toàn bộ phiếu 7 ngày, mỗi lần ghi thêm 1 dòng nhật ký y hệt (đo 28/7:
+  // 9 dòng trùng). Chốt ở đây thì agent đẩy bao nhiêu lần cũng không sinh rác.
+  const { data: cur } = await supabaseAdmin
+    .from('nvl_day_slips')
+    .select('id, status, main_refs, reject_reason, line_errors')
+    .eq('uid', uid).single();
+
   const patch: Record<string, unknown> = {
     synced_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -131,8 +140,16 @@ export async function POST(req: Request) {
     .from('nvl_day_slips').update(patch).eq('uid', uid).select('id, status').single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  // Chỉ ghi nhật ký khi app chính CHỐT (duyệt / từ chối) — tránh spam mỗi vòng poll
-  if (body.status === 'approved' || body.status === 'rejected' || body.status === 'draft') {
+  // Chỉ ghi nhật ký khi app chính CHỐT (duyệt / từ chối) VÀ có gì đó thực sự đổi
+  // so với lần đẩy trước — tránh rác mỗi lần agent khởi động lại.
+  const same =
+    cur != null &&
+    cur.status === body.status &&
+    JSON.stringify(cur.main_refs ?? []) === JSON.stringify(body.main_refs ?? []) &&
+    (cur.reject_reason ?? null) === (body.reject_reason ?? null) &&
+    JSON.stringify(cur.line_errors ?? []) === JSON.stringify(patch.line_errors ?? cur.line_errors ?? []);
+  if (!same
+      && (body.status === 'approved' || body.status === 'rejected' || body.status === 'draft')) {
     await supabaseAdmin.from('nvl_slip_events').insert({
       slip_id: data.id,
       slip_uid: uid,

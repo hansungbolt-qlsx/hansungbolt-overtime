@@ -383,20 +383,26 @@ async function pushNvlStock(force = false) {
     method: 'POST',
     body: JSON.stringify({ part: 'aux', payload: aux.aux.materials, n: aux.aux.n }),
   });
-  let extra = '';
+  // Cuộn ĐANG Ở LINE = nguồn chọn của tab TRẢ KHO ⇒ phải theo kịp tồn, KHÔNG để
+  // nhịp 6 giờ (rà 28/7: 8 cuộn vừa xuất 18:06 chưa có trong danh sách trả, còn
+  // cuộn đã trả thì vẫn nằm đó tới 6 tiếng). Đo thật gói này 217 KB, tồn đổi
+  // ~2 lần/ngày ⇒ thêm ~0,5 MB/ngày, không đáng kể so với quota 5 GB.
+  const line = await mainGet('/api/ot/stock?branch=nvl&include=line');
+  await otFetch('/api/nvl-stock', {
+    method: 'POST',
+    body: JSON.stringify({ part: 'nvl_line', payload: line.nvl.line_coils, n: line.nvl.n_line }),
+  });
+  let extra = ` + ${line.nvl.n_line} cuộn ở line`;
+  // Master NVL gần như bất động → giữ nhịp 6 giờ.
   if (heavyDue) {
-    const heavy = await mainGet('/api/ot/stock?branch=nvl&include=line,master');
-    await otFetch('/api/nvl-stock', {
-      method: 'POST',
-      body: JSON.stringify({ part: 'nvl_line', payload: heavy.nvl.line_coils, n: heavy.nvl.n_line }),
-    });
+    const heavy = await mainGet('/api/ot/stock?branch=nvl&include=master');
     await otFetch('/api/nvl-stock', {
       method: 'POST',
       body: JSON.stringify({ part: 'nvl_master', payload: heavy.nvl.materials, n: heavy.nvl.materials.length }),
     });
     lastHeavyAt = Date.now();
     lastHeavyVer = payloadVer;
-    extra = ` + ${heavy.nvl.n_line} cuộn ở line + ${heavy.nvl.materials.length} mã master`;
+    extra += ` + ${heavy.nvl.materials.length} mã master`;
   }
   lastStockVersion = version;
   console.log(
