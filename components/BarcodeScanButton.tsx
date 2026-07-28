@@ -97,12 +97,10 @@ export default function BarcodeScanButton({
         });
         scannerRef.current = scanner;
         await scanner.start(
-          // Xin luồng PHÂN GIẢI CAO — mã vạch 1D cần nhiều pixel ngang
-          {
-            facingMode: 'environment',
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-          } as MediaTrackConstraints,
+          // ⚠ Tham số này BẮT BUỘC chỉ có ĐÚNG 1 KHOÁ (html5-qrcode
+          // html5-qrcode.ts:1261 — `keys.length !== 1` là throw). Truyền thêm
+          // width/height vào đây là "Không mở được camera" ngay (đã dính 28/7).
+          { facingMode: 'environment' },
           {
             fps: 12,
             // Khung rộng gần hết chiều ngang, thấp — đúng hình dáng mã vạch
@@ -110,6 +108,13 @@ export default function BarcodeScanButton({
               width: Math.floor(vw * 0.94),
               height: Math.max(90, Math.floor(vh * 0.42)),
             }),
+            // ĐÂY mới là chỗ xin luồng phân giải cao (mã vạch 1D cần nhiều
+            // pixel ngang). Thư viện ưu tiên videoConstraints nếu có.
+            videoConstraints: {
+              facingMode: 'environment',
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+            },
           },
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (text: string, result: any) => {
@@ -123,11 +128,12 @@ export default function BarcodeScanButton({
         );
       } catch (e) {
         if (!cancelled) {
-          setErr(
-            e instanceof Error
-              ? `Không mở được camera: ${e.message}`
-              : 'Không mở được camera',
-          );
+          // ⚠ html5-qrcode ném CHUỖI, không phải Error → `e instanceof Error`
+          // là false và thông báo mất luôn nguyên nhân (đã dính 28/7: chỉ thấy
+          // "Không mở được camera", phải đi đọc mã nguồn thư viện mới ra).
+          const detail =
+            e instanceof Error ? e.message : typeof e === 'string' ? e : JSON.stringify(e);
+          setErr(`Không mở được camera — ${detail || 'không rõ nguyên nhân'}`);
         }
       }
     })();
