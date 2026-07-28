@@ -213,7 +213,11 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
 
   const coilsOfPicked = useMemo(() => {
     const list = coils.filter((c) => c.code === pickedCode && !usedCoilIds.has(c.id));
-    const k = (c: StockCoil) => dateOf(c) || '9999-99-99';   // thiếu ngày → cuối
+    // Cuộn thiếu ngày → coi là ĐỢT SỚM NHẤT, gom về đầu (user 28/7): mấy cuộn
+    // đó là tồn lúc chuyển hệ thống nên phải ưu tiên dùng trước, không phải bỏ
+    // xuống cuối. Thực tế 28/7 cột received_at không rỗng cuộn nào, đây là
+    // phòng hờ cho dữ liệu nhập tay sau này.
+    const k = (c: StockCoil) => dateOf(c) || '0000-00-00';
     return list.sort((a, b) => {
       const ka = k(a), kb = k(b);
       if (ka !== kb) return isReturn ? (ka < kb ? 1 : -1) : (ka < kb ? -1 : 1);
@@ -223,15 +227,24 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
 
   // Gom thành từng ĐỢT theo ngày để tô nền phân biệt (user 28/7): 9 cuộn về 3
   // đợt → 3 khối màu khác nhau, nhìn là biết nhóm nào cũ.
+  //
+  // `opening` = cả khối là cuộn TỒN ĐẦU KỲ lúc chuyển sang hệ thống này. Nhận
+  // diện bằng coil_no bắt đầu 'OPN-' — đối chiếu DB thật 28/7 khớp 241/241 cuộn
+  // của 7 phiếu OPN-20260423-*, và không có cuộn nào khác mang tiền tố này.
   const coilGroups = useMemo(() => {
-    const out: Array<{ date: string; items: StockCoil[] }> = [];
+    const out: Array<{ date: string; items: StockCoil[]; opening: boolean }> = [];
     for (const c of coilsOfPicked) {
       const d = dateOf(c);
-      if (!out.length || out[out.length - 1].date !== d) out.push({ date: d, items: [] });
+      if (!out.length || out[out.length - 1].date !== d) {
+        out.push({ date: d, items: [], opening: false });
+      }
       out[out.length - 1].items.push(c);
     }
+    for (const g of out) {
+      g.opening = !isReturn && g.items.every((c) => (c.coil_no || '').startsWith('OPN-'));
+    }
     return out;
-  }, [coilsOfPicked, dateOf]);
+  }, [coilsOfPicked, dateOf, isReturn]);
 
   function pick(code: string, name = '') {
     setPickedCode(code);
@@ -626,9 +639,22 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                           Đợt {gi + 1}
                         </span>
                         <span>
-                          {isReturn ? 'xuất line ' : 'nhập kho '}
-                          {g.date ? ddmm(g.date) : 'chưa rõ ngày'}
+                          {g.opening ? (
+                            <>
+                              tồn đầu kỳ · chuyển hệ thống
+                              {g.date && ` ${ddmm(g.date)}`}
+                            </>
+                          ) : (
+                            <>
+                              {isReturn ? 'xuất line ' : 'nhập kho '}
+                              {g.date ? ddmm(g.date) : 'chưa rõ ngày'}
+                            </>
+                          )}
                         </span>
+                        {/* Đợt cũ nhất → nhắc dùng trước cho đúng FIFO */}
+                        {gi === 0 && coilGroups.length > 1 && !isReturn && (
+                          <span className="text-orange-700 font-bold">← dùng trước</span>
+                        )}
                         <span className="ml-auto font-normal text-brand-navy-soft">
                           {g.items.length} cuộn · {fmtQty(totalKg)} kg
                         </span>
