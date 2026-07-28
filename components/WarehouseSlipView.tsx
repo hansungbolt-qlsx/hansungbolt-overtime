@@ -51,6 +51,11 @@ function hhmmVN() {
   return new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(11, 16);
 }
 
+/** Ngày VN dạng YYYY-MM-DD (máy nhân viên có thể lệch múi giờ). */
+function todayVN() {
+  return new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
 /** 'YYYY-MM-DD' → 'DD/MM'. Chuỗi ngày thuần (không giờ) nên KHÔNG quy múi giờ. */
 function ddmm(iso?: string | null): string {
   if (!iso || iso.length < 10) return '';
@@ -66,8 +71,12 @@ const STATUS_UI: Record<string, { label: string; cls: string }> = {
 
 export default function WarehouseSlipView({ kind }: { kind: Kind }) {
   const [branch, setBranch] = useState<Branch>('nvl');
+  // Ngày đang xem — mặc định hôm nay. Xem ngày khác thì CHỈ ĐỌC (user 28/7):
+  // ô soạn luôn ghi vào phiếu của HÔM NAY nên không được sửa phiếu ngày cũ ở đây.
+  const [viewDate, setViewDate] = useState(todayVN());
+  const isToday = viewDate === todayVN();
   const [loadedFor, setLoadedFor] = useState('');
-  const loading = loadedFor !== `${kind}|${branch}`;
+  const loading = loadedFor !== `${kind}|${branch}|${viewDate}`;
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
@@ -111,7 +120,9 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
   const loadSlip = useCallback(async () => {
     setErr('');
     try {
-      const r = await fetch(`/api/nvl-slips?kind=${kind}&branch=${branch}`);
+      const r = await fetch(
+        `/api/nvl-slips?kind=${kind}&branch=${branch}&date=${viewDate}`,
+      );
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Không tải được phiếu');
       const mapped = (d.lines ?? []).map((l: SlipLine & { qty: string | number }) => ({
@@ -137,7 +148,7 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Lỗi tải phiếu');
     }
-  }, [kind, branch]);
+  }, [kind, branch, viewDate]);
 
   const loadStock = useCallback(async () => {
     try {
@@ -164,10 +175,10 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
     let cancelled = false;
     (async () => {
       await Promise.all([loadSlip(), loadStock()]);
-      if (!cancelled) setLoadedFor(`${kind}|${branch}`);
+      if (!cancelled) setLoadedFor(`${kind}|${branch}|${viewDate}`);
     })();
     return () => { cancelled = true; };
-  }, [kind, branch, loadSlip, loadStock]);
+  }, [kind, branch, viewDate, loadSlip, loadStock]);
 
   // ---- Ô gợi ý mã -------------------------------------------------------
   // NVL: gộp cuộn theo mã để hiện "Code – Tên – Size – n cuộn / x kg"
@@ -452,6 +463,34 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
         ))}
       </div>
 
+      {/* Chọn ngày — xem lại phiếu hôm trước. Ngày khác hôm nay thì CHỈ ĐỌC. */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <label className="text-sm font-semibold text-brand-navy">Ngày</label>
+        <input
+          type="date"
+          value={viewDate}
+          max={todayVN()}
+          onChange={(e) => { setViewDate(e.target.value || todayVN()); resetForm(); setMsg(''); setErr(''); }}
+          className="px-3 py-2 border border-gray-300 rounded-md text-brand-navy"
+        />
+        {!isToday && (
+          <button
+            type="button"
+            onClick={() => { setViewDate(todayVN()); resetForm(); setMsg(''); setErr(''); }}
+            className="px-3 py-2 rounded-lg bg-brand-teal text-white text-sm font-semibold"
+          >
+            ↩ Về hôm nay
+          </button>
+        )}
+      </div>
+
+      {!isToday && (
+        <div className="rounded-lg bg-slate-100 border border-slate-300 text-slate-700 text-sm p-2.5">
+          Đang xem lại phiếu ngày <b>{ddmm(viewDate)}</b> — <b>chỉ để xem</b>, không
+          ghi thêm được. Muốn ghi thì bấm “Về hôm nay”.
+        </div>
+      )}
+
       {loading && <p className="text-sm text-brand-navy-soft">Đang tải…</p>}
 
       {/* Phiếu ĐÃ DUYỆT trong ngày — THU GỌN, chỉ đọc. Bấm mới mở chi tiết.
@@ -537,7 +576,8 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
       )}
 
 
-      {/* Thêm dòng */}
+      {/* Thêm dòng — chỉ khi đang ở HÔM NAY */}
+      {isToday && (
       <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-4 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="font-bold text-brand-navy">
@@ -860,6 +900,8 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
         )}
       </div>
 
+      )}
+
       {/* Dòng đã có */}
       <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-4">
         <h3 className="font-bold text-brand-navy mb-2">
@@ -917,14 +959,15 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
         <input
           value={slipNote}
           onChange={(e) => setSlipNote(e.target.value)}
+          disabled={!isToday}
           placeholder="Ghi chú sẽ hiện lên phiếu bên app chính"
           className="w-full px-3 py-2.5 border border-gray-300 rounded-md"
         />
 
-        <div className="grid grid-cols-2 gap-2 mt-3">
+        <div className={`grid grid-cols-2 gap-2 mt-3 ${isToday ? '' : 'hidden'}`}>
           <button
             type="button"
-            disabled={saving || lines.length === 0}
+            disabled={saving || lines.length === 0 || !isToday}
             onClick={() => save(false)}
             className="py-3 rounded-xl border border-brand-navy text-brand-navy font-bold disabled:opacity-40"
           >
@@ -932,7 +975,7 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
           </button>
           <button
             type="button"
-            disabled={saving || lines.length === 0}
+            disabled={saving || lines.length === 0 || !isToday}
             onClick={() => save(true)}
             className="py-3 rounded-xl bg-brand-navy text-white font-bold disabled:opacity-40"
           >
