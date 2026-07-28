@@ -495,7 +495,8 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
           </h3>
           {stockAt && (
             <span className="text-[11px] text-brand-navy-soft">
-              tồn lúc {new Date(new Date(stockAt).getTime() + 7 * 3600e3).toISOString().slice(11, 16)}
+              {isNvl && isReturn ? 'cuộn ở line lúc ' : 'tồn lúc '}
+              {new Date(new Date(stockAt).getTime() + 7 * 3600e3).toISOString().slice(11, 16)}
             </span>
           )}
         </div>
@@ -574,8 +575,16 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                         {/* Loại NVL + size in ĐẬM MÀU CAM cho dễ nhận (user 28/7) */}
                         <span className={EMPH}>{o.name}</span>
                         {o.size && <> — <span className={EMPH}>{o.size}</span></>}
+                        {/* ⚠ Ở tab TRẢ KHO, danh sách là cuộn ĐÃ XUẤT RA LINE
+                            (để chọn trả về), KHÔNG phải tồn kho — phải ghi khác
+                            nhau, nếu không người đọc hiểu ngược (user 28/7). */}
                         <span className={o.n ? 'text-brand-navy-soft' : 'text-rose-600 font-semibold'}>
-                          {' '}— {o.n ? `${o.n} cuộn / ${fmtQty(o.kg)} kg` : 'hết tồn'}
+                          {' '}—{' '}
+                          {o.n
+                            ? `${o.n} cuộn ${isReturn ? 'ở line' : 'tồn'} / ${fmtQty(o.kg)} kg`
+                            : isReturn
+                              ? 'chưa xuất ra line'
+                              : 'hết tồn'}
                         </span>
                       </button>
                     </li>
@@ -592,8 +601,22 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                         <span className={EMPH}>{m.name}</span>
                         {m.material && <> — <span className={EMPH}>{m.material}</span></>}
                         {m.spec && <> — <span className={EMPH}>{m.spec}</span></>}
-                        <span className={m.stock > 0 ? 'text-brand-navy-soft' : 'text-rose-600 font-semibold'}>
-                          {' '}— {m.stock > 0 ? `tồn ${fmtQty(m.stock)} ${m.unit}` : 'hết tồn kho'}
+                        {/* TRẢ kho phụ liệu KHÔNG phụ thuộc tồn (trả là cộng vào
+                            tồn) → tồn 0 vẫn trả được, đừng tô đỏ "hết tồn kho"
+                            làm người dùng tưởng bị chặn. */}
+                        <span
+                          className={
+                            isReturn || m.stock > 0
+                              ? 'text-brand-navy-soft'
+                              : 'text-rose-600 font-semibold'
+                          }
+                        >
+                          {' '}—{' '}
+                          {isReturn
+                            ? `tồn hiện tại ${fmtQty(m.stock)} ${m.unit}`
+                            : m.stock > 0
+                              ? `tồn ${fmtQty(m.stock)} ${m.unit}`
+                              : 'hết tồn kho'}
                         </span>
                       </button>
                     </li>
@@ -614,7 +637,7 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                   {' — '}<span className={EMPH}>{pickedNvl.name}</span>
                   {pickedNvl.size && <> · <span className={EMPH}>{pickedNvl.size}</span></>}
                   <span className="font-normal text-brand-navy-soft">
-                    {' '}({coilsOfPicked.length} cuộn)
+                    {' '}({coilsOfPicked.length} cuộn{isReturn ? ' ở line' : ''})
                   </span>
                 </>
               )}
@@ -731,8 +754,14 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
               {pickedAux.material && <> · <span className={EMPH}>{pickedAux.material}</span></>}
               {pickedAux.spec && <> · <span className={EMPH}>{pickedAux.spec}</span></>}
               <br />
-              Số lượng ({pickedAux.unit}) — tồn{' '}
+              {isReturn ? 'Số lượng trả' : 'Số lượng xuất'} ({pickedAux.unit})
+              {' — tồn hiện tại '}
               <span className={EMPH}>{fmtQty(pickedAux.stock)}</span>
+              {isReturn && (
+                <span className="font-normal text-brand-navy-soft">
+                  {' '}(trả về sẽ cộng thêm vào tồn)
+                </span>
+              )}
             </label>
             <input
               inputMode="decimal"
