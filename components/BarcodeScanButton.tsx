@@ -103,17 +103,16 @@ export default function BarcodeScanButton({
           { facingMode: 'environment' },
           {
             fps: 12,
-            // Khung rộng gần hết chiều ngang, thấp — đúng hình dáng mã vạch
-            qrbox: (vw: number, vh: number) => ({
-              width: Math.floor(vw * 0.94),
-              height: Math.max(90, Math.floor(vh * 0.42)),
-            }),
-            // ĐÂY mới là chỗ xin luồng phân giải cao (mã vạch 1D cần nhiều
-            // pixel ngang). Thư viện ưu tiên videoConstraints nếu có.
+            // KHÔNG đặt qrbox → quét TOÀN KHUNG. Lợi 2 điều: (1) mã vạch 1D dài
+            // nên càng nhiều pixel ngang càng dễ đọc, (2) không có lớp phủ khung
+            // nào để lệch khi CSS co video lại cho vừa modal (bug 28/7: video
+            // phình to, "chia 2 phân vùng", đẩy nút Đóng ra khỏi màn hình).
+            // ĐÂY mới là chỗ xin luồng phân giải cao — 1280×720 là mức vừa đủ
+            // tốt cho mã vạch mà không làm phần tử video quá khổ.
             videoConstraints: {
               facingMode: 'environment',
-              width: { ideal: 1920 },
-              height: { ideal: 1080 },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
             },
           },
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -215,35 +214,44 @@ export default function BarcodeScanButton({
       <div id={FILE_BOX_ID} className="hidden" />
 
       {open && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex flex-col items-center justify-center p-3">
-          <div className="bg-white rounded-xl p-3 w-full max-w-md">
-            <div className="flex items-center justify-between mb-2">
+        // Bố cục CHỐNG VỠ: khung cố định cả màn hình, chia 3 tầng —
+        // đầu (Đóng) và chân (2 nút) KHÔNG co, chỉ vùng video co giãn. Nhờ vậy
+        // nút thoát luôn nhìn thấy kể cả khi video bị thư viện đặt sai kích cỡ
+        // (bug 28/7: nút Đóng bị đẩy ra khỏi màn hình, không huỷ được lệnh quét).
+        <div className="fixed inset-0 z-50 bg-black/85 flex flex-col p-3">
+          <div className="bg-white rounded-xl p-3 w-full max-w-md mx-auto my-auto flex flex-col max-h-full overflow-hidden">
+            <div className="flex items-center justify-between mb-2 shrink-0">
               <span className="font-bold text-brand-navy">Quét tem cuộn</span>
               <button
                 type="button"
                 onClick={close}
-                className="text-sm text-red-600 font-semibold px-2 py-1"
+                className="text-base text-white bg-red-600 font-bold px-4 py-2 rounded-lg active:scale-95"
               >
-                Đóng
+                ✕ Đóng
               </button>
             </div>
 
-            <div id={BOX_ID} className="w-full rounded-lg overflow-hidden bg-black" />
+            <div
+              id={BOX_ID}
+              className="w-full rounded-lg overflow-hidden bg-black shrink-0"
+            />
 
-            {err ? (
-              <p className="mt-2 text-sm text-red-600 font-semibold">{err}</p>
-            ) : (
-              <p className="mt-2 text-xs text-brand-navy-soft">
-                Đưa mã vạch nằm NGANG, chiếm gần hết chiều ngang khung. Giữ máy yên
-                khoảng 2 giây.
-                {secs >= 8 && (
-                  <span className="block mt-1 text-amber-700 font-semibold">
-                    Đã thử {secs}s mà chưa đọc được — bấm “📸 Chụp ảnh tem” bên dưới,
-                    camera gốc của máy nét hơn nhiều.
-                  </span>
-                )}
-              </p>
-            )}
+            <div className="mt-2 overflow-auto min-h-0">
+              {err ? (
+                <p className="text-sm text-red-600 font-semibold break-words">{err}</p>
+              ) : (
+                <p className="text-xs text-brand-navy-soft">
+                  Đưa mã vạch nằm NGANG, chiếm gần hết chiều ngang khung. Giữ máy yên
+                  khoảng 2 giây.
+                  {secs >= 8 && (
+                    <span className="block mt-1 text-amber-700 font-semibold">
+                      Đã thử {secs}s mà chưa đọc được — bấm “📸 Chụp ảnh tem” bên dưới,
+                      camera gốc của máy nét hơn nhiều.
+                    </span>
+                  )}
+                </p>
+              )}
+            </div>
 
             {/* Đường ăn chắc trên iPhone: chụp bằng camera gốc rồi giải mã từ ảnh */}
             <input
@@ -254,14 +262,24 @@ export default function BarcodeScanButton({
               className="hidden"
               onChange={(e) => void onFile(e.target.files?.[0])}
             />
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => fileRef.current?.click()}
-              className="mt-2 w-full py-3 rounded-xl bg-brand-teal text-white font-bold disabled:opacity-50"
-            >
-              {busy ? 'Đang đọc ảnh…' : '📸 Chụp ảnh tem (nét hơn)'}
-            </button>
+            <div className="mt-2 shrink-0 space-y-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => fileRef.current?.click()}
+                className="w-full py-3 rounded-xl bg-brand-teal text-white font-bold disabled:opacity-50"
+              >
+                {busy ? 'Đang đọc ảnh…' : '📸 Chụp ảnh tem (nét hơn)'}
+              </button>
+              {/* Nút huỷ thứ 2 ở chân — ngón tay ở dưới màn hình dễ với hơn */}
+              <button
+                type="button"
+                onClick={close}
+                className="w-full py-3 rounded-xl border-2 border-red-500 text-red-600 font-bold"
+              >
+                ✕ Huỷ quét
+              </button>
+            </div>
           </div>
         </div>
       )}

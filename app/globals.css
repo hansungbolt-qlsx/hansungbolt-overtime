@@ -47,3 +47,22 @@ body {
   background-repeat: no-repeat, no-repeat, no-repeat, repeat;
   background-size: auto, auto, auto, 120px 104px;
 }
+
+/* ── Khung quét tem cuộn NVL (28/07/2026) ─────────────────────────────────
+   html5-qrcode tự đặt width/height INLINE cho <video>/<canvas> theo kích
+   thước luồng camera. Xin luồng 1280×720 thì phần tử phình to hơn modal,
+   trên iPhone làm video "chia 2 phân vùng" và đẩy nút Đóng ra khỏi màn hình.
+   Chặn cứng bằng !important để không phụ thuộc nội bộ thư viện. */
+#nvl-barcode-box {
+  max-height: 52vh;
+  overflow: hidden;
+}
+#nvl-barcode-box video,
+#nvl-barcode-box canvas,
+#nvl-barcode-box img {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  max-height: 52vh !important;
+  object-fit: cover;
+}
