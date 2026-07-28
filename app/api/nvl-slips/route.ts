@@ -39,36 +39,56 @@ export async function GET(req: Request) {
   }
   const date = (url.searchParams.get('date') || todayVN()).slice(0, 10);
 
-  // Phiếu MỚI NHẤT trong ngày của (loại, nhánh) — seq lớn nhất
+  // TẤT CẢ phiếu trong ngày của (loại, nhánh), seq tăng dần.
+  // ⚠ Trước 28/7 chỉ trả phiếu seq lớn nhất → phiếu đã duyệt buổi sáng BIẾN MẤT
+  // khỏi điện thoại ngay khi mở phiếu thứ hai. Ngày làm 3-4 đợt là không còn đối
+  // chiếu được đã xuất bao nhiêu. Giờ trả hết, client tự tách lịch sử / đang soạn.
   const { data: slips, error } = await supabaseAdmin
     .from('nvl_day_slips')
     .select('*')
     .eq('slip_date', date)
     .eq('kind', kind)
     .eq('branch', branch)
-    .order('seq', { ascending: false })
-    .limit(1);
+    .order('seq', { ascending: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const slip = slips?.[0] ?? null;
-  if (!slip) {
-    return NextResponse.json({ date, kind, branch, slip: null, lines: [], events: [] });
+  if (!slips || slips.length === 0) {
+    return NextResponse.json({
+      date, kind, branch, slips: [], slip: null, lines: [], events: [],
+    });
   }
 
-  const [{ data: lines }, { data: events }] = await Promise.all([
-    supabaseAdmin.from('nvl_slip_lines').select('*').eq('slip_id', slip.id).order('seq_no'),
+  // Phiếu ĐANG SOẠN = phiếu seq lớn nhất (khớp đúng phiếu mà POST sẽ gộp vào)
+  const latest = slips[slips.length - 1];
+
+  const [{ data: allLines, error: lnErr }, { data: events }] = await Promise.all([
+    supabaseAdmin
+      .from('nvl_slip_lines')
+      .select('*')
+      .in('slip_id', slips.map((s) => s.id))
+      .order('seq_no'),
     supabaseAdmin
       .from('nvl_slip_events')
       .select('at, actor, action, detail')
-      .eq('slip_id', slip.id)
+      .eq('slip_id', latest.id)
       .order('at', { ascending: false })
       .limit(30),
   ]);
+  if (lnErr) return NextResponse.json({ error: lnErr.message }, { status: 500 });
+
+  const bySlip = new Map<string, typeof allLines>();
+  for (const l of allLines ?? []) {
+    const arr = bySlip.get(l.slip_id);
+    if (arr) arr.push(l);
+    else bySlip.set(l.slip_id, [l]);
+  }
 
   return NextResponse.json({
     date, kind, branch,
-    slip,
-    lines: lines ?? [],
+    slips: slips.map((s) => ({ slip: s, lines: bySlip.get(s.id) ?? [] })),
+    // Giữ 3 khoá cũ cho tương thích (phiếu mới nhất)
+    slip: latest,
+    lines: bySlip.get(latest.id) ?? [],
     events: events ?? [],
   });
 }

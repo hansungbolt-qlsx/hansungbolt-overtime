@@ -82,8 +82,9 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
   const [err, setErr] = useState('');
 
   const [slip, setSlip] = useState<Slip | null>(null);
-  // Phiếu ĐÃ DUYỆT trong ngày — chỉ để xem lại, tách hẳn khỏi phần đang soạn
-  const [done, setDone] = useState<{ slip: Slip; lines: SlipLine[] } | null>(null);
+  // CÁC PHIẾU TRƯỚC trong ngày (đã duyệt, hoặc bị xoá bên app chính) — chỉ để xem
+  // lại, tách hẳn khỏi phần đang soạn. Ngày làm nhiều đợt thì xếp thu gọn hết ở đây.
+  const [past, setPast] = useState<Array<{ slip: Slip; lines: SlipLine[] }>>([]);
   const [lines, setLines] = useState<SlipLine[]>([]);
   const [events, setEvents] = useState<SlipEvent[]>([]);
   const [slipNote, setSlipNote] = useState('');
@@ -125,25 +126,25 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
       );
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Không tải được phiếu');
-      const mapped = (d.lines ?? []).map((l: SlipLine & { qty: string | number }) => ({
-        ...l, qty: Number(l.qty),
-      }));
+      const num = (ls: Array<SlipLine & { qty: string | number }>) =>
+        (ls ?? []).map((l) => ({ ...l, qty: Number(l.qty) }));
+
+      const all: Array<{ slip: Slip; lines: SlipLine[] }> =
+        (d.slips ?? []).map((s: { slip: Slip; lines: Array<SlipLine & { qty: string | number }> }) => ({
+          slip: s.slip, lines: num(s.lines),
+        }));
+      // Phiếu đang soạn = phiếu seq lớn nhất, TRỪ KHI nó đã duyệt.
       // ⚠ Phiếu ĐÃ DUYỆT phải tách hẳn ra khỏi phần đang ghi (user 28/7).
       // Trước đây giữ chung: 23 dòng đã duyệt vẫn nằm trong ô soạn và nút "Gửi
       // lên app chính" vẫn bấm được → bấm là tạo phiếu MỚI với Y NGUYÊN 23 dòng
       // đó → duyệt tiếp là TRỪ TỒN LẦN HAI. Giờ nó thành khối lịch sử chỉ đọc,
       // còn ô soạn bắt đầu TRỐNG cho đợt mới trong ngày.
-      if (d.slip && d.slip.status === 'approved') {
-        setDone({ slip: d.slip, lines: mapped });
-        setSlip(null);
-        setLines([]);
-        setSlipNote('');
-      } else {
-        setDone(null);
-        setSlip(d.slip);
-        setSlipNote(d.slip?.note ?? '');
-        setLines(mapped);
-      }
+      const last = all.length ? all[all.length - 1] : null;
+      const editing = last && last.slip.status !== 'approved' ? last : null;
+      setPast(editing ? all.slice(0, -1) : all);
+      setSlip(editing?.slip ?? null);
+      setSlipNote(editing?.slip.note ?? '');
+      setLines(editing?.lines ?? []);
       setEvents(d.events ?? []);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Lỗi tải phiếu');
@@ -223,12 +224,16 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
   // Cuộn của mã đang chọn, trừ cuộn đã nằm trong phiếu
   // Gồm cả cuộn của phiếu ĐÃ DUYỆT hôm nay: snapshot tồn có thể chưa kịp làm mới
   // (agent đẩy sau ~60s) nên cuộn vừa xuất vẫn còn trong danh sách — chặn tick lại.
+  // Ngoại lệ: phiếu cũ bị XOÁ bên app chính (về `draft`) thì cuộn đã quay lại kho
+  // Main thật → phải cho tick lại, không chặn.
   const usedCoilIds = useMemo(
     () => new Set([
       ...lines.map((l) => l.coil_id),
-      ...(done?.lines ?? []).map((l) => l.coil_id),
+      ...past
+        .filter((p) => p.slip.status === 'approved' || p.slip.status === 'pending')
+        .flatMap((p) => p.lines.map((l) => l.coil_id)),
     ].filter(Boolean) as number[]),
-    [lines, done],
+    [lines, past],
   );
   // FIFO (user chốt lại 28/7 — bỏ phương án xếp theo Kg): cuộn NHẬP TRƯỚC lên
   // trước. Cùng ngày thì theo id (thứ tự nhập trong phiếu). Cuộn thiếu ngày
@@ -493,41 +498,71 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
 
       {loading && <p className="text-sm text-brand-navy-soft">Đang tải…</p>}
 
-      {/* Phiếu ĐÃ DUYỆT trong ngày — THU GỌN, chỉ đọc. Bấm mới mở chi tiết.
-          Tách hẳn khỏi phần soạn bên dưới để không thể gửi lại nhầm. */}
-      {done && (
-        <details className="rounded-xl border border-emerald-300 bg-emerald-50 overflow-hidden">
-          <summary className="cursor-pointer p-3 text-sm">
-            <span className="font-bold text-emerald-800">✅ Đã duyệt — tồn đã trừ</span>
-            <span className="text-emerald-900">
-              {' · '}{done.lines.length} dòng · {fmtQty(done.lines.reduce((s, l) => s + l.qty, 0))}{' '}
-              {done.lines[0]?.unit ?? ''}
-              {done.slip.seq > 1 && ` · phiếu #${done.slip.seq}`}
-            </span>
-            {done.slip.main_refs?.length > 0 && (
-              <span className="block text-xs text-emerald-900 mt-0.5">
-                Phiếu đã tạo: {done.slip.main_refs.map((r) => `${r.no} (${r.department})`).join(' · ')}
-              </span>
-            )}
-            <span className="block text-xs text-emerald-700 mt-0.5">
-              Bấm để xem lại · ghi thêm trong ngày sẽ tự mở phiếu mới bên dưới
-            </span>
-          </summary>
-          <ul className="divide-y divide-white bg-white/60">
-            {done.lines.map((l, i) => (
-              <li key={i} className="px-3 py-1.5 text-sm flex items-start gap-2">
-                <span className="flex-1 min-w-0">
-                  <span className="font-mono font-semibold">{l.material_code}</span>
-                  <span className="text-brand-navy-soft"> · {l.department}</span>
-                  <span className="block text-xs text-brand-navy-soft truncate">
-                    {l.material_name}{l.lot_no ? ` · ${l.lot_no}` : ''}
+      {/* CÁC PHIẾU TRƯỚC trong ngày — THU GỌN, chỉ đọc. Bấm mới mở chi tiết.
+          Tách hẳn khỏi phần soạn bên dưới để không thể gửi lại nhầm.
+          Ngày làm nhiều đợt thì mỗi phiếu 1 dòng, cộng tổng cả ngày ở chân. */}
+      {past.length > 0 && (
+        <div className="space-y-2">
+          {past.map(({ slip: s, lines: sl }) => {
+            const sst = STATUS_UI[s.status] ?? STATUS_UI.draft;
+            const gone = s.status !== 'approved';   // bị xoá/gỡ duyệt bên app chính
+            return (
+              <details
+                key={s.id}
+                className={`rounded-xl border overflow-hidden ${sst.cls}`}
+              >
+                <summary className="cursor-pointer p-3 text-sm">
+                  <span className="font-bold">{sst.label}</span>
+                  <span>
+                    {' · '}phiếu #{s.seq} · {sl.length} dòng ·{' '}
+                    {fmtQty(sl.reduce((a, l) => a + l.qty, 0))} {sl[0]?.unit ?? ''}
                   </span>
-                </span>
-                <span className={`${EMPH} whitespace-nowrap`}>{fmtQty(l.qty)} {l.unit}</span>
-              </li>
-            ))}
-          </ul>
-        </details>
+                  {s.main_refs?.length > 0 && (
+                    <span className="block text-xs mt-0.5">
+                      Phiếu đã tạo: {s.main_refs.map((r) => `${r.no} (${r.department})`).join(' · ')}
+                    </span>
+                  )}
+                  {gone && (
+                    <span className="block text-xs font-semibold mt-0.5">
+                      Phiếu này KHÔNG còn trừ tồn bên app chính
+                      {s.reject_reason ? ` · ${s.reject_reason}` : ''}
+                    </span>
+                  )}
+                  <span className="block text-xs opacity-80 mt-0.5">Bấm để xem lại</span>
+                </summary>
+                <ul className="divide-y divide-white bg-white/60">
+                  {sl.map((l, i) => (
+                    <li key={i} className="px-3 py-1.5 text-sm flex items-start gap-2">
+                      <span className="flex-1 min-w-0">
+                        <span className="font-mono font-semibold">{l.material_code}</span>
+                        <span className="text-brand-navy-soft"> · {l.department}</span>
+                        <span className="block text-xs text-brand-navy-soft truncate">
+                          {l.material_name}{l.lot_no ? ` · ${l.lot_no}` : ''}
+                        </span>
+                      </span>
+                      <span className={`${EMPH} whitespace-nowrap`}>{fmtQty(l.qty)} {l.unit}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            );
+          })}
+
+          {/* Tổng ĐÃ DUYỆT cả ngày — con số nhân viên kho cần khi đối chiếu cuối ngày */}
+          {(() => {
+            const ok = past.filter((p) => p.slip.status === 'approved');
+            if (ok.length < 2) return null;
+            const nl = ok.reduce((a, p) => a + p.lines.length, 0);
+            const qty = ok.reduce((a, p) => a + p.lines.reduce((b, l) => b + l.qty, 0), 0);
+            const unit = ok[0].lines[0]?.unit ?? '';
+            return (
+              <div className="rounded-xl border border-emerald-400 bg-emerald-100 p-2.5 text-sm font-bold text-emerald-900">
+                Tổng đã duyệt {ddmm(viewDate)}: {ok.length} phiếu · {nl} dòng ·{' '}
+                <span className="text-orange-700">{fmtQty(qty)} {unit}</span>
+              </div>
+            );
+          })()}
+        </div>
       )}
 
       {/* Trạng thái phiếu ĐANG SOẠN / chờ duyệt / bị từ chối */}
@@ -905,7 +940,10 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
       {/* Dòng đã có */}
       <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-4">
         <h3 className="font-bold text-brand-navy mb-2">
-          {done ? 'Phiếu mới trong ngày' : 'Phiếu hôm nay'} — {lines.length} dòng
+          {past.length > 0
+            ? `Phiếu mới #${slip?.seq ?? past[past.length - 1].slip.seq + 1}`
+            : 'Phiếu hôm nay'}
+          {' — '}{lines.length} dòng
           {lines.length > 0 && ` · ${fmtQty(lines.reduce((s, l) => s + l.qty, 0))} ${lines[0].unit}`}
         </h3>
         {lines.length === 0 ? (
