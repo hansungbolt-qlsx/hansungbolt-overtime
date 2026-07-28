@@ -41,6 +41,12 @@ function hhmmVN() {
   return new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(11, 16);
 }
 
+/** 'YYYY-MM-DD' → 'DD/MM'. Chuỗi ngày thuần (không giờ) nên KHÔNG quy múi giờ. */
+function ddmm(iso?: string | null): string {
+  if (!iso || iso.length < 10) return '';
+  return `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+}
+
 const STATUS_UI: Record<string, { label: string; cls: string }> = {
   draft: { label: '📝 Đang ghi (chưa gửi)', cls: 'bg-slate-100 text-slate-700 border-slate-300' },
   pending: { label: '📤 Đã gửi — chờ duyệt', cls: 'bg-amber-50 text-amber-800 border-amber-300' },
@@ -184,8 +190,17 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
     () => new Set(lines.map((l) => l.coil_id).filter(Boolean) as number[]),
     [lines],
   );
+  // Xếp theo Kg TĂNG DẦN (user chốt 28/7) — cuộn nhỏ/lẻ lên trước để dùng hết
+  // trước, khỏi để cuộn dở nằm lại kho. App chính trả về theo ngày nhập (FIFO)
+  // nên phải xếp lại ở đây; ngày nhập vẫn hiện trên từng dòng để không mất tín
+  // hiệu cuộn cũ. Kg bằng nhau → giữ nguyên thứ tự cũ (tức cuộn nhập trước lên trước).
   const coilsOfPicked = useMemo(
-    () => coils.filter((c) => c.code === pickedCode && !usedCoilIds.has(c.id)),
+    () =>
+      coils
+        .filter((c) => c.code === pickedCode && !usedCoilIds.has(c.id))
+        .map((c, i) => ({ c, i }))
+        .sort((a, b) => (a.c.kg - b.c.kg) || (a.i - b.i))
+        .map((x) => x.c),
     [coils, pickedCode, usedCoilIds],
   );
 
@@ -581,6 +596,14 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                         <span className="flex-1 min-w-0">
                           <span className="font-mono">{c.coil_no}</span>
                           {c.lot_no && <span className="text-brand-navy-soft"> · {c.lot_no}</span>}
+                          {/* Ngày (nhập kho khi xuất · xuất ra line khi trả) —
+                              giữ tín hiệu cuộn cũ vì list đã xếp theo Kg */}
+                          {(isReturn ? c.issued_at : c.received_at) && (
+                            <span className="block text-xs text-brand-navy-soft">
+                              {isReturn ? 'xuất ' : 'nhập '}
+                              {ddmm(isReturn ? c.issued_at : c.received_at)}
+                            </span>
+                          )}
                         </span>
                         <span className={`${EMPH} whitespace-nowrap tabular-nums`}>
                           {fmtQty(c.kg)} kg

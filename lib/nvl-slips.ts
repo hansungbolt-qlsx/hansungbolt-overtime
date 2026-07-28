@@ -45,7 +45,8 @@ export type StockCoil = {
   code: string;
   name: string;
   size: string;
-  issued_at: string | null;
+  received_at?: string | null;   // ngày nhập kho — hiện kèm vì list xếp theo Kg
+  issued_at: string | null;      // ngày xuất ra line (dùng khi TRẢ kho)
 };
 
 export type StockAux = {
