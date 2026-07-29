@@ -58,6 +58,18 @@ const SUP_STYLE = [
   { bg: 'bg-slate-200', chip: 'bg-slate-600', text: 'text-slate-800' },
 ];
 
+// Màu chữ dòng "Đợt N" trong phiếu đang soạn (user 29/7) — 2 đợt liền nhau phải
+// khác màu để nhìn ra ranh giới. Chỉ tô DÒNG ĐỢT, các dòng nội dung giữ nguyên.
+// Không dùng đỏ/hồng: đã dành cho nút Xoá và cảnh báo.
+const BATCH_TEXT = [
+  'text-sky-700',
+  'text-emerald-700',
+  'text-violet-700',
+  'text-teal-700',
+  'text-amber-700',
+  'text-indigo-700',
+];
+
 // ---- Bộ nhớ đệm gói tồn trên máy (user chốt 28/7 tối) ---------------------
 // Khoá theo mốc `pushed_at` của app chính: mốc còn nguyên = tồn chưa biến động
 // = không tải lại gì. Hỏng/đầy bộ nhớ thì lặng lẽ bỏ qua, chỉ mất phần tiết kiệm
@@ -1100,7 +1112,7 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
         ) : (
           batches.map(([bseq, bl]) => (
             <div key={bseq} className="mb-3">
-              <div className="text-xs font-semibold text-brand-navy-soft mb-1">
+              <div className={`text-sm font-bold mb-1 ${BATCH_TEXT[(bseq - 1) % BATCH_TEXT.length]}`}>
                 Đợt {bseq} · {bl[0].batch_time} · {bl.length} dòng
               </div>
               <ul className="divide-y border border-gray-100 rounded-md">
