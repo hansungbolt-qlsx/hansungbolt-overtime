@@ -69,24 +69,65 @@ export async function GET(req: Request) {
   }
 
   try {
-    const [regs, items, emps] = await Promise.all([
-      pullAll<RegRow>(
+    type FullReg = RegRow & {
+      department: string; time_from: string | null; time_to: string | null;
+    };
+    type FullItem = ItemRow & {
+      equipment_id: string | null; item_code: string | null; item_name: string | null;
+      planned_quantity: number | null; actual_quantity: number | null;
+      note: string | null; time_from: string | null; time_to: string | null;
+    };
+    const [regs, items, emps, eqs] = await Promise.all([
+      pullAll<FullReg>(
         'overtime_registrations',
-        'id, overtime_date, day_type, duration_hours',
+        'id, overtime_date, day_type, duration_hours, department, time_from, time_to',
         'overtime_date',
       ),
-      pullAll<ItemRow>(
+      pullAll<FullItem>(
         'overtime_items',
-        'employee_id, registration_id, duration_hours',
+        'employee_id, registration_id, duration_hours, equipment_id, item_code,'
+          + ' item_name, planned_quantity, actual_quantity, note, time_from, time_to',
         'id',
       ),
       pullAll<{
         id: string; full_name: string; department: string;
         order_no: number | null; active: boolean | null;
       }>('employees', 'id, full_name, department, order_no, active', 'order_no'),
+      pullAll<{ id: string; code: string; machine_type: string | null }>(
+        'equipments', 'id, code, machine_type', 'code'),
     ]);
 
     const { empDateMap, dateTypeMap } = buildEmpDateHours(regs, items);
+
+    // BẢN SAO LƯU TOÀN BỘ (user chốt 29/7 tối): kèm chi tiết từng dòng phiếu —
+    // máy, mã hàng, số lượng, khung giờ, ghi chú — để app chính lưu vĩnh viễn.
+    // Khung giờ/ghi chú ưu tiên giá trị dòng (admin sửa tay), rơi về giá trị
+    // phiếu. `hours` ở đây là giờ THÔ của dòng, CHỈ để xem chi tiết — giờ tính
+    // công vẫn lấy từ `rows` (luật MAX người × ngày), không được cộng details.
+    const regById = new Map(regs.map((r) => [r.id, r]));
+    const eqById = new Map(eqs.map((e) => [e.id, e]));
+    const hhmm = (t: string | null | undefined) => (t ? String(t).slice(0, 5) : null);
+    const details = items.flatMap((it) => {
+      const rg = regById.get(it.registration_id);
+      if (!rg) return [];
+      const eq = it.equipment_id ? eqById.get(it.equipment_id) : undefined;
+      return [{
+        employee_id: it.employee_id,
+        date: rg.overtime_date,
+        department: rg.department,
+        machine: eq?.code ?? null,
+        machine_type: eq?.machine_type ?? null,
+        item_code: it.item_code,
+        item_name: it.item_name,
+        qty_planned: it.planned_quantity,
+        qty_actual: it.actual_quantity,
+        time_from: hhmm(it.time_from) ?? hhmm(rg.time_from),
+        time_to: hhmm(it.time_to) ?? hhmm(rg.time_to),
+        hours: it.duration_hours ?? rg.duration_hours,
+        note: it.note,
+        reg_id: it.registration_id,
+      }];
+    });
 
     const rows: Array<{ employee_id: string; date: string; hours: number }> = [];
     for (const [empId, dateMap] of empDateMap) {
@@ -106,6 +147,7 @@ export async function GET(req: Request) {
       employees: emps,
       dates,
       rows,
+      details,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
