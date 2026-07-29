@@ -500,6 +500,72 @@ async function pullNvlStatuses() {
   }
 }
 
+// -----------------------------------------------------------
+// TĂNG CA → app chính, menu Overtime (29/7) — một chiều, CHỈ ĐỌC bên OT.
+//
+// Dò dấu vân tay (~150 B) mỗi 60" qua /api/overtime-export?meta=1; ĐỔI mới kéo
+// bản đầy đủ (người × ngày, đã tính giờ bằng luật của bảng in — agent và app
+// chính KHÔNG tính lại giờ) rồi đẩy vào app chính. App chính chỉ ghi đè phần
+// trong vùng phủ 30 ngày, phần cũ hơn là kho lưu vĩnh viễn của nó.
+//
+// Chưa chạy migration 19 (hàm overtime_fingerprint) → fp=null → hạ nhịp kéo
+// 30 phút/lần để không phí quota, vẫn đồng bộ được.
+// -----------------------------------------------------------
+const OT_SYNC_MS = 60_000;
+const OT_FALLBACK_MS = 30 * 60_000;
+let lastOtSyncAt = 0;
+let lastOtFp = null;      // RAM — agent restart thì kéo lại 1 lần (rẻ, vô hại)
+let lastOtPullAt = 0;
+let otNoFpWarned = false;
+
+async function syncOvertimeOnce() {
+  if (!MAIN_APP_URL || !MAIN_APP_TOKEN) return;
+  const metaRes = await fetch(`${APP_URL}/api/overtime-export?meta=1`, {
+    headers: { Authorization: `Bearer ${AGENT_SECRET}` },
+  });
+  if (!metaRes.ok) throw new Error(`overtime meta HTTP ${metaRes.status}`);
+  const meta = await metaRes.json();
+
+  let due;
+  if (meta.fp) {
+    due = meta.fp !== lastOtFp;
+    otNoFpWarned = false;
+  } else {
+    due = Date.now() - lastOtPullAt > OT_FALLBACK_MS;
+    if (!otNoFpWarned) {
+      console.warn(
+        `[${new Date().toISOString()}] Overtime: chưa có hàm vân tay (migration 19)` +
+          ' — tạm kéo 30 phút/lần',
+      );
+      otNoFpWarned = true;
+    }
+  }
+  if (!due) return;
+
+  const res = await fetch(`${APP_URL}/api/overtime-export`, {
+    headers: { Authorization: `Bearer ${AGENT_SECRET}` },
+  });
+  if (!res.ok) throw new Error(`overtime export HTTP ${res.status}`);
+  const data = await res.json();
+  if (!data.ok) throw new Error(`overtime export: ${data.error}`);
+
+  const up = await fetch(`${MAIN_APP_URL}/api/ot/overtime-sync`, {
+    method: 'POST',
+    headers: { 'X-Agent-Token': MAIN_APP_TOKEN, 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  const d = await up.json().catch(() => null);
+  if (!up.ok || !d?.ok) {
+    throw new Error((d && d.detail) || `app chính overtime-sync HTTP ${up.status}`);
+  }
+  lastOtFp = data.fp ?? meta.fp ?? null;
+  lastOtPullAt = Date.now();
+  console.log(
+    `[${new Date().toISOString()}] Overtime → app chính: ${d.n_rows} ô người-ngày` +
+      ` (vùng phủ từ ${data.coverage_start}, giữ nguyên ${d.n_kept_older} ô cũ hơn)`,
+  );
+}
+
 async function syncNvlOnce() {
   if (!MAIN_APP_URL || !MAIN_APP_TOKEN) return;
   const today = vnDate();
@@ -606,6 +672,15 @@ async function pollLoop() {
         console.error(`[${new Date().toISOString()}] Sync kho NPL lỗi: ${e.message}`);
       }
       lastNvlSyncAt = Date.now();
+    }
+    // Tăng ca → menu Overtime app chính mỗi 60" (dò vân tay, đổi mới kéo)
+    if (Date.now() - lastOtSyncAt > OT_SYNC_MS) {
+      try {
+        await syncOvertimeOnce();
+      } catch (e) {
+        console.error(`[${new Date().toISOString()}] Sync Overtime lỗi: ${e.message}`);
+      }
+      lastOtSyncAt = Date.now();
     }
     try {
       const jobs = await pollPendingJobs();

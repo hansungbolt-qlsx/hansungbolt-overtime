@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth-server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { buildEmpDateHours } from '@/lib/overtime-hours';
 import PrintClient from './PrintClient';
 
 function currentMonthISO() {
@@ -53,46 +54,16 @@ export default async function PrintOvertimeSummaryPage({
     );
   }
 
-  // Map: date -> day_type
-  const dateTypeMap = new Map<string, 'weekday' | 'sunday'>();
-  const regMap = new Map<
-    string,
-    { date: string; dayType: 'weekday' | 'sunday'; durationHours: number }
-  >();
-  for (const r of regs) {
-    dateTypeMap.set(r.overtime_date, r.day_type as 'weekday' | 'sunday');
-    regMap.set(r.id, {
-      date: r.overtime_date,
-      dayType: r.day_type as 'weekday' | 'sunday',
-      durationHours: Number(r.duration_hours ?? 0),
-    });
-  }
-
   const regIds = regs.map((r) => r.id);
   const { data: items } = await supabaseAdmin
     .from('overtime_items')
     .select('employee_id, registration_id, duration_hours')
     .in('registration_id', regIds);
 
-  // Build: empId -> { date -> hours thực tế }
-  // Ưu tiên duration_hours của item (từ migration 06 — admin đã sửa per-row),
-  // fallback duration_hours của registration (leader submit ban đầu),
-  // fallback hardcoded theo day_type.
-  // Nếu 1 NV có nhiều item cùng ngày với duration khác nhau → lấy MAX.
-  const empDateMap = new Map<string, Map<string, number>>();
-  for (const it of items ?? []) {
-    const reg = regMap.get(it.registration_id);
-    if (!reg) continue;
-    if (!empDateMap.has(it.employee_id)) empDateMap.set(it.employee_id, new Map());
-    const dateMap = empDateMap.get(it.employee_id)!;
-    const hours = Number(
-      it.duration_hours ??
-        reg.durationHours ??
-        (reg.dayType === 'sunday' ? 8 : 3),
-    );
-    const existing = dateMap.get(reg.date) ?? 0;
-    if (hours > existing) dateMap.set(reg.date, hours);
-  }
+  // Luật quy giờ (item admin sửa → registration → 8h CN/3h thường, trùng ngày
+  // lấy MAX) nằm MỘT CHỖ ở lib/overtime-hours.ts — dùng chung với API đồng bộ
+  // sang app chính (menu Overtime). Sửa luật thì sửa ở lib, đừng sửa tại đây.
+  const { empDateMap, dateTypeMap } = buildEmpDateHours(regs, items ?? []);
 
   const empIds = Array.from(empDateMap.keys());
   const { data: emps } = await supabaseAdmin
