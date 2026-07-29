@@ -1170,7 +1170,7 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
           </button>
         </div>
         <p className="mt-2 text-[11px] text-brand-navy-soft">
-          Quên bấm Gửi thì cuối ngày (16:15) máy tự gửi giúp. Tồn kho chỉ thay đổi khi
+          Quên bấm Gửi thì cuối ngày (16:30) máy tự gửi giúp. Tồn kho chỉ thay đổi khi
           app chính duyệt.
         </p>
       </div>

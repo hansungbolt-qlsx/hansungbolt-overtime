@@ -138,7 +138,7 @@ Nhân viên kho (`phamvancuong`, role `qlsx`) ghi phiếu trên điện thoại 
 | Spec đầy đủ | app chính: `hsb-material-app/docs/SPEC_OT_XUAT_TRA_KHO.md` |
 
 Quy tắc đã cài: mỗi ngày 1 phiếu tổng / loại / nhánh, ghi nhiều đợt · gửi lại = ghi đè
-bản chờ duyệt · đã duyệt rồi thì tự mở phiếu mới · agent **vét 16:15** + sáng bật PC
+bản chờ duyệt · đã duyệt rồi thì tự mở phiếu mới · agent **vét 16:30** + sáng bật PC
 cho phiếu quên bấm Gửi · chỉ 2 bộ phận Heading/Rolling (dầu 46HS·527V → Heading,
 322 → Rolling) · phụ liệu hết tồn thì chặn ngay trên điện thoại.
 

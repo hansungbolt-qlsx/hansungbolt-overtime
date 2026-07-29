@@ -9,7 +9,7 @@ export const runtime = 'nodejs';
 //
 //   GET  /api/nvl-slips/sync[?sweep=1]
 //        → các phiếu cần đẩy sang app chính, kèm dòng.
-//          sweep=1 (agent vét 16:15 + sáng hôm sau): lấy CẢ phiếu 'draft' mà
+//          sweep=1 (agent vét 16:30 + sáng hôm sau): lấy CẢ phiếu 'draft' mà
 //          nhân viên quên bấm Gửi — user chốt cơ chế gửi kép chống quên.
 //
 //   POST /api/nvl-slips/sync
@@ -64,11 +64,11 @@ export async function GET(req: Request) {
 
   let slips = fresh ?? [];
   if (sweep) {
-    // Vét 16:15 + sáng bật PC: gom cả phiếu nhân viên quên bấm Gửi
+    // Vét 16:30 + sáng bật PC: gom cả phiếu nhân viên quên bấm Gửi
     // ⚠ CHỈ vét phiếu draft CHƯA TỪNG ĐẨY (synced_at IS NULL). Phiếu quay về
     // draft vì app chính XOÁ phiếu thật thì `synced_at` vẫn còn → agent KHÔNG tự
     // gửi lại. Bắt buộc có người bấm Gửi (lúc đó POST /api/nvl-slips xoá
-    // synced_at). Thiếu chốt này thì 16:15 agent tự gửi lại phiếu vừa bị xoá và
+    // synced_at). Thiếu chốt này thì 16:30 agent tự gửi lại phiếu vừa bị xoá và
     // tồn có thể bị trừ LẦN HAI.
     const { data: drafts, error: dErr } = await base()
       .eq('status', 'draft').is('synced_at', null)

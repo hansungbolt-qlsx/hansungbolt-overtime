@@ -311,7 +311,12 @@ async function pushDccdCatalog() {
 // -----------------------------------------------------------
 const NVL_SYNC_MS = 60_000;          // nhịp kiểm tra phiếu + trạng thái
 const NVL_HEAVY_MS = 6 * 3600_000;   // phần nặng (cuộn ở line + master) — 6 giờ/lần
-const SWEEP_AT = '16:15';            // giờ VÉT phiếu nhân viên quên bấm Gửi
+// Giờ VÉT phiếu nhân viên quên bấm Gửi (user đổi 16:15 → 16:30 ngày 28/7).
+// ⚠ PC tắt lúc 16h30 nên vòng vét có thể không kịp chạy — lúc đó phiếu nằm chờ
+// và được vét khi bật PC sáng hôm sau (`!sweepOnStartDone`), đúng ý user.
+// Phiếu ĐÃ GỬI thì không bị vét: vòng vét chỉ lấy phiếu `draft` + `synced_at`
+// còn trống, phiếu đã gửi mang trạng thái pending/approved.
+const SWEEP_AT = '16:30';
 let lastNvlSyncAt = 0;
 let lastStockVersion = null;
 let lastHeavyAt = 0;
@@ -498,7 +503,7 @@ async function pullNvlStatuses() {
 async function syncNvlOnce() {
   if (!MAIN_APP_URL || !MAIN_APP_TOKEN) return;
   const today = vnDate();
-  // Vét: 1 lần khi agent khởi động (sáng bật PC) + 1 lần lúc 16:15
+  // Vét: 1 lần khi agent khởi động (sáng bật PC) + 1 lần lúc 16:30
   const sweep = !sweepOnStartDone || (vnHHMM() >= SWEEP_AT && sweptToday !== today);
   if (sweep) {
     if (vnHHMM() >= SWEEP_AT) sweptToday = today;
