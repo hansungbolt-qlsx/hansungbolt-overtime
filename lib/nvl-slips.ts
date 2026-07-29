@@ -37,6 +37,56 @@ export function defaultDepartment(branch: Branch, code: string, name = ''): Depa
   return branch === 'nvl' ? 'Heading' : 'Rolling';
 }
 
+// ===========================================================================
+// Ô GỢI Ý MÃ — khớp kiểu "tên dính cỡ" (user chốt 29/7)
+//
+// Nhân viên kho quen gõ liền: `18A320` · `SCM545` · `STS430320` · `430320`.
+// Trước đây chỉ so chuỗi con trên "code + tên + cỡ" nên mấy kiểu này ra 0 kết quả.
+//
+// Mẹo: MÃ NVL đã mã hoá sẵn cỡ ở 4 số cuối — 3.2 → `0320`, 5.45 → `0545`.
+// Nên quy cỡ về 4 chữ số rồi so là khớp được cả `320`, `0320`, `32`.
+// ===========================================================================
+
+/** Bỏ mọi ký tự không phải chữ/số + hoa hoá. '104300-3000-2F' → '10430030002F' */
+export function normSearch(s: unknown): string {
+  return String(s ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
+/** Cỡ NVL → 4 chữ số theo đúng quy luật mã: 3.2 → '0320' · 5.45 → '0545' · 16 → '1600' */
+export function sizeKey(size: unknown): string {
+  const n = Number(String(size ?? '').replace(',', '.'));
+  if (!Number.isFinite(n) || n <= 0) return '';
+  return String(Math.round(n * 100)).padStart(4, '0');
+}
+
+/** Mã NVL có khớp ô tìm không. Kiểm chứng trên 331 mã thật ngày 29/7. */
+export function matchNvl(q: string, code: unknown, name: unknown, size: unknown): boolean {
+  const s = normSearch(q);
+  if (!s) return false;
+  const c = normSearch(code);
+  const n = normSearch(name);
+  const k = sizeKey(size);
+  // 1) cách cũ — gõ mã, gõ tên, gõ cỡ
+  if (c.includes(s) || n.includes(s) || (k !== '' && k.includes(s))) return true;
+  // 2) "tên + cỡ dính liền": thử tách đuôi 4 / 3 / 2 chữ số làm cỡ
+  //    ⚠ PHẢI thử CẢ BA. Chỉ thử một kiểu là 'STS304320' trượt (đã dính lúc thử).
+  for (const L of [4, 3, 2]) {
+    if (s.length <= L) continue;
+    const d = s.slice(-L);
+    if (!/^\d+$/.test(d)) continue;
+    const head = s.slice(0, -L);
+    if (k !== '' && k.includes(d) && (n.includes(head) || c.includes(head))) return true;
+  }
+  return false;
+}
+
+/** Mã phụ liệu — chỉ bỏ dấu câu (mã PL không mã hoá cỡ như NVL). */
+export function matchAux(q: string, ...fields: unknown[]): boolean {
+  const s = normSearch(q);
+  if (!s) return false;
+  return fields.some((f) => normSearch(f).includes(s));
+}
+
 // LÝ DO TRẢ KHO (user chốt 29/7) — gắn theo TỪNG DÒNG, không phải cả phiếu.
 // Chuỗi lưu xuống DB đúng nguyên văn dưới đây; 'Khác' thì lưu nội dung user gõ.
 export const RETURN_REASONS = [

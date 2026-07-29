@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import BarcodeScanButton from './BarcodeScanButton';
 import {
   BRANCH_LABEL, DEPARTMENTS, KIND_LABEL, RETURN_REASONS, RETURN_REASON_DEFAULT,
-  RETURN_REASON_OTHER, defaultDepartment, supShort,
+  RETURN_REASON_OTHER, defaultDepartment, matchAux, matchNvl, supShort,
   type Branch, type Department, type Kind, type SlipLine,
   type StockAux, type StockCoil,
 } from '@/lib/nvl-slips';
@@ -293,15 +293,19 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
   }, [coils, nvlMaster]);
 
   const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
+    const s = q.trim();
     if (!s) return [];
     if (isNvl) {
+      // CÒN TỒN lên trước (user 29/7) — mã hết tồn vẫn hiện để báo "hết tồn kho",
+      // nhưng không được chiếm chỗ đầu danh sách 20 dòng.
       return nvlOptions
-        .filter((o) => `${o.code} ${o.name} ${o.size}`.toLowerCase().includes(s))
+        .filter((o) => matchNvl(s, o.code, o.name, o.size))
+        .sort((a, b) => (b.n > 0 ? 1 : 0) - (a.n > 0 ? 1 : 0) || a.code.localeCompare(b.code))
         .slice(0, 20);
     }
     return auxMats
-      .filter((m) => `${m.code} ${m.name} ${m.material} ${m.spec}`.toLowerCase().includes(s))
+      .filter((m) => matchAux(s, m.code, m.name, m.material, m.spec))
+      .sort((a, b) => (b.stock > 0 ? 1 : 0) - (a.stock > 0 ? 1 : 0) || a.code.localeCompare(b.code))
       .slice(0, 20);
   }, [q, isNvl, nvlOptions, auxMats]);
 
