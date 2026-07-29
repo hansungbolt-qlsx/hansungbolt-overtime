@@ -107,6 +107,7 @@ type LineIn = {
   qty?: number | string;
   unit?: string;
   note?: string;
+  reason?: string;
 };
 
 export async function POST(req: Request) {
@@ -141,6 +142,9 @@ export async function POST(req: Request) {
       qty: Math.max(0, Number(l.qty) || 0),
       unit: (l.unit || (branch === 'nvl' ? 'KG' : 'EA')).slice(0, 16),
       note: (l.note || '').slice(0, 255) || null,
+      // Lý do CHỈ có ý nghĩa với phiếu TRẢ kho (user chốt 29/7). Phiếu xuất kho
+      // gửi kèm cũng bị bỏ, tránh dữ liệu rác.
+      reason: kind === 'return' ? ((l.reason || '').trim().slice(0, 255) || null) : null,
     }))
     .filter((l) => l.material_code || l.coil_id);
 

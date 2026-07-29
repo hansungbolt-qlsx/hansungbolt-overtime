@@ -37,6 +37,15 @@ export function defaultDepartment(branch: Branch, code: string, name = ''): Depa
   return branch === 'nvl' ? 'Heading' : 'Rolling';
 }
 
+// LÝ DO TRẢ KHO (user chốt 29/7) — gắn theo TỪNG DÒNG, không phải cả phiếu.
+// Chuỗi lưu xuống DB đúng nguyên văn dưới đây; 'Khác' thì lưu nội dung user gõ.
+export const RETURN_REASONS = [
+  'Sản xuất dư - trả kho',
+  'NVL lỗi - Trả kho',
+] as const;
+export const RETURN_REASON_DEFAULT = RETURN_REASONS[0];
+export const RETURN_REASON_OTHER = 'Khác';
+
 export type StockCoil = {
   id: number;
   coil_no: string;
@@ -100,4 +109,7 @@ export type SlipLine = {
   qty: number;
   unit: string;
   note?: string | null;
+  // Lý do TRẢ kho của riêng dòng này (migration 18). Rỗng/NULL = mặc định.
+  // Phiếu xuất kho luôn để trống.
+  reason?: string | null;
 };

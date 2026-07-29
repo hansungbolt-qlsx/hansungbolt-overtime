@@ -12,7 +12,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import BarcodeScanButton from './BarcodeScanButton';
 import {
-  BRANCH_LABEL, DEPARTMENTS, KIND_LABEL, defaultDepartment, supShort,
+  BRANCH_LABEL, DEPARTMENTS, KIND_LABEL, RETURN_REASONS, RETURN_REASON_DEFAULT,
+  RETURN_REASON_OTHER, defaultDepartment, supShort,
   type Branch, type Department, type Kind, type SlipLine,
   type StockAux, type StockCoil,
 } from '@/lib/nvl-slips';
@@ -159,6 +160,9 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
   const [pickedCode, setPickedCode] = useState('');
   const [dept, setDept] = useState<Department>('Heading');
   const [lineNote, setLineNote] = useState('');
+  // Lý do TRẢ kho (user chốt 29/7) — chọn theo từng lần "Thêm vào phiếu", nên
+  // một phiếu ghi được nhiều lý do; app chính tách phiếu thật theo bộ phận × lý do.
+  const [reasonPick, setReasonPick] = useState<string>(RETURN_REASON_DEFAULT);
   const [auxQty, setAuxQty] = useState('');
   const [ticked, setTicked] = useState<Record<number, string>>({});   // coil_id → Kg (chuỗi)
   // Kết quả lần quét gần nhất — để BIẾT tem mỗi NCC chứa gì (khảo sát 28/7:
@@ -459,6 +463,21 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
     const nextBatch = batchSeq + (lines.length ? 1 : 1);
     const time = hhmmVN();
 
+    // Lý do trả kho: 'Khác' thì lưu chính nội dung người dùng gõ ở ô Ghi chú,
+    // và BẮT BUỘC có nội dung (giống app chính: lý do khác phải ghi rõ).
+    let reason: string | null = null;
+    if (isReturn) {
+      if (reasonPick === RETURN_REASON_OTHER) {
+        if (!lineNote.trim()) {
+          setErr('Chọn "Khác" thì phải ghi rõ lý do vào ô Ghi chú');
+          return;
+        }
+        reason = lineNote.trim();
+      } else {
+        reason = reasonPick;
+      }
+    }
+
     if (isNvl) {
       const ids = Object.keys(ticked).map(Number);
       if (ids.length === 0) { setErr('Chưa tick cuộn nào'); return; }
@@ -473,7 +492,7 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
           department: dept,
           material_code: c.code, material_name: c.name, material_spec: c.size,
           coil_id: c.id, coil_no: c.coil_no, lot_no: c.lot_no,
-          qty: kg, unit: 'KG', note: lineNote || null,
+          qty: kg, unit: 'KG', note: lineNote || null, reason,
         });
       }
       if (news.length === 0) { setErr('Không có cuộn hợp lệ'); return; }
@@ -503,7 +522,7 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
         material_code: pickedAux.code, material_name: pickedAux.name,
         material_spec: [pickedAux.material, pickedAux.spec].filter(Boolean).join(' · '),
         coil_id: null, coil_no: null, lot_no: null,
-        qty, unit: pickedAux.unit, note: lineNote || null,
+        qty, unit: pickedAux.unit, note: lineNote || null, reason,
       }]);
     }
     resetForm();
@@ -1065,6 +1084,23 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
 
         {pickedCode && (
           <>
+            {/* LÝ DO TRẢ KHO (user 29/7) — theo từng lần thêm dòng, nên 1 phiếu
+                ghi được nhiều lý do. Xuất kho không có khái niệm này. */}
+            {isReturn && (
+              <div className="mb-2">
+                <label className="block text-sm font-semibold text-brand-navy mb-1">
+                  Lý do trả kho
+                </label>
+                <select
+                  value={reasonPick}
+                  onChange={(e) => setReasonPick(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-md bg-white font-semibold"
+                >
+                  {RETURN_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+                  <option value={RETURN_REASON_OTHER}>{RETURN_REASON_OTHER} — ghi rõ ở ô Ghi chú</option>
+                </select>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-sm font-semibold text-brand-navy mb-1">Bộ phận</label>
@@ -1077,11 +1113,22 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-brand-navy mb-1">Ghi chú</label>
+                <label className="block text-sm font-semibold text-brand-navy mb-1">
+                  {isReturn && reasonPick === RETURN_REASON_OTHER ? (
+                    <span className="text-orange-600">Ghi chú — bắt buộc</span>
+                  ) : 'Ghi chú'}
+                </label>
                 <input
                   value={lineNote}
                   onChange={(e) => setLineNote(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-md"
+                  placeholder={
+                    isReturn && reasonPick === RETURN_REASON_OTHER ? 'Ghi rõ lý do trả kho' : ''
+                  }
+                  className={`w-full px-3 py-2.5 border rounded-md ${
+                    isReturn && reasonPick === RETURN_REASON_OTHER && !lineNote.trim()
+                      ? 'border-orange-400 bg-orange-50'
+                      : 'border-gray-300'
+                  }`}
                 />
               </div>
             </div>
@@ -1124,6 +1171,13 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                         <div>
                           <span className="font-mono font-semibold">{l.material_code}</span>
                           <span className="text-brand-navy-soft"> · {l.department}</span>
+                          {/* Lý do trả kho hiện ngay trên dòng — 1 phiếu có thể
+                              nhiều lý do nên phải nhìn ra được từng dòng là gì */}
+                          {isReturn && l.reason && (
+                            <span className="ml-1 text-xs font-bold text-orange-600">
+                              · {l.reason}
+                            </span>
+                          )}
                         </div>
                         <div className="text-xs text-brand-navy-soft truncate">
                           {l.material_name}

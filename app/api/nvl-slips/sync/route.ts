@@ -107,6 +107,7 @@ export async function GET(req: Request) {
         qty: Number(l.qty),
         unit: l.unit,
         note: l.note,
+        reason: l.reason ?? null,   // lý do trả kho theo dòng (migration 18)
       })),
     })),
   });
