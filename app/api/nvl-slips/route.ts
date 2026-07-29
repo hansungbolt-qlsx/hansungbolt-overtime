@@ -152,8 +152,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Phiếu phải có ít nhất 1 dòng' }, { status: 400 });
   }
 
-  // Tìm phiếu để GỘP VÀO (user chốt: ưu tiên thêm vào phiếu đã có trong ngày).
-  // Chỉ phiếu ĐÃ DUYỆT mới buộc mở phiếu mới với seq kế tiếp.
+  // Tìm phiếu để GỘP VÀO — chỉ gộp khi phiếu CHƯA RỜI KHỎI TAY nhân viên kho.
+  //
+  // ⚠ ĐÃ GỬI (pending) thì KHÔNG gộp nữa (user chốt 29/7). Trước đây phiếu chờ
+  // duyệt vẫn ghi đè được, sinh ra lỗ hổng: người duyệt mở màn Chờ duyệt đọc 2
+  // dòng → nhân viên thêm 3 dòng rồi Gửi → phiếu thành 5 dòng → người duyệt bấm
+  // Duyệt là TRỪ TỒN 5 DÒNG trong khi chỉ đọc 2. Màn người duyệt không tự làm
+  // mới, khoảng cách gửi → duyệt thường vài tiếng.
+  // Gửi nhầm muốn sửa: người duyệt bấm Từ chối → phiếu về 'rejected' → gộp lại
+  // được. Mọi thay đổi sau khi gửi đều để lại dấu vết.
   const { data: existing, error: exErr } = await supabaseAdmin
     .from('nvl_day_slips')
     .select('id, uid, seq, status')
@@ -165,7 +172,7 @@ export async function POST(req: Request) {
   if (exErr) return NextResponse.json({ error: exErr.message }, { status: 500 });
 
   const prev = existing?.[0] ?? null;
-  const reuse = prev && prev.status !== 'approved';
+  const reuse = prev != null && (prev.status === 'draft' || prev.status === 'rejected');
   const seq = reuse ? prev!.seq : (prev ? prev.seq + 1 : 1);
   const uid = reuse ? prev!.uid : slipUid(date, kind, branch, seq);
 

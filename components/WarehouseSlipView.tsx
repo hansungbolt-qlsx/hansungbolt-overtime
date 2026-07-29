@@ -196,14 +196,18 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
         (d.slips ?? []).map((s: { slip: Slip; lines: Array<SlipLine & { qty: string | number }> }) => ({
           slip: s.slip, lines: num(s.lines),
         }));
-      // Phiếu đang soạn = phiếu seq lớn nhất, TRỪ KHI nó đã duyệt.
-      // ⚠ Phiếu ĐÃ DUYỆT phải tách hẳn ra khỏi phần đang ghi (user 28/7).
-      // Trước đây giữ chung: 23 dòng đã duyệt vẫn nằm trong ô soạn và nút "Gửi
-      // lên app chính" vẫn bấm được → bấm là tạo phiếu MỚI với Y NGUYÊN 23 dòng
-      // đó → duyệt tiếp là TRỪ TỒN LẦN HAI. Giờ nó thành khối lịch sử chỉ đọc,
-      // còn ô soạn bắt đầu TRỐNG cho đợt mới trong ngày.
+      // Phiếu đang soạn = phiếu seq lớn nhất, VÀ phải còn trong tay nhân viên kho:
+      // chỉ 'draft' (đang ghi) hoặc 'rejected' (bị trả về để sửa).
+      //
+      // ⚠ ĐÃ DUYỆT tách ra (user 28/7): trước đây 23 dòng đã duyệt vẫn nằm trong
+      // ô soạn và nút Gửi vẫn bấm được → tạo phiếu mới y nguyên 23 dòng → duyệt
+      // tiếp là TRỪ TỒN LẦN HAI.
+      // ⚠ ĐÃ GỬI cũng tách ra (user 29/7): phiếu chờ duyệt mà còn sửa được thì
+      // người duyệt đọc 2 dòng rồi bấm Duyệt lại trừ 5 dòng. Muốn sửa phải nhờ
+      // người duyệt bấm Từ chối → phiếu về 'rejected' → mở lại được.
       const last = all.length ? all[all.length - 1] : null;
-      const editing = last && last.slip.status !== 'approved' ? last : null;
+      const OPEN = ['draft', 'rejected'];
+      const editing = last && OPEN.includes(last.slip.status) ? last : null;
       setPast(editing ? all.slice(0, -1) : all);
       setSlip(editing?.slip ?? null);
       setSlipNote(editing?.slip.note ?? '');
@@ -628,7 +632,10 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
         <div className="space-y-2">
           {past.map(({ slip: s, lines: sl }) => {
             const sst = STATUS_UI[s.status] ?? STATUS_UI.draft;
-            const gone = s.status !== 'approved';   // bị xoá/gỡ duyệt bên app chính
+            // 'draft' trong danh sách CŨ = phiếu thật bên app chính đã bị XOÁ.
+            // ⚠ Đừng dùng `!== 'approved'`: từ 29/7 phiếu ĐÃ GỬI (pending) cũng
+            // nằm ở đây, mà nó thì đang chờ duyệt bình thường chứ không mất gì.
+            const gone = s.status === 'draft';
             return (
               <details
                 key={s.id}
@@ -648,7 +655,16 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                   {gone && (
                     <span className="block text-xs font-semibold mt-0.5">
                       Phiếu này KHÔNG còn trừ tồn bên app chính
-                      {s.reject_reason ? ` · ${s.reject_reason}` : ''}
+                    </span>
+                  )}
+                  {s.status === 'rejected' && s.reject_reason && (
+                    <span className="block text-xs font-semibold mt-0.5">
+                      Lý do từ chối: {s.reject_reason}
+                    </span>
+                  )}
+                  {s.status === 'pending' && (
+                    <span className="block text-xs mt-0.5">
+                      Muốn sửa phiếu này thì nhờ người duyệt bấm Từ chối
                     </span>
                   )}
                   <span className="block text-xs opacity-80 mt-0.5">Bấm để xem lại</span>
