@@ -58,6 +58,42 @@ const SUP_STYLE = [
   { bg: 'bg-slate-200', chip: 'bg-slate-600', text: 'text-slate-800' },
 ];
 
+// ---- Bộ nhớ đệm gói tồn trên máy (user chốt 28/7 tối) ---------------------
+// Khoá theo mốc `pushed_at` của app chính: mốc còn nguyên = tồn chưa biến động
+// = không tải lại gì. Hỏng/đầy bộ nhớ thì lặng lẽ bỏ qua, chỉ mất phần tiết kiệm
+// chứ không bao giờ chặn nhân viên kho làm việc.
+const STOCK_CACHE_PREFIX = 'nvlstk:';
+
+function readStockCache(part: string, at: string): unknown[] | null {
+  if (typeof window === 'undefined' || !at) return null;
+  try {
+    const raw = window.localStorage.getItem(STOCK_CACHE_PREFIX + part);
+    if (!raw) return null;
+    const o = JSON.parse(raw) as { at?: string; payload?: unknown[] };
+    return o?.at === at && Array.isArray(o.payload) ? o.payload : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStockCache(part: string, at: string, payload: unknown[]): void {
+  if (typeof window === 'undefined' || !at) return;
+  try {
+    window.localStorage.setItem(STOCK_CACHE_PREFIX + part, JSON.stringify({ at, payload }));
+  } catch {
+    // Hết chỗ → dọn các gói tồn cũ rồi thử lại đúng 1 lần
+    try {
+      for (let i = window.localStorage.length - 1; i >= 0; i -= 1) {
+        const k = window.localStorage.key(i);
+        if (k?.startsWith(STOCK_CACHE_PREFIX)) window.localStorage.removeItem(k);
+      }
+      window.localStorage.setItem(STOCK_CACHE_PREFIX + part, JSON.stringify({ at, payload }));
+    } catch {
+      /* chịu — lần sau tải lại từ mạng */
+    }
+  }
+}
+
 function hhmmVN() {
   return new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(11, 16);
 }
@@ -164,17 +200,43 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
 
   const loadStock = useCallback(async () => {
     try {
-      const parts = isNvl ? `${stockPart},nvl_master` : 'aux';
-      const r = await fetch(`/api/nvl-stock?part=${parts}`);
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Không tải được tồn kho');
+      const want = isNvl ? [stockPart, 'nvl_master'] : ['aux'];
+
+      // ⚠ CHỈ TẢI LẠI KHI TỒN BIẾN ĐỘNG (user chốt 28/7 tối).
+      // Hỏi mốc trước (~100 B), trùng mốc đã lưu trong máy thì dùng luôn bản cũ.
+      // Trước đây mỗi lần mở màn là tải nguyên gói dù tồn y nguyên: xuất kho
+      // 133 KB, trả kho 316 KB — nhân với mấy chục lần mở/ngày là phí thật.
+      const rm = await fetch(`/api/nvl-stock?part=${want.join(',')}&meta=1`);
+      const dm = await rm.json();
+      if (!rm.ok) throw new Error(dm.error || 'Không đọc được mốc tồn kho');
+
+      const cached: Record<string, unknown[]> = {};
+      const stale: string[] = [];
+      for (const p of want) {
+        const at = dm.parts?.[p]?.pushed_at ?? '';
+        const hit = at ? readStockCache(p, at) : null;
+        if (hit) cached[p] = hit;
+        else stale.push(p);
+      }
+      // Chỉ tải phần đã đổi; cả hai phần còn nguyên thì KHÔNG gọi mạng lần nữa.
+      if (stale.length) {
+        const r = await fetch(`/api/nvl-stock?part=${stale.join(',')}`);
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Không tải được tồn kho');
+        for (const p of stale) {
+          const pl = (d.parts?.[p]?.payload ?? []) as unknown[];
+          cached[p] = pl;
+          writeStockCache(p, d.parts?.[p]?.pushed_at ?? '', pl);
+        }
+      }
+
       if (isNvl) {
-        setCoils((d.parts?.[stockPart]?.payload ?? []) as StockCoil[]);
-        setNvlMaster((d.parts?.nvl_master?.payload ?? []) as MasterNvl[]);
-        setStockAt(d.parts?.[stockPart]?.pushed_at ?? '');
+        setCoils((cached[stockPart] ?? []) as StockCoil[]);
+        setNvlMaster((cached.nvl_master ?? []) as MasterNvl[]);
+        setStockAt(dm.parts?.[stockPart]?.pushed_at ?? '');
       } else {
-        setAuxMats((d.parts?.aux?.payload ?? []) as StockAux[]);
-        setStockAt(d.parts?.aux?.pushed_at ?? '');
+        setAuxMats((cached.aux ?? []) as StockAux[]);
+        setStockAt(dm.parts?.aux?.pushed_at ?? '');
       }
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Lỗi tải tồn kho');
