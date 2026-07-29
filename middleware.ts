@@ -46,6 +46,7 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|api/auth|api/labels/cleanup|api/registrations/cleanup|api/print-jobs).*)',
+    // api/overtime-export: agent kéo tăng ca (tự check Bearer AGENT_SECRET như print-jobs)
+    '/((?!_next/static|_next/image|favicon.ico|api/auth|api/labels/cleanup|api/registrations/cleanup|api/print-jobs|api/overtime-export).*)',
   ],
 };
