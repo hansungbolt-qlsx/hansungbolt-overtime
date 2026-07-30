@@ -715,16 +715,36 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                   )}
                   <span className="block text-xs opacity-80 mt-0.5">Bấm để xem lại</span>
                 </summary>
+                {/* Cùng quy ước với danh sách phiếu đang nhập (user 30/7):
+                    NVL — trên: Code · Loại · Size, dưới: Lot (bỏ Heading vì
+                    xuất NVL mặc định Heading). Phụ liệu giữ bộ phận. */}
                 <ul className="divide-y divide-white bg-white/60">
                   {sl.map((l, i) => (
                     <li key={i} className="px-3 py-1.5 text-sm flex items-start gap-2">
-                      <span className="flex-1 min-w-0">
-                        <span className="font-mono font-semibold">{l.material_code}</span>
-                        <span className="text-brand-navy-soft"> · {l.department}</span>
-                        <span className="block text-xs text-brand-navy-soft truncate">
-                          {l.material_name}{l.lot_no ? ` · ${l.lot_no}` : ''}
+                      {isNvl ? (
+                        <span className="flex-1 min-w-0">
+                          <span className="block truncate">
+                            <span className="font-mono font-semibold">{l.material_code}</span>
+                            {l.material_name && (
+                              <span className="text-brand-navy-soft"> · {l.material_name}</span>
+                            )}
+                            {l.material_spec && <span className={EMPH}> · {l.material_spec}</span>}
+                          </span>
+                          <span className="block text-xs text-brand-navy-soft truncate">
+                            Lot: <span className="font-mono">{l.lot_no || l.coil_no || '?'}</span>
+                            {isReturn && l.reason ? ` · ${l.reason}` : ''}
+                          </span>
                         </span>
-                      </span>
+                      ) : (
+                        <span className="flex-1 min-w-0">
+                          <span className="font-mono font-semibold">{l.material_code}</span>
+                          <span className="text-brand-navy-soft"> · {l.department}</span>
+                          <span className="block text-xs text-brand-navy-soft truncate">
+                            {l.material_name}
+                            {l.material_spec ? ` · ${l.material_spec}` : ''}
+                          </span>
+                        </span>
+                      )}
                       <span className={`${EMPH} whitespace-nowrap`}>{fmtQty(l.qty)} {l.unit}</span>
                     </li>
                   ))}
