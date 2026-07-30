@@ -168,6 +168,11 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
   const [reasonPick, setReasonPick] = useState<string>(RETURN_REASON_DEFAULT);
   const [auxQty, setAuxQty] = useState('');
   const [ticked, setTicked] = useState<Record<number, string>>({});   // coil_id → Kg (chuỗi)
+  // THỨ TỰ tick (user 30/7): dòng trong đợt phải xếp đúng thứ tự tay bấm/quét,
+  // như ghi giấy. ⚠ Không dùng Object.keys(ticked) — khoá SỐ bị JS tự sắp tăng
+  // dần theo ID cuộn, thứ tự tick mất sạch (đã dính: anh Cường dò phiếu không khớp).
+  // Bỏ tick rồi tick lại → cuộn xếp xuống cuối theo lần tick sau cùng.
+  const [tickOrder, setTickOrder] = useState<number[]>([]);
   // Kết quả lần quét gần nhất — để BIẾT tem mỗi NCC chứa gì (khảo sát 28/7:
   // 4/5 tem không in giá trị mã vạch nên phải quét thật mới rõ)
   const [scan, setScan] = useState<{
@@ -181,6 +186,7 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
 
   const resetForm = useCallback(() => {
     setQ(''); setPickedCode(''); setLineNote(''); setAuxQty(''); setTicked({});
+    setTickOrder([]);
     setScan(null);
   }, []);
 
@@ -431,6 +437,7 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
     setPickedCode(code);
     setQ(code);
     setTicked({});
+    setTickOrder([]);
     setAuxQty('');
     setDept(defaultDepartment(branch, code, name));
   }
@@ -486,6 +493,8 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
       setDept(defaultDepartment(branch, code, exact[0].name));
       if (exact.length === 1) {
         setTicked((t) => ({ ...t, [exact[0].id]: String(exact[0].kg) }));
+        // Quét cuộn nào trước → dòng đó đứng trước (cùng luật với tick tay)
+        setTickOrder((o) => (o.includes(exact[0].id) ? o : [...o, exact[0].id]));
         setMsg(`Đã tick cuộn ${exact[0].coil_no}`);
       } else {
         setMsg(`${exact.length} cuộn cùng Lot ${s} — tick cuộn đúng bên dưới`);
@@ -517,7 +526,14 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
     }
 
     if (isNvl) {
-      const ids = Object.keys(ticked).map(Number);
+      // Dòng xếp ĐÚNG THỨ TỰ TICK/QUÉT (user 30/7) — không dùng Object.keys
+      // (khoá số bị JS sắp theo ID cuộn, mất thứ tự tay bấm). Phòng hờ lệch
+      // trạng thái: cuộn có tick mà thiếu trong tickOrder thì nối vào cuối.
+      const ordered = tickOrder.filter((id) => ticked[id] !== undefined);
+      const ids = [
+        ...ordered,
+        ...Object.keys(ticked).map(Number).filter((id) => !ordered.includes(id)),
+      ];
       if (ids.length === 0) { setErr('Chưa tick cuộn nào'); return; }
       const news: SlipLine[] = [];
       for (const id of ids) {
@@ -1100,14 +1116,20 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                         <input
                           type="checkbox"
                           checked={on}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const on2 = e.target.checked;
                             setTicked((t) => {
                               const n = { ...t };
-                              if (e.target.checked) n[c.id] = String(c.kg);
+                              if (on2) n[c.id] = String(c.kg);
                               else delete n[c.id];
                               return n;
-                            })
-                          }
+                            });
+                            setTickOrder((o) =>
+                              on2
+                                ? (o.includes(c.id) ? o : [...o, c.id])
+                                : o.filter((id) => id !== c.id),
+                            );
+                          }}
                           className="w-6 h-6 shrink-0"
                         />
                       </label>
