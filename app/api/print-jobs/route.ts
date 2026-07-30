@@ -10,7 +10,19 @@ export const runtime = 'nodejs';
 //   registration: ref_id = registration.id (uuid)
 //   labels_day: ref_id = 'YYYY-MM-DD' (in tất cả tem của ngày đó)
 export async function POST(req: Request) {
-  const session = await getSession();
+  // App chính (menu TV → Overtime, 30/7) gửi lệnh in bằng Bearer AGENT_SECRET
+  // → coi như admin hệ thống (in gộp phiếu ngày ngay từ app chính, khỏi mở
+  // app tăng ca). Mọi caller khác vẫn theo session đăng nhập như cũ.
+  const authHdr = req.headers.get('authorization') ?? '';
+  const viaAgentSecret =
+    !!process.env.AGENT_SECRET && authHdr === `Bearer ${process.env.AGENT_SECRET}`;
+  const session = viaAgentSecret
+    ? {
+        role: 'admin',
+        userId: null as string | null,
+        department: null as string | null,
+      }
+    : await getSession();
   if (!session) {
     return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
   }
