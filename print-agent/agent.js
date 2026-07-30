@@ -437,9 +437,16 @@ async function pushNvlStock(force = false) {
   );
 }
 
-/** ② Kéo phiếu lên app chính. sweep = lấy cả phiếu 'draft' nhân viên quên gửi. */
+/** ② Kéo phiếu lên app chính.
+ *  sweep = 'eod'   → vét HẾT phiếu nháp (mốc 16:30 — kể cả phiếu hôm nay)
+ *  sweep = 'start' → vét CHỈ phiếu nháp ngày TRƯỚC hôm nay (sáng bật PC vét bù
+ *                    hôm qua). Agent restart giữa ngày KHÔNG được gửi sớm phiếu
+ *                    nháp trong ngày — đã dính 2 lần (29-30/7) làm tách phiếu. */
 async function pushNvlSlips(sweep) {
-  const { slips } = await otFetch(`/api/nvl-slips/sync${sweep ? '?sweep=1' : ''}`);
+  let qs = '';
+  if (sweep === 'eod') qs = '?sweep=1';
+  else if (sweep === 'start') qs = `?sweep=1&before=${vnDate()}`;
+  const { slips } = await otFetch(`/api/nvl-slips/sync${qs}`);
   if (!slips || slips.length === 0) return;
   for (const s of slips) {
     if (!s.lines || s.lines.length === 0) continue;
@@ -590,14 +597,22 @@ async function syncOvertimeOnce() {
 async function syncNvlOnce() {
   if (!MAIN_APP_URL || !MAIN_APP_TOKEN) return;
   const today = vnDate();
-  // Vét: 1 lần khi agent khởi động (sáng bật PC) + 1 lần lúc 16:30
-  const sweep = !sweepOnStartDone || (vnHHMM() >= SWEEP_AT && sweptToday !== today);
-  if (sweep) {
-    if (vnHHMM() >= SWEEP_AT) sweptToday = today;
+  // Vét 2 kiểu (user chốt 30/7):
+  //   'start' — 1 lần khi agent khởi động: CHỈ phiếu ngày trước (vét bù hôm qua
+  //             khi PC tắt trước 16:30). Restart giữa ngày không đụng phiếu hôm nay.
+  //   'eod'   — mốc 16:30: vét hết, kể cả phiếu nháp hôm nay.
+  let sweep = null;
+  if (!sweepOnStartDone) {
+    sweep = 'start';
     sweepOnStartDone = true;
-    console.log(`[${new Date().toISOString()}] Vét phiếu chưa gửi (sweep)`);
+  } else if (vnHHMM() >= SWEEP_AT && sweptToday !== today) {
+    sweep = 'eod';
+    sweptToday = today;
   }
-  await pushNvlStock(sweep);
+  if (sweep) {
+    console.log(`[${new Date().toISOString()}] Vét phiếu chưa gửi (sweep=${sweep})`);
+  }
+  await pushNvlStock(!!sweep);
   await pushNvlSlips(sweep);
   await pullNvlStatuses();
 }

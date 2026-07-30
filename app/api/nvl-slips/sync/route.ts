@@ -7,10 +7,14 @@ export const runtime = 'nodejs';
 // ============================================================
 // Cầu nối cho AGENT trên PC (đăng nhập bằng tài khoản thật như print-agent).
 //
-//   GET  /api/nvl-slips/sync[?sweep=1]
+//   GET  /api/nvl-slips/sync[?sweep=1][&before=YYYY-MM-DD]
 //        → các phiếu cần đẩy sang app chính, kèm dòng.
 //          sweep=1 (agent vét 16:30 + sáng hôm sau): lấy CẢ phiếu 'draft' mà
 //          nhân viên quên bấm Gửi — user chốt cơ chế gửi kép chống quên.
+//          before=YYYY-MM-DD: vét CHỈ phiếu nháp có slip_date TRƯỚC ngày này.
+//          Dùng cho vét KHỞI ĐỘNG (user chốt 30/7): agent restart giữa ngày
+//          (deploy…) không được gửi sớm phiếu nháp CỦA CHÍNH HÔM ĐÓ — đã dính
+//          2 lần (29/7 phiếu 42 dòng, 30/7 phiếu 30 dòng) làm tách phiếu.
 //
 //   POST /api/nvl-slips/sync
 //        → agent ghi ngược kết quả từ app chính:
@@ -45,7 +49,10 @@ export async function GET(req: Request) {
   if (!agentAllowed(session.role)) {
     return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   }
-  const sweep = new URL(req.url).searchParams.get('sweep') === '1';
+  const url = new URL(req.url);
+  const sweep = url.searchParams.get('sweep') === '1';
+  const beforeRaw = url.searchParams.get('before') ?? '';
+  const before = /^\d{4}-\d{2}-\d{2}$/.test(beforeRaw) ? beforeRaw : '';
 
   // CHỈ trả phiếu CHƯA đẩy sang app chính (`synced_at IS NULL`).
   // Nếu không lọc, agent sẽ đẩy lại cùng 1 phiếu MỖI 60 GIÂY suốt thời gian nó
@@ -70,9 +77,9 @@ export async function GET(req: Request) {
     // gửi lại. Bắt buộc có người bấm Gửi (lúc đó POST /api/nvl-slips xoá
     // synced_at). Thiếu chốt này thì 16:30 agent tự gửi lại phiếu vừa bị xoá và
     // tồn có thể bị trừ LẦN HAI.
-    const { data: drafts, error: dErr } = await base()
-      .eq('status', 'draft').is('synced_at', null)
-      .order('slip_date').order('seq');
+    let q = base().eq('status', 'draft').is('synced_at', null);
+    if (before) q = q.lt('slip_date', before);   // vét khởi động: chỉ ngày TRƯỚC
+    const { data: drafts, error: dErr } = await q.order('slip_date').order('seq');
     if (dErr) return NextResponse.json({ error: dErr.message }, { status: 500 });
     slips = [...slips, ...(drafts ?? [])];
   }
