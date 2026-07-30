@@ -1187,25 +1187,46 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                   const i = lines.indexOf(l);
                   return (
                     <li key={i} className="px-2.5 py-2 text-sm flex items-start gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div>
-                          <span className="font-mono font-semibold">{l.material_code}</span>
-                          <span className="text-brand-navy-soft"> · {l.department}</span>
-                          {/* Lý do trả kho hiện ngay trên dòng — 1 phiếu có thể
-                              nhiều lý do nên phải nhìn ra được từng dòng là gì */}
-                          {isReturn && l.reason && (
-                            <span className="ml-1 text-xs font-bold text-orange-600">
-                              · {l.reason}
-                            </span>
-                          )}
+                      {isNvl ? (
+                        /* NVL (user 30/7): mặc định Heading nên KHÔNG hiện bộ phận.
+                           Dòng trên: Code · Loại NVL · Size (KG ở cột phải).
+                           Dòng dưới: Lot (1 số duy nhất — coil_no với lot_no vốn
+                           trùng nhau, hiện cả hai là tràn chữ) + lý do/ghi chú. */
+                        <div className="flex-1 min-w-0">
+                          <div className="truncate">
+                            <span className="font-mono font-semibold">{l.material_code}</span>
+                            {l.material_name && (
+                              <span className="text-brand-navy-soft"> · {l.material_name}</span>
+                            )}
+                            {l.material_spec && <span className={EMPH}> · {l.material_spec}</span>}
+                          </div>
+                          <div className="text-xs text-brand-navy-soft truncate">
+                            Lot: <span className="font-mono">{l.lot_no || l.coil_no || '?'}</span>
+                            {isReturn && l.reason && (
+                              <span className="font-bold text-orange-600"> · {l.reason}</span>
+                            )}
+                            {l.note && ` · ${l.note}`}
+                          </div>
                         </div>
-                        <div className="text-xs text-brand-navy-soft truncate">
-                          {l.material_name}
-                          {l.coil_no && ` · ${l.coil_no}`}
-                          {l.lot_no && ` · ${l.lot_no}`}
-                          {l.note && ` · ${l.note}`}
+                      ) : (
+                        /* Phụ liệu: giữ bộ phận (Heading/Rolling lẫn nhau) */
+                        <div className="flex-1 min-w-0">
+                          <div>
+                            <span className="font-mono font-semibold">{l.material_code}</span>
+                            <span className="text-brand-navy-soft"> · {l.department}</span>
+                            {isReturn && l.reason && (
+                              <span className="ml-1 text-xs font-bold text-orange-600">
+                                · {l.reason}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-brand-navy-soft truncate">
+                            {l.material_name}
+                            {l.material_spec && ` · ${l.material_spec}`}
+                            {l.note && ` · ${l.note}`}
+                          </div>
                         </div>
-                      </div>
+                      )}
                       <div className="text-right whitespace-nowrap">
                         <div className="font-semibold">{fmtQty(l.qty)} {l.unit}</div>
                         {(
