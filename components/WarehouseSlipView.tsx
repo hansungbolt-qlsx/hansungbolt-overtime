@@ -931,12 +931,12 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                         <span className={EMPH}>{m.name}</span>
                         {m.material && <> — <span className={EMPH}>{m.material}</span></>}
                         {m.spec && <> — <span className={EMPH}>{m.spec}</span></>}
-                        {/* TRẢ kho phụ liệu KHÔNG phụ thuộc tồn (trả là cộng vào
-                            tồn) → tồn 0 vẫn trả được, đừng tô đỏ "hết tồn kho"
-                            làm người dùng tưởng bị chặn. */}
+                        {/* Tồn = 0 tô ĐỎ ở CẢ 2 tab cho dễ nhận biết (user 30/7).
+                            Tab TRẢ vẫn ghi "tồn hiện tại 0" (trả là cộng vào tồn,
+                            tồn 0 vẫn trả được — màu đỏ chỉ báo hết hàng). */}
                         <span
                           className={
-                            isReturn || m.stock > 0
+                            m.stock > 0
                               ? 'text-brand-navy-soft'
                               : 'text-rose-600 font-semibold'
                           }
