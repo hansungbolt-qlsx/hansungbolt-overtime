@@ -362,6 +362,17 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
   // Gom thành từng ĐỢT theo ngày để tô nền phân biệt (user 28/7): 9 cuộn về 3
   // đợt → 3 khối màu khác nhau, nhìn là biết nhóm nào cũ.
   //
+  // Tra NCC theo số cuộn để hiện viết tắt sau Lot trên dòng phiếu (user 30/7).
+  // Cuộn chưa duyệt vẫn nằm trong tồn nên tra được; cuộn đã duyệt (rời tồn)
+  // thì thôi không hiện — lúc đó phiếu cũng đã khoá/thu gọn rồi.
+  const coilSup = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of coils) {
+      if (c.coil_no && c.supplier) m.set(c.coil_no, c.supplier);
+    }
+    return m;
+  }, [coils]);
+
   // `opening` = cả khối là cuộn TỒN ĐẦU KỲ lúc chuyển sang hệ thống này. Nhận
   // diện bằng coil_no bắt đầu 'OPN-' — đối chiếu DB thật 28/7 khớp 241/241 cuộn
   // của 7 phiếu OPN-20260423-*, và không có cuộn nào khác mang tiền tố này.
@@ -1202,6 +1213,9 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                           </div>
                           <div className="text-xs text-brand-navy-soft truncate">
                             Lot: <span className="font-mono">{l.lot_no || l.coil_no || '?'}</span>
+                            {coilSup.has(l.coil_no || '') && (
+                              <span className="font-semibold"> · {supShort(coilSup.get(l.coil_no || ''))}</span>
+                            )}
                             {isReturn && l.reason && (
                               <span className="font-bold text-orange-600"> · {l.reason}</span>
                             )}
