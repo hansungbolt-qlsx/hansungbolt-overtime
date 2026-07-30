@@ -400,16 +400,25 @@ async function pushNvlStock(force = false) {
   // Mã NVL trong KHSX HÔM NAY (user 30/7) — điện thoại cảnh báo khi xuất NVL
   // ngoài kế hoạch. Payload bọc MẢNG 1 phần tử cho khớp cache localStorage.
   // stock-version đã kèm id KHSX nên đồng bộ KHSX giữa ngày là đẩy lại liền.
-  const kh = await mainGet('/api/ot/khsx-nvl');
-  await otFetch('/api/nvl-stock', {
-    method: 'POST',
-    body: JSON.stringify({
-      part: 'nvl_khsx',
-      payload: [{ date: kh.date, has_data: kh.has_data, codes: kh.codes }],
-      n: (kh.codes || []).length,
-    }),
-  });
-  let extra = ` + ${line.nvl.n_line} cuộn ở line + ${(kh.codes || []).length} mã KHSX`;
+  // ⚠ Bọc try riêng: part phụ, lỗi (vd chưa chạy migration 21 nới CHECK part)
+  // KHÔNG được chặn cập nhật version — không thì cả gói tồn bị đẩy lại mỗi 60".
+  let extra = ` + ${line.nvl.n_line} cuộn ở line`;
+  try {
+    const kh = await mainGet('/api/ot/khsx-nvl');
+    await otFetch('/api/nvl-stock', {
+      method: 'POST',
+      body: JSON.stringify({
+        part: 'nvl_khsx',
+        payload: [{ date: kh.date, has_data: kh.has_data, codes: kh.codes }],
+        n: (kh.codes || []).length,
+      }),
+    });
+    extra += ` + ${(kh.codes || []).length} mã KHSX`;
+  } catch (e) {
+    console.error(
+      `[${new Date().toISOString()}] Part nvl_khsx lỗi (chưa chạy migration 21?): ${e.message}`,
+    );
+  }
   // Master NVL gần như bất động → giữ nhịp 6 giờ.
   if (heavyDue) {
     const heavy = await mainGet('/api/ot/stock?branch=nvl&include=master');
