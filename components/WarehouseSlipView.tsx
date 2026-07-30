@@ -1237,28 +1237,40 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
           className="w-full px-3 py-2.5 border border-gray-300 rounded-md"
         />
 
-        <div className={`grid grid-cols-2 gap-2 mt-3 ${isToday ? '' : 'hidden'}`}>
+        {/* User 30/7: LƯU là nút chính — mục tiêu gom cả ngày 1 phiếu, 16:30 máy
+            tự gửi. GỬI NGAY thu nhỏ + hỏi xác nhận để không bấm nhầm (gửi xong
+            phiếu bị KHÓA, xuất thêm là tách phiếu mới). */}
+        <div className={`mt-3 ${isToday ? '' : 'hidden'}`}>
           <button
             type="button"
             disabled={saving || lines.length === 0 || !isToday}
             onClick={() => save(false)}
-            className="py-3 rounded-xl border border-brand-navy text-brand-navy font-bold disabled:opacity-40"
+            className="w-full py-3 rounded-xl bg-brand-navy text-white font-bold disabled:opacity-40"
           >
-            💾 Lưu
+            💾 Lưu phiếu
           </button>
-          <button
-            type="button"
-            disabled={saving || lines.length === 0 || !isToday}
-            onClick={() => save(true)}
-            className="py-3 rounded-xl bg-brand-navy text-white font-bold disabled:opacity-40"
-          >
-            📤 Gửi lên app chính
-          </button>
+          <div className="mt-2 flex items-center justify-between gap-3">
+            <p className="text-[11px] text-brand-navy-soft">
+              Không cần bấm gửi — 16:30 máy tự gom cả ngày thành 1 phiếu gửi giúp.
+              Tồn kho chỉ thay đổi khi app chính duyệt.
+            </p>
+            <button
+              type="button"
+              disabled={saving || lines.length === 0 || !isToday}
+              onClick={() => {
+                if (
+                  window.confirm(
+                    'Gửi ngay lên app chính?\n\nGửi xong phiếu sẽ bị KHÓA — nếu xuất/trả thêm sau đó sẽ tách sang phiếu mới.\nBình thường nên để 16:30 máy tự gửi.',
+                  )
+                )
+                  save(true);
+              }}
+              className="shrink-0 px-2.5 py-1.5 rounded-lg border border-gray-300 text-xs font-semibold text-gray-500 disabled:opacity-40"
+            >
+              📤 Gửi ngay
+            </button>
+          </div>
         </div>
-        <p className="mt-2 text-[11px] text-brand-navy-soft">
-          Quên bấm Gửi thì cuối ngày (16:30) máy tự gửi giúp. Tồn kho chỉ thay đổi khi
-          app chính duyệt.
-        </p>
       </div>
 
       {/* Lịch sử */}
