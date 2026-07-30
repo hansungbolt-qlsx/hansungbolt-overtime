@@ -20,9 +20,10 @@ export const runtime = 'nodejs';
 //
 // part: nvl_main (cuộn kho Main) · nvl_line (cuộn đang ở line, dùng khi TRẢ kho)
 //       nvl_master (master NVL) · aux (mã phụ liệu + tồn)
+//       nvl_khsx (mã NVL trong KHSX hôm nay — cảnh báo xuất ngoài kế hoạch, 30/7)
 // ============================================================
 
-const PARTS = ['nvl_main', 'nvl_line', 'nvl_master', 'aux'] as const;
+const PARTS = ['nvl_main', 'nvl_line', 'nvl_master', 'aux', 'nvl_khsx'] as const;
 
 export async function GET(req: Request) {
   const session = await getSession();

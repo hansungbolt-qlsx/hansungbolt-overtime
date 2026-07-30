@@ -397,7 +397,19 @@ async function pushNvlStock(force = false) {
     method: 'POST',
     body: JSON.stringify({ part: 'nvl_line', payload: line.nvl.line_coils, n: line.nvl.n_line }),
   });
-  let extra = ` + ${line.nvl.n_line} cuộn ở line`;
+  // Mã NVL trong KHSX HÔM NAY (user 30/7) — điện thoại cảnh báo khi xuất NVL
+  // ngoài kế hoạch. Payload bọc MẢNG 1 phần tử cho khớp cache localStorage.
+  // stock-version đã kèm id KHSX nên đồng bộ KHSX giữa ngày là đẩy lại liền.
+  const kh = await mainGet('/api/ot/khsx-nvl');
+  await otFetch('/api/nvl-stock', {
+    method: 'POST',
+    body: JSON.stringify({
+      part: 'nvl_khsx',
+      payload: [{ date: kh.date, has_data: kh.has_data, codes: kh.codes }],
+      n: (kh.codes || []).length,
+    }),
+  });
+  let extra = ` + ${line.nvl.n_line} cuộn ở line + ${(kh.codes || []).length} mã KHSX`;
   // Master NVL gần như bất động → giữ nhịp 6 giờ.
   if (heavyDue) {
     const heavy = await mainGet('/api/ot/stock?branch=nvl&include=master');

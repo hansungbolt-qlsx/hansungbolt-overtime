@@ -151,6 +151,9 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
 
   // Tồn app chính đẩy xuống
   const [coils, setCoils] = useState<StockCoil[]>([]);
+  // Mã NVL trong KHSX hôm nay (user 30/7) — cảnh báo mềm khi XUẤT ngoài kế hoạch.
+  // null / has_data=false / khác ngày = KHÔNG cảnh báo (chưa có KHSX hôm nay).
+  const [khsx, setKhsx] = useState<{ date: string; has_data: boolean; codes: string[] } | null>(null);
   const [auxMats, setAuxMats] = useState<StockAux[]>([]);
   const [nvlMaster, setNvlMaster] = useState<MasterNvl[]>([]);
   const [stockAt, setStockAt] = useState<string>('');
@@ -220,7 +223,11 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
 
   const loadStock = useCallback(async () => {
     try {
-      const want = isNvl ? [stockPart, 'nvl_master'] : ['aux'];
+      // nvl_khsx chỉ cần cho XUẤT nguyên liệu (user 30/7: trả kho + phụ liệu
+      // không cảnh báo) — gói bé (~1 KB) nên đi cùng chuyến hỏi mốc.
+      const want = isNvl
+        ? [stockPart, 'nvl_master', ...(kind === 'issue' ? ['nvl_khsx'] : [])]
+        : ['aux'];
 
       // ⚠ CHỈ TẢI LẠI KHI TỒN BIẾN ĐỘNG (user chốt 28/7 tối).
       // Hỏi mốc trước (~100 B), trùng mốc đã lưu trong máy thì dùng luôn bản cũ.
@@ -253,6 +260,12 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
       if (isNvl) {
         setCoils((cached[stockPart] ?? []) as StockCoil[]);
         setNvlMaster((cached.nvl_master ?? []) as MasterNvl[]);
+        if (kind === 'issue') {
+          const k = (cached.nvl_khsx ?? [])[0] as
+            | { date: string; has_data: boolean; codes: string[] }
+            | undefined;
+          setKhsx(k ?? null);
+        }
         setStockAt(dm.parts?.[stockPart]?.pushed_at ?? '');
       } else {
         setAuxMats((cached.aux ?? []) as StockAux[]);
@@ -261,7 +274,13 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Lỗi tải tồn kho');
     }
-  }, [isNvl, stockPart]);
+  }, [isNvl, stockPart, kind]);
+
+  // Cảnh báo KHSX chỉ BẬT khi: xuất NVL + có dữ liệu + đúng ngày hôm nay
+  // (danh sách của hôm qua mà đem soi hôm nay là báo ảo).
+  const khsxActive =
+    isNvl && kind === 'issue' && !!khsx?.has_data && khsx.date === todayVN();
+  const khsxSet = useMemo(() => new Set(khsx?.codes ?? []), [khsx]);
 
   // Không setState đồng bộ trong effect (cascading render) — `loading` suy ra từ
   // "đã nạp xong cho tổ hợp nào", chỉ set sau khi await xong.
@@ -515,6 +534,18 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
         });
       }
       if (news.length === 0) { setErr('Không có cuộn hợp lệ'); return; }
+      // ⚠ CẢNH BÁO AN TOÀN (user 30/7): NVL không nằm trong KHSX hôm nay →
+      // hỏi xác nhận; đồng ý thì xuất bình thường (cảnh báo mềm, không chặn).
+      if (khsxActive) {
+        const off = [...new Set(
+          news.map((n) => n.material_code).filter((c) => c && !khsxSet.has(c)),
+        )];
+        if (off.length > 0 && !window.confirm(
+          `⚠ CẢNH BÁO AN TOÀN\n\n${off.join(', ')} không có trong KHSX hôm nay.\n\nVẫn tiếp tục xuất?`,
+        )) {
+          return;
+        }
+      }
       setLines((p) => [...p, ...news]);
     } else {
       if (!pickedAux) { setErr('Chưa chọn mã phụ liệu'); return; }
@@ -921,6 +952,13 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                 </>
               )}
             </div>
+            {/* Cảnh báo sớm NGAY KHI CHỌN MÃ (user 30/7): mã không nằm trong
+                KHSX hôm nay — nhắc trước cả khi bấm Thêm vào phiếu. */}
+            {khsxActive && pickedCode && !khsxSet.has(pickedCode) && (
+              <div className="mb-1.5 px-3 py-2 rounded-lg bg-amber-50 border border-amber-300 text-xs font-semibold text-amber-800">
+                ⚠ Mã này KHÔNG có trong KHSX hôm nay — kiểm tra lại trước khi xuất.
+              </div>
+            )}
             {/* Mã có ≥2 NCC → chú thích màu + số cuộn từng nhà, để biết đang
                 tick lẫn hàng của 2 nhà hay không (user 28/7). */}
             {multiSup && coilsOfPicked.length > 0 && (
@@ -1205,6 +1243,10 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
                            trùng nhau, hiện cả hai là tràn chữ) + lý do/ghi chú. */
                         <div className="flex-1 min-w-0">
                           <div className="truncate">
+                            {/* ⚠ = NVL ngoài KHSX hôm nay (user 30/7, cảnh báo mềm) */}
+                            {khsxActive && l.material_code && !khsxSet.has(l.material_code) && (
+                              <span title="Không nằm trong KHSX hôm nay">⚠ </span>
+                            )}
                             <span className="font-mono font-semibold">{l.material_code}</span>
                             {l.material_name && (
                               <span className="text-brand-navy-soft"> · {l.material_name}</span>
