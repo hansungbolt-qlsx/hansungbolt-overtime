@@ -174,6 +174,9 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
   // dần theo ID cuộn, thứ tự tick mất sạch (đã dính: anh Cường dò phiếu không khớp).
   // Bỏ tick rồi tick lại → cuộn xếp xuống cuối theo lần tick sau cùng.
   const [tickOrder, setTickOrder] = useState<number[]>([]);
+  // Mã đang có dòng XUẤT TẠM chờ chốt — khối phiếu tạm báo ngược lên. Dùng để
+  // nhắc khi xuất kho thường cùng mã đó, tránh ghi trùng hai nơi (user 31/7).
+  const [tempWaitingCodes, setTempWaitingCodes] = useState<string[]>([]);
   // Kết quả lần quét gần nhất — để BIẾT tem mỗi NCC chứa gì (khảo sát 28/7:
   // 4/5 tem không in giá trị mã vạch nên phải quét thật mới rõ)
   const [scan, setScan] = useState<{
@@ -505,6 +508,17 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
   );
 
   // ---- Thêm dòng --------------------------------------------------------
+  /** Hỏi lại nếu mã đang có dòng xuất tạm chờ chốt. true = cho đi tiếp. */
+  function warnTempWaiting(codes: Array<string | null | undefined>): boolean {
+    if (kind !== 'issue' || tempWaitingCodes.length === 0) return true;
+    const dup = [...new Set(codes.filter((c): c is string => !!c && tempWaitingCodes.includes(c)))];
+    if (dup.length === 0) return true;
+    return window.confirm(
+      `⚠ ${dup.join(', ')} đang có dòng ở PHIẾU XUẤT KHO TẠM chưa chốt.\n\n`
+      + 'Kiểm tra kẻo ghi trùng hai nơi cho cùng một lần xuất.\n\nVẫn tiếp tục?',
+    );
+  }
+
   function addLines() {
     setErr(''); setMsg('');
     const batchSeq = lines.length ? Math.max(...lines.map((l) => l.batch_seq)) : 0;
@@ -563,6 +577,10 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
           return;
         }
       }
+      // Nhắc khỏi ghi trùng hai nơi (user chốt 31/7): mã này đang có dòng xuất
+      // tạm chờ chốt. Cuộn thì đã được chặn ở tầng khác (phiếu tạm không gợi ý
+      // cuộn đã vào phiếu), đây chỉ là lời nhắc để khỏi ghi thừa rồi phải xoá.
+      if (!warnTempWaiting(news.map((n) => n.material_code))) return;
       setLines((p) => [...p, ...news]);
     } else {
       if (!pickedAux) { setErr('Chưa chọn mã phụ liệu'); return; }
@@ -583,6 +601,7 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
           return;
         }
       }
+      if (!warnTempWaiting([pickedAux.code])) return;
       setLines((p) => [...p, {
         batch_seq: nextBatch, batch_time: time, batch_user: '',
         department: dept,
@@ -724,6 +743,10 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
           auxMats={auxMats}
           nvlMaster={nvlMaster}
           onMerge={mergeTempLines}
+          usedCoilIds={usedCoilIds}
+          khsxActive={khsxActive}
+          khsxSet={khsxSet}
+          onWaitingCodes={setTempWaitingCodes}
         />
       )}
 

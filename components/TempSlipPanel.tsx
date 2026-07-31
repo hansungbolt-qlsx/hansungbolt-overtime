@@ -37,6 +37,7 @@ const fmtQty = (n: number) =>
 
 export default function TempSlipPanel({
   branch, coils, auxMats, nvlMaster, onMerge,
+  usedCoilIds, khsxActive, khsxSet, onWaitingCodes,
 }: {
   branch: Branch;
   coils: StockCoil[];
@@ -44,6 +45,13 @@ export default function TempSlipPanel({
   nvlMaster: MasterNvl[];
   /** Đưa dòng đã chốt vào phiếu hôm nay. Trả true nếu ghi thành công. */
   onMerge: (lines: SlipLine[]) => Promise<boolean>;
+  /** Cuộn ĐÃ nằm trong phiếu hôm nay / phiếu đã gửi — KHÔNG được ghép lần nữa. */
+  usedCoilIds: Set<number>;
+  /** Cảnh báo NVL ngoài KHSX (chỉ có ý nghĩa với ngày hôm nay). */
+  khsxActive: boolean;
+  khsxSet: Set<string>;
+  /** Báo ngược danh sách mã đang chờ để luồng xuất kho thường nhắc khỏi trùng. */
+  onWaitingCodes: (codes: string[]) => void;
 }) {
   const isNvl = branch === 'nvl';
 
@@ -96,10 +104,24 @@ export default function TempSlipPanel({
   useEffect(() => { void load(); }, [load]);
 
   // ---- Đối chiếu với tồn hiện có ----------------------------------------
-  const matches: TempMatch[] = useMemo(
-    () => (isNvl ? matchAllTempLines(rows, coils) : []),
-    [isNvl, rows, coils],
+  // ⚠ PHẢI trừ cuộn ĐÃ nằm trong phiếu hôm nay (user 31/7). Nếu không, cuộn vừa
+  // tick tay vào phiếu vẫn được gợi ý cho dòng tạm → chốt xong phiếu có CÙNG MỘT
+  // CUỘN HAI LẦN → app chính cộng đôi trọng lượng khi duyệt (cuộn chỉ trừ kho 1
+  // lần). Luồng xuất thường đã chặn bằng usedCoilIds; đây là chốt chặn tương ứng.
+  const availCoils = useMemo(
+    () => coils.filter((c) => !usedCoilIds.has(c.id)),
+    [coils, usedCoilIds],
   );
+
+  const matches: TempMatch[] = useMemo(
+    () => (isNvl ? matchAllTempLines(rows, availCoils) : []),
+    [isNvl, rows, availCoils],
+  );
+
+  // Báo ngược cho luồng xuất kho thường biết mã nào đang có dòng tạm chờ.
+  useEffect(() => {
+    onWaitingCodes([...new Set(rows.map((r) => r.material_code))]);
+  }, [rows, onWaitingCodes]);
 
   /** Phụ liệu: "đã có tồn" = tồn hiện tại ≥ số đã gõ. */
   const auxStock = useMemo(() => {
@@ -178,6 +200,14 @@ export default function TempSlipPanel({
         'Chưa gõ Lot / số hiệu cuộn.\n\nKhông có lot thì lúc đối chiếu app chỉ so được theo Kg.\nVẫn tiếp tục?',
       )) return;
     }
+    // CẢNH BÁO NVL NGOÀI KHSX — cùng luật với luồng xuất kho thường (user 30/7):
+    // mềm, không chặn. CHỈ soi khi ngày xuất thực tế đúng là HÔM NAY, vì điện
+    // thoại chỉ có danh sách KHSX của hôm nay — đem soi ngày khác là báo ảo.
+    if (isNvl && khsxActive && realDate === todayVN() && !khsxSet.has(pickedCode)) {
+      if (!window.confirm(
+        `⚠ CẢNH BÁO AN TOÀN\n\n${pickedCode} không có trong KHSX hôm nay.\n\nVẫn ghi dòng xuất tạm?`,
+      )) return;
+    }
     setBusy(true);
     try {
       const r = await fetch('/api/nvl-temp', {
@@ -240,7 +270,9 @@ export default function TempSlipPanel({
       const ln = m.line;
       if (isNvl) {
         const coilId = override[ln.id] ?? m.pick?.id;
-        const c = coils.find((x) => x.id === coilId);
+        // Tìm trong availCoils: cuộn đã vào phiếu hôm nay thì KHÔNG chốt lần nữa
+        // (chốt chặn cuối cùng — dù người dùng có ô chọn cũ trong bộ nhớ).
+        const c = availCoils.find((x) => x.id === coilId);
         if (!c) continue;
         newLines.push({
           batch_seq: 1, batch_time: time, batch_user: '',

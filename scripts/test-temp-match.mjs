@@ -170,7 +170,27 @@ console.log('\n=== 13. Không có cuộn nào trùng Kg → vẫn đủ danh sá
   check('liệt kê đủ 2 cuộn', m.candidates.length, 2);
 }
 
-console.log('\n=== 14. Cảnh báo treo quá 24h ===');
+console.log('\n=== 14. KHÔNG ghép cuộn ĐÃ nằm trong phiếu hôm nay (vá 31/7) ===');
+{
+  // Kịch bản hỏng thật: tick cuộn 1 vào phiếu tay, rồi mở phiếu tạm ra kiểm tra.
+  // Nếu app vẫn gợi ý cuộn 1 → phiếu có cùng cuộn 2 lần → app chính cộng ĐÔI Kg.
+  const coils = [
+    coil(1, 'L1', 2050, 'STS430-3.2', '2026-08-01'),
+    coil(2, 'L1', 2050, 'STS430-3.2', '2026-08-02'),
+  ];
+  const daVaoPhieu = new Set([1]);          // cuộn 1 đã nằm trong phiếu hôm nay
+  const con = coils.filter((c) => !daVaoPhieu.has(c.id));   // đúng cách màn hình lọc
+  const m = matchTempLine(line('a', 'L1', 2050), con, new Set());
+  check('KHÔNG gợi ý cuộn đã vào phiếu', m.pick?.id, 2);
+  check('ô chọn cũng không có cuộn đó', m.candidates.some(c => c.id === 1), false);
+
+  // Cuộn duy nhất đã bị dùng → không còn gì để ghép, phải báo rõ chứ không im.
+  const m2 = matchTempLine(line('b', 'L1', 2050), coils.filter(c => c.id !== 1 && c.id !== 2), new Set());
+  check('hết cuộn khả dụng → không đoán bừa', m2.pick, null);
+  check('báo chưa có cuộn', m2.reason.includes('Chưa có cuộn nào'), true);
+}
+
+console.log('\n=== 15. Cảnh báo treo quá 24h ===');
 {
   const old = { ...line('a', 'L1', 100), created_at: new Date(Date.now() - 25 * 3600_000).toISOString() };
   const fresh = { ...line('b', 'L1', 100), created_at: new Date(Date.now() - 3 * 3600_000).toISOString() };
