@@ -6,7 +6,7 @@ import {
   type Branch, type Department, type SlipLine, type StockAux, type StockCoil,
 } from '@/lib/nvl-slips';
 import {
-  isStale, matchAllTempLines, type TempLine, type TempMatch,
+  isStale, kgEq, matchAllTempLines, type TempLine, type TempMatch,
 } from '@/lib/nvl-temp';
 
 // ===========================================================================
@@ -429,8 +429,11 @@ export default function TempSlipPanel({
                             className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm"
                           >
                             <option value={0}>— chưa chọn cuộn —</option>
+                            {/* Ô này liệt kê ĐỦ mọi cuộn của mã, cuộn trùng Kg xếp
+                                trước và có dấu ✓ để khỏi chọn nhầm khi gõ nhầm Kg. */}
                             {m.candidates.map((c) => (
                               <option key={c.id} value={c.id}>
+                                {kgEq(c.kg, m.line.qty) ? '✓ ' : ''}
                                 {(c.lot_no || c.coil_no)} · {fmtQty(c.kg)} Kg
                                 {c.received_at ? ` · nhập ${ddmm(c.received_at)}` : ''}
                               </option>

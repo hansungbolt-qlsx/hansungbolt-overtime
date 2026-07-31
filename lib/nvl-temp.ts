@@ -102,26 +102,40 @@ export function matchTempLine(
     String(a.received_at || '').localeCompare(String(b.received_at || '')) || a.id - b.id;
 
   const kgOk = pool.filter((c) => kgEq(c.kg, line.qty)).sort(byOld);
+
+  // Ô CHỌN TAY LUÔN CÓ ĐỦ MỌI CUỘN của mã đó (user chốt 31/7 chiều), chỉ xếp
+  // cuộn trùng Kg lên đầu. Trước đây khi đã tìm được cuộn trùng Kg thì danh sách
+  // bị thu hẹp còn mấy cuộn đó → nhân viên kho GÕ NHẦM Kg (hay gặp với hàng nhập
+  // tay kiểu Vĩnh Thành, trọng lượng ghi tay dễ lệch) thì không cách nào chọn
+  // đúng cuộn mình đã lấy, phải xoá dòng gõ lại từ đầu.
+  const kgIds = new Set(kgOk.map((c) => c.id));
+  const allSorted = [...kgOk, ...pool.filter((c) => !kgIds.has(c.id)).sort(byOld)];
+
   if (kgOk.length > 0) {
     const lotOk = kgOk.filter(
       (c) => lotEq(line.lot_typed, c.lot_no) || lotEq(line.lot_typed, c.coil_no),
     );
     if (lotOk.length > 0) {
       return {
-        line, pick: lotOk[0], verdict: 'exact', candidates: kgOk,
+        line, pick: lotOk[0], verdict: 'exact', candidates: allSorted,
         reason: lotOk.length > 1
           ? `Khớp lot và Kg — có ${lotOk.length} cuộn giống hệt, lấy cuộn nhập trước nhất`
           : 'Khớp cả lot lẫn Kg',
       };
     }
+    // Chưa gõ lot ≠ gõ sai lot — nói đúng bản chất để người dùng khỏi tưởng mình
+    // gõ nhầm (hàng Vĩnh Thành nhập tay thường không có lot NCC để mà gõ).
+    const daGoLot = (line.lot_typed || '').trim() !== '';
+    const cuonGoiY = kgOk[0].lot_no ? `lot ${kgOk[0].lot_no}` : `cuộn ${kgOk[0].coil_no}`;
     return {
-      line, pick: kgOk[0], verdict: 'kg_only', candidates: kgOk,
-      reason: `Lot không khớp — nhưng có cuộn đúng ${fmtKgShort(line.qty)} Kg`
-        + (kgOk[0].lot_no ? `, lot ${kgOk[0].lot_no}` : `, cuộn ${kgOk[0].coil_no}`),
+      line, pick: kgOk[0], verdict: 'kg_only', candidates: allSorted,
+      reason: daGoLot
+        ? `Lot không khớp — nhưng có cuộn đúng ${fmtKgShort(line.qty)} Kg, ${cuonGoiY}`
+        : `Chưa gõ lot — gợi ý theo Kg: cuộn đúng ${fmtKgShort(line.qty)} Kg, ${cuonGoiY}`,
     };
   }
   return {
-    line, pick: null, verdict: 'none', candidates: [...pool].sort(byOld),
+    line, pick: null, verdict: 'none', candidates: allSorted,
     reason: pool.length === 0
       ? 'Chưa có cuộn nào của mã này trong kho'
       : `Kg đã gõ (${fmtKgShort(line.qty)}) không trùng cuộn nào — chọn tay`,

@@ -132,7 +132,45 @@ console.log('\n=== 10. Mã chưa có cuộn nào trong kho ===');
   check('báo chưa có cuộn', m.reason.includes('Chưa có cuộn nào'), true);
 }
 
-console.log('\n=== 11. Cảnh báo treo quá 24h ===');
+console.log('\n=== 11. GÕ NHẦM Kg vẫn phải chọn được cuộn khác (user chốt 31/7 chiều) ===');
+{
+  // Ca Vĩnh Thành: nhập tay, lot trên app chính là SỐ PHIẾU NHẬP, trọng lượng
+  // ghi tay dễ lệch. Gõ 1500 (trùng 2 cuộn) nhưng thực tế lấy cuộn 980.
+  const coils = [
+    coil(1, 'PN-2607-15', 1500, 'SWCH-5.5', '2026-07-20', 'VT-001'),
+    coil(2, 'PN-2607-15', 1500, 'SWCH-5.5', '2026-07-25', 'VT-002'),
+    coil(3, 'PN-2607-16', 980, 'SWCH-5.5', '2026-07-28', 'VT-003'),
+  ];
+  const m = matchTempLine(line('a', '', 1500, 'SWCH-5.5'), coils, new Set());
+  check('vẫn gợi ý cuộn trùng Kg', m.pick?.id, 1);
+  check('ô chọn có ĐỦ 3 cuộn', m.candidates.length, 3);
+  check('cuộn trùng Kg xếp trước', m.candidates.map(c => c.id), [1, 2, 3]);
+  check('chọn được cuộn 980kg', m.candidates.some(c => c.id === 3), true);
+}
+
+console.log('\n=== 12. Chưa gõ lot ≠ gõ sai lot (lời giải thích) ===');
+{
+  const coils = [coil(1, 'PN-2607-15', 1500, 'SWCH-5.5', '2026-07-20', 'VT-001')];
+  const chuaGo = matchTempLine(line('a', '', 1500, 'SWCH-5.5'), coils, new Set());
+  const goSai = matchTempLine(line('b', 'SAI-BET', 1500, 'SWCH-5.5'), coils, new Set());
+  check('chưa gõ → "Chưa gõ lot"', chuaGo.reason.startsWith('Chưa gõ lot'), true);
+  check('chưa gõ → KHÔNG nói "Lot không khớp"', chuaGo.reason.includes('Lot không khớp'), false);
+  check('gõ sai → "Lot không khớp"', goSai.reason.startsWith('Lot không khớp'), true);
+  check('cả hai vẫn gợi ý theo Kg', [chuaGo.verdict, goSai.verdict], ['kg_only', 'kg_only']);
+}
+
+console.log('\n=== 13. Không có cuộn nào trùng Kg → vẫn đủ danh sách ===');
+{
+  const coils = [
+    coil(1, 'L1', 1500, 'SWCH-5.5', '2026-07-20'),
+    coil(2, 'L2', 980, 'SWCH-5.5', '2026-07-25'),
+  ];
+  const m = matchTempLine(line('a', '', 1200, 'SWCH-5.5'), coils, new Set());
+  check('không đoán bừa', m.pick, null);
+  check('liệt kê đủ 2 cuộn', m.candidates.length, 2);
+}
+
+console.log('\n=== 14. Cảnh báo treo quá 24h ===');
 {
   const old = { ...line('a', 'L1', 100), created_at: new Date(Date.now() - 25 * 3600_000).toISOString() };
   const fresh = { ...line('b', 'L1', 100), created_at: new Date(Date.now() - 3 * 3600_000).toISOString() };
