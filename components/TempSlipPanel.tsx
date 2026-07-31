@@ -280,17 +280,25 @@ export default function TempSlipPanel({
     : 'chưa có dòng nào';
 
   return (
-    <div className={`rounded-xl border overflow-hidden ${
-      ready.length > 0 ? 'border-emerald-400 bg-emerald-50'
-        : nStale > 0 ? 'border-rose-400 bg-rose-50'
-          : 'border-brand-surface-alt bg-white'
+    // MÀU CAM = KHU VỰC TẠM (user chốt 31/7). Phiếu xuất kho chính nền trắng
+    // chữ xanh navy; khối này cam + vạch cam bên trái để nhìn phát biết ngay
+    // đang ở vùng "hàng chưa nhập kho", không nhầm với phiếu thật.
+    // Hai trạng thái CẦN CHÚ Ý vẫn thắng màu nền: xanh = đã có tồn (chốt được),
+    // đỏ = có dòng treo quá 24h.
+    <div className={`rounded-xl border border-l-4 overflow-hidden ${
+      ready.length > 0 ? 'border-emerald-400 border-l-emerald-500 bg-emerald-50'
+        : nStale > 0 ? 'border-rose-400 border-l-rose-500 bg-rose-50'
+          : 'border-amber-300 border-l-amber-500 bg-amber-50'
     }`}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="w-full text-left px-4 py-3 flex items-center justify-between gap-2"
       >
-        <span className="font-bold text-brand-navy text-sm">
+        <span className={`font-bold text-sm ${
+          ready.length > 0 ? 'text-emerald-800'
+            : nStale > 0 ? 'text-rose-800' : 'text-amber-800'
+        }`}>
           🕓 Phiếu xuất kho tạm — Hàng chưa nhập kho
         </span>
         <span className="flex items-center gap-2 shrink-0">
@@ -304,8 +312,8 @@ export default function TempSlipPanel({
               {nStale} treo &gt;24h
             </span>
           )}
-          <span className="text-xs text-brand-navy-soft">{badge}</span>
-          <span className="text-brand-navy-soft">{open ? '▲' : '▼'}</span>
+          <span className="text-xs text-amber-900/70">{badge}</span>
+          <span className="text-amber-700">{open ? '▲' : '▼'}</span>
         </span>
       </button>
 
@@ -314,15 +322,19 @@ export default function TempSlipPanel({
           {err && <p className="text-sm text-rose-700 font-semibold">⛔ {err}</p>}
           {msg && <p className="text-sm text-emerald-700 font-semibold">✓ {msg}</p>}
 
-          <p className="text-xs text-brand-navy-soft leading-relaxed">
+          <p className="text-xs text-amber-900/80 leading-relaxed">
             Dùng khi hàng về gấp, đưa vào máy trước lúc kho nhập lên app.
             Ghi <b>mỗi cuộn một dòng</b> (lot + Kg đọc trên tem). Khi app chính nhập kho xong,
             quay lại đây bấm <b>Kiểm tra</b> để chốt cuộn rồi đưa vào phiếu hôm nay.
+            <br />
+            <b>Ô Lot phải gõ đúng số in trên tem cuộn</b> — gõ tên nhà cung cấp thì
+            app không dò được cuộn. Mã <b>đang còn tồn vẫn chọn được</b> (tồn cũ có
+            thể là hàng NG nên hàng mới về vẫn phải xuất ngay).
           </p>
 
           {/* ---- Danh sách dòng đang chờ ---- */}
           {rows.length === 0 ? (
-            <p className="text-sm text-brand-navy-soft">Chưa có dòng tạm nào.</p>
+            <p className="text-sm text-amber-900/70">Chưa có dòng tạm nào.</p>
           ) : (
             <ul className="divide-y border border-black/5 rounded-lg bg-white">
               {rows.map((r) => {
@@ -445,9 +457,9 @@ export default function TempSlipPanel({
           )}
 
           {/* ---- Thêm dòng tạm mới ---- */}
-          <details className="rounded-lg border border-black/10 bg-white">
-            <summary className="px-2.5 py-2 text-sm font-semibold text-brand-navy cursor-pointer">
-              ➕ Ghi dòng xuất tạm
+          <details className="rounded-lg border border-amber-300 bg-white">
+            <summary className="px-2.5 py-2 text-sm font-semibold text-amber-800 cursor-pointer">
+              ➕ Ghi dòng xuất tạm (hàng chưa nhập kho)
             </summary>
             <div className="px-2.5 pb-2.5 space-y-2">
               <input
@@ -530,7 +542,7 @@ export default function TempSlipPanel({
                     type="button"
                     onClick={() => void addRow()}
                     disabled={busy}
-                    className="w-full py-2 rounded-xl bg-brand-teal text-white font-bold text-sm disabled:opacity-50"
+                    className="w-full py-2 rounded-xl bg-amber-600 text-white font-bold text-sm disabled:opacity-50"
                   >
                     Ghi dòng tạm
                   </button>
@@ -541,8 +553,8 @@ export default function TempSlipPanel({
 
           {/* ---- Đã chốt gần đây ---- */}
           {merged.length > 0 && (
-            <details className="rounded-lg border border-black/10 bg-white">
-              <summary className="px-2.5 py-2 text-sm font-semibold text-brand-navy cursor-pointer">
+            <details className="rounded-lg border border-amber-200 bg-white">
+              <summary className="px-2.5 py-2 text-sm font-semibold text-amber-800 cursor-pointer">
                 ✓ Đã chốt 7 ngày gần đây ({merged.length})
               </summary>
               <ul className="px-2.5 pb-2.5 text-xs text-brand-navy-soft space-y-1">
