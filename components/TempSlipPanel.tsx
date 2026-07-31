@@ -53,6 +53,10 @@ export default function TempSlipPanel({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
+  // Chưa chạy migration 22 → bảng chưa tồn tại. ẨN HẲN cả khối thay vì hiện lỗi
+  // đỏ: nhân viên kho không cần biết chuyện kỹ thuật, và màn xuất kho hằng ngày
+  // phải trông y như cũ cho tới khi tính năng thật sự sẵn sàng.
+  const [notReady, setNotReady] = useState(false);
 
   // Form thêm dòng
   const [q, setQ] = useState('');
@@ -72,7 +76,15 @@ export default function TempSlipPanel({
     try {
       const r = await fetch(`/api/nvl-temp?branch=${branch}`);
       const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Không tải được phiếu tạm');
+      if (!r.ok) {
+        // Bảng chưa có (migration 22 chưa chạy) → ẩn khối, KHÔNG báo lỗi.
+        if (/does not exist|schema cache|relation|nvl_temp_lines/i.test(d.error || '')) {
+          setNotReady(true);
+          return;
+        }
+        throw new Error(d.error || 'Không tải được phiếu tạm');
+      }
+      setNotReady(false);
       setRows((d.waiting ?? []).map((x: TempLine) => ({ ...x, qty: Number(x.qty) })));
       setMerged((d.merged ?? []).map((x: TempLine) => ({ ...x, qty: Number(x.qty) })));
     } catch (e) {
@@ -260,6 +272,9 @@ export default function TempSlipPanel({
   }
 
   // ---- Render ------------------------------------------------------------
+  // Chưa chạy migration → màn xuất kho giữ nguyên như trước, không thừa thứ gì.
+  if (notReady) return null;
+
   const badge = rows.length > 0
     ? `${rows.length} dòng chờ${ready.length > 0 ? ` · ${ready.length} đã có tồn` : ''}`
     : 'chưa có dòng nào';
