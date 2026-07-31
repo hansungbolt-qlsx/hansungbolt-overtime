@@ -121,19 +121,45 @@ export default function TempSlipPanel({
   const nStale = rows.filter((r) => isStale(r)).length;
 
   // ---- Ô gợi ý mã --------------------------------------------------------
+  /** Tồn hiện có theo mã NVL (gộp cuộn) — để ô gợi ý ghi rõ còn/hết như màn chính. */
+  const nvlStock = useMemo(() => {
+    const m = new Map<string, { n: number; kg: number }>();
+    for (const c of coils) {
+      const cur = m.get(c.code) ?? { n: 0, kg: 0 };
+      cur.n += 1; cur.kg += c.kg;
+      m.set(c.code, cur);
+    }
+    return m;
+  }, [coils]);
+
   const options = useMemo(() => {
     const s = q.trim();
     if (!s) return [];
     if (isNvl) {
       return nvlMaster
         .filter((m) => matchNvl(s, m.code, m.name, m.size))
-        .slice(0, 30);
+        .slice(0, 30)
+        .map((m) => {
+          const st = nvlStock.get(m.code);
+          return {
+            id: m.id, code: m.code, name: m.name, size: m.size, unit: m.unit,
+            // Ghi rõ tồn NGAY TRONG ô gợi ý (user chốt 31/7): hết tồn = chữ đỏ.
+            // ⚠ Ở phiếu TẠM, hết tồn KHÔNG phải lỗi — chính là ca dùng chính của
+            // tính năng (hàng chưa nhập kho). Chỉ để nhận biết, không chặn.
+            stockText: st ? `${st.n} cuộn tồn / ${fmtQty(st.kg)} kg` : 'hết tồn',
+            hasStock: !!st,
+          };
+        });
     }
     return auxMats
       .filter((a) => matchAux(s, a.code, a.name, a.material, a.spec))
       .slice(0, 30)
-      .map((a) => ({ id: a.id, code: a.code, name: a.name, size: a.spec, unit: a.unit }));
-  }, [q, isNvl, nvlMaster, auxMats]);
+      .map((a) => ({
+        id: a.id, code: a.code, name: a.name, size: a.spec, unit: a.unit,
+        stockText: a.stock > 0 ? `tồn ${fmtQty(a.stock)} ${a.unit}` : 'hết tồn kho',
+        hasStock: a.stock > 0,
+      }));
+  }, [q, isNvl, nvlMaster, auxMats, nvlStock]);
 
   const picked = useMemo(
     () => options.find((o) => o.code === pickedCode)
@@ -483,7 +509,13 @@ export default function TempSlipPanel({
                         }}
                         className="w-full text-left px-2.5 py-1.5 text-sm hover:bg-brand-surface"
                       >
-                        <b>{o.code}</b> <span className="text-brand-navy-soft">{o.name} {o.size}</span>
+                        <b>{o.code}</b>{' '}
+                        <span className="text-orange-600 font-semibold">{o.name}</span>
+                        {o.size ? <span className="text-orange-600 font-semibold"> {o.size}</span> : null}
+                        <span className={o.hasStock
+                          ? 'text-brand-navy-soft' : 'text-rose-600 font-semibold'}>
+                          {' — '}{o.stockText}
+                        </span>
                       </button>
                     </li>
                   ))}
@@ -491,6 +523,21 @@ export default function TempSlipPanel({
               )}
               {pickedCode && (
                 <>
+                  {/* Nhắc lại tồn của mã vừa chọn — hết tồn là bình thường ở phiếu
+                      tạm (hàng chưa nhập kho), chỉ để người ghi biết mình đang ở đâu. */}
+                  {(() => {
+                    const st = isNvl ? nvlStock.get(pickedCode) : null;
+                    const aux = isNvl ? null : auxMats.find((a) => a.code === pickedCode);
+                    const con = isNvl ? !!st : (aux?.stock ?? 0) > 0;
+                    const txt = isNvl
+                      ? (st ? `${st.n} cuộn tồn / ${fmtQty(st.kg)} kg` : 'Kho chưa có cuộn nào của mã này')
+                      : (aux && aux.stock > 0 ? `tồn ${fmtQty(aux.stock)} ${aux.unit}` : 'Kho chưa có tồn mã này');
+                    return (
+                      <p className={`text-xs ${con ? 'text-brand-navy-soft' : 'text-rose-600 font-semibold'}`}>
+                        {con ? '📦 ' : '⛔ '}{txt}
+                      </p>
+                    );
+                  })()}
                   <div className="grid grid-cols-2 gap-2">
                     <label className="text-xs text-brand-navy-soft">
                       Ngày xuất thực tế
