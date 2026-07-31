@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import BarcodeScanButton from './BarcodeScanButton';
+import TempSlipPanel from './TempSlipPanel';
 import {
   BRANCH_LABEL, DEPARTMENTS, KIND_LABEL, RETURN_REASONS, RETURN_REASON_DEFAULT,
   RETURN_REASON_OTHER, defaultDepartment, matchAux, matchNvl, supShort,
@@ -599,6 +600,33 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
     setLines((p) => p.filter((_, idx) => idx !== i));
   }
 
+  /**
+   * Nhận dòng đã chốt từ PHIẾU XUẤT TẠM → nhập vào phiếu hôm nay (user chốt 31/7).
+   *
+   * ⚠ LƯU NGAY chứ không chỉ setState: ngay sau khi hàm này trả true, bên kia sẽ
+   * đánh dấu dòng tạm là "đã chốt". Nếu chỉ để trong bộ nhớ mà người dùng đóng
+   * máy thì dòng tạm mất mà phiếu không có gì — mất dấu hàng đã vào máy.
+   * Phiếu hôm nay đã gửi rồi thì API tự mở phiếu mới (seq kế tiếp) — đúng thiết kế.
+   */
+  async function mergeTempLines(newLines: SlipLine[]): Promise<boolean> {
+    const nextBatch = (lines.length ? Math.max(...lines.map((l) => l.batch_seq)) : 0) + 1;
+    const all = [...lines, ...newLines.map((l) => ({ ...l, batch_seq: nextBatch }))];
+    try {
+      const r = await fetch('/api/nvl-slips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind, branch, send: false, note: slipNote, lines: all }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || 'Lưu thất bại');
+      await loadSlip();
+      return true;
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Lỗi ghi dòng vào phiếu hôm nay');
+      return false;
+    }
+  }
+
   // ---- Lưu / Gửi --------------------------------------------------------
   async function save(send: boolean) {
     if (lines.length === 0) { setErr('Phiếu chưa có dòng nào'); return; }
@@ -686,6 +714,18 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
       )}
 
       {loading && <p className="text-sm text-brand-navy-soft">Đang tải…</p>}
+
+      {/* PHIẾU XUẤT KHO TẠM — chỉ có ở XUẤT kho, và chỉ khi đang ở hôm nay
+          (xem lại ngày cũ là chỉ đọc). Trả kho không có khái niệm hàng chưa nhập. */}
+      {kind === 'issue' && isToday && !loading && (
+        <TempSlipPanel
+          branch={branch}
+          coils={coils}
+          auxMats={auxMats}
+          nvlMaster={nvlMaster}
+          onMerge={mergeTempLines}
+        />
+      )}
 
       {/* CÁC PHIẾU TRƯỚC trong ngày — THU GỌN, chỉ đọc. Bấm mới mở chi tiết.
           Tách hẳn khỏi phần soạn bên dưới để không thể gửi lại nhầm.

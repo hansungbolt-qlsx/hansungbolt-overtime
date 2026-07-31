@@ -108,6 +108,10 @@ type LineIn = {
   unit?: string;
   note?: string;
   reason?: string;
+  // Ngày xuất THỰC TẾ — chỉ dòng đến từ PHIẾU XUẤT TẠM mới có (hàng về gấp, xuất
+  // trước khi nhập kho, chốt vào phiếu ngày sau). App chính dùng để soi cảnh báo
+  // KHSX theo đúng ngày sản xuất và tự ghi chú "Xuất thực tế dd/mm" lên phiếu.
+  real_date?: string | null;
 };
 
 export async function POST(req: Request) {
@@ -145,6 +149,9 @@ export async function POST(req: Request) {
       // Lý do CHỈ có ý nghĩa với phiếu TRẢ kho (user chốt 29/7). Phiếu xuất kho
       // gửi kèm cũng bị bỏ, tránh dữ liệu rác.
       reason: kind === 'return' ? ((l.reason || '').trim().slice(0, 255) || null) : null,
+      // Chỉ nhận ngày dạng YYYY-MM-DD; rác thì bỏ (dòng thường luôn NULL).
+      real_date: /^\d{4}-\d{2}-\d{2}$/.test(String(l.real_date || ''))
+        ? String(l.real_date) : null,
     }))
     .filter((l) => l.material_code || l.coil_id);
 

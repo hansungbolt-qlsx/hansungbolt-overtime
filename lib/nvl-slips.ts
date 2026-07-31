@@ -162,4 +162,8 @@ export type SlipLine = {
   // Lý do TRẢ kho của riêng dòng này (migration 18). Rỗng/NULL = mặc định.
   // Phiếu xuất kho luôn để trống.
   reason?: string | null;
+  // NGÀY XUẤT THỰC TẾ (migration 22) — chỉ dòng đến từ PHIẾU XUẤT TẠM mới có:
+  // hàng về gấp, xuất trước khi nhập kho, chốt vào phiếu của ngày sau. App chính
+  // dùng để soi cảnh báo KHSX đúng ngày sản xuất + tự ghi chú "Xuất thực tế dd/mm".
+  real_date?: string | null;
 };

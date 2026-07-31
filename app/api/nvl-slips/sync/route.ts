@@ -115,6 +115,10 @@ export async function GET(req: Request) {
         unit: l.unit,
         note: l.note,
         reason: l.reason ?? null,   // lý do trả kho theo dòng (migration 18)
+        // Ngày xuất thực tế của dòng đến từ phiếu xuất tạm (migration 22).
+        // App chính soi cảnh báo KHSX theo ngày này thay vì ngày phiếu, và tự
+        // sinh ghi chú "Xuất thực tế dd/mm" in lên phiếu Q402-02.
+        real_date: l.real_date ?? null,
       })),
     })),
   });
