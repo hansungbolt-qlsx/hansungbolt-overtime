@@ -220,8 +220,20 @@ export async function POST(req: Request) {
     slipId = data.id;
   }
 
+  // ⚠ AN TOÀN THỨ TỰ TRIỂN KHAI (31/7): ngay trên kia đã XOÁ SẠCH dòng cũ rồi mới
+  // insert lại, mà hai lệnh này KHÔNG nằm trong cùng giao dịch. Nếu insert hỏng thì
+  // phiếu mất trắng dòng. Cột `real_date` là cột MỚI (migration 22) — deploy trước
+  // khi chạy migration là insert hỏng ngay, thổi bay phiếu đang soạn dở của kho.
+  // Vì vậy: dòng nào KHÔNG có ngày xuất thực tế thì BỎ HẲN khoá đó khỏi bản ghi
+  // (kết quả trong DB y hệt: cột mặc định NULL). Nhờ đó code mới chạy được cả trên
+  // DB chưa migration — chỉ dòng đến từ phiếu xuất tạm mới cần cột đó, mà phiếu tạm
+  // thì cũng chỉ tồn tại sau khi đã migration.
   const { error: linErr } = await supabaseAdmin.from('nvl_slip_lines').insert(
-    lines.map((l, i) => ({ ...l, slip_id: slipId, seq_no: i + 1 })),
+    lines.map((l, i) => {
+      const { real_date, ...rest } = l;
+      const row = { ...rest, slip_id: slipId, seq_no: i + 1 };
+      return real_date ? { ...row, real_date } : row;
+    }),
   );
   if (linErr) return NextResponse.json({ error: linErr.message }, { status: 500 });
 
