@@ -129,8 +129,12 @@ Phần liên quan tới repo này:
 - **Đóng phiên:** anh Hữu nói dừng/nghỉ/compact → chạy `git status` **cả hai
   app** rồi mới báo cáo. Repo này **đã từng để sót** `CLAUDE.md` suốt 2 ngày
   không commit (01→03/08/2026) đúng vì thiếu bước này.
-- Commit cục bộ thoải mái — nhưng **`git push` lên `main` = deploy thật ngay
-  cho người đang dùng**. Push phải hỏi anh Hữu.
+- **Xong một việc đã kiểm chứng → commit NGAY, không hỏi lại** (anh Hữu chốt
+  03/08/2026). Đây là ngoại lệ có chủ ý của quy tắc 4️⃣ — commit là *cất giữ
+  việc vừa xong*, không phải *làm thêm việc*.
+- ⚠ Ngoại lệ đó **chỉ cho `git commit`**. Repo này **`git push` lên `main` =
+  deploy thật ngay cho người đang dùng** → push **luôn phải hỏi anh Hữu**.
+  Trước khi commit vẫn chạy `npx tsc --noEmit`, phải sạch lỗi.
 
 ---
 
