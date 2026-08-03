@@ -116,5 +116,23 @@ và **bản xuất JSON toàn bộ Supabase** (19 bảng).
 
 ---
 
-*Cập nhật 01/08/2026. Chi tiết tính năng, cấu trúc bảng, lịch sử quyết định:
-xem `PROJECT_CONTEXT.md`.*
+## 🔒 NGHI THỨC PHIÊN LÀM VIỆC — áp dụng cho CẢ HAI app
+
+**Bản đầy đủ nằm ở một nơi duy nhất** (cố ý KHÔNG chép lại đây, để hai bản
+không bao giờ lệch nhau):
+`f:\0. Quản lý nguyên liệu\hsb-material-app\CLAUDE.md` → mục 2 →
+*"GIT & NGHI THỨC PHIÊN LÀM VIỆC"*.
+
+Phần liên quan tới repo này:
+
+- **Mở phiên:** `git log --oneline -3` + `git status --short` ở **cả hai** repo.
+- **Đóng phiên:** anh Hữu nói dừng/nghỉ/compact → chạy `git status` **cả hai
+  app** rồi mới báo cáo. Repo này **đã từng để sót** `CLAUDE.md` suốt 2 ngày
+  không commit (01→03/08/2026) đúng vì thiếu bước này.
+- Commit cục bộ thoải mái — nhưng **`git push` lên `main` = deploy thật ngay
+  cho người đang dùng**. Push phải hỏi anh Hữu.
+
+---
+
+*Cập nhật 03/08/2026 (thêm nghi thức phiên). Chi tiết tính năng, cấu trúc bảng,
+lịch sử quyết định: xem `PROJECT_CONTEXT.md`.*
