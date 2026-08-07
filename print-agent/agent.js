@@ -625,7 +625,39 @@ async function pushNvlStock(force = false) {
  *  sweep = 'start' → vét CHỈ phiếu nháp ngày TRƯỚC hôm nay (sáng bật PC vét bù
  *                    hôm qua). Agent restart giữa ngày KHÔNG được gửi sớm phiếu
  *                    nháp trong ngày — đã dính 2 lần (29-30/7) làm tách phiếu. */
+// ─────────────────────────────────────────────────────────────────────────────
+// CỬA KIỂM — hỏi THẲNG Supabase "có phiếu nào chưa đẩy không?" (07/08/2026)
+//
+// Vì sao: câu hỏi này chạy 1.548 lần/ngày để bắt ~2 phiếu thật (tỷ lệ 725:1),
+// và mỗi lần đi vòng agent → Vercel → Supabase → Vercel → agent. Nhưng dữ liệu
+// nằm ở Supabase; Vercel chỉ làm người đưa thư mà mỗi chuyến tính vào hạn mức
+// 4 giờ. Hỏi thẳng Supabase thì chuyến đó **miễn phí**.
+//
+// ⚠ Điều kiện lọc PHẢI khớp Y HỆT `app/api/nvl-slips/sync/route.ts`:
+//      vòng thường : .eq('status','pending').is('synced_at', null)
+//      vòng vét    : thêm .eq('status','draft').is('synced_at', null)
+//   Lệch một chữ là hoặc bỏ sót phiếu, hoặc cửa mở suốt ngày (anh Cường để một
+//   phiếu NHÁP chưa gửi thì cửa vẫn phải ĐÓNG ở vòng thường — đúng như route).
+//
+// ⚠ HỎNG THÌ MỞ, KHÔNG ĐÓNG. Supabase không trả lời → coi như "có việc" → gọi
+//   Vercel y như hôm nay. Xấu nhất = không tệ hơn hiện tại, KHÔNG BAO GIỜ mất phiếu.
+async function coPhieuChuaDay(sweep) {
+  if (!SB_ON) return true;                       // thiếu cấu hình → đi đường cũ
+  const dk = sweep
+    ? 'status=in.(pending,draft)'
+    : 'status=eq.pending';
+  try {
+    const res = await sb(`nvl_day_slips?${dk}&synced_at=is.null&select=uid&limit=1`);
+    return ((await res.json()) || []).length > 0;
+  } catch (e) {
+    console.error(`[${new Date().toISOString()}] Cửa kiểm phiếu lỗi (mở cửa): ${e.message}`);
+    return true;
+  }
+}
+
 async function pushNvlSlips(sweep) {
+  // Không có phiếu nào chờ ⇒ khỏi làm phiền Vercel. Đây là chỗ cắt 774 lượt/ngày.
+  if (!(await coPhieuChuaDay(sweep))) return;
   let qs = '';
   if (sweep === 'eod') qs = '?sweep=1';
   else if (sweep === 'start') qs = `?sweep=1&before=${vnDate()}`;
@@ -729,30 +761,57 @@ let lastOtFp = null;      // RAM — agent restart thì kéo lại 1 lần (rẻ
 let lastOtPullAt = 0;
 let otNoFpWarned = false;
 
+/** Lấy dấu vân tay tăng ca — THẲNG từ Supabase thay vì qua Vercel (07/08/2026).
+ *
+ * Route `/api/overtime-export?meta=1` của Vercel **không làm gì khác** ngoài gọi
+ * đúng hàm `overtime_fingerprint()` này rồi chuyển tiếp kết quả. Đã đối chiếu
+ * thật cùng thời điểm: Supabase trả `de7bb629d4ec0aec093138b6c453da8a`, Vercel
+ * cũng trả `de7bb629d4ec0aec093138b6c453da8a` — GIỐNG HỆT.
+ *
+ * Trả `null` nếu không lấy được → gọi lại đường Vercel cũ (hỏng thì mở, không đóng).
+ */
+async function vanTayTangCaTuSupabase() {
+  if (!SB_ON) return null;
+  try {
+    const res = await sb('rpc/overtime_fingerprint', { method: 'POST', body: '{}' });
+    const fp = await res.json();
+    return typeof fp === 'string' && fp ? fp : null;
+  } catch (e) {
+    console.error(`[${new Date().toISOString()}] Vân tay tăng ca lỗi (dùng đường Vercel): ${e.message}`);
+    return null;
+  }
+}
+
 async function syncOvertimeOnce() {
   if (!MAIN_APP_URL || !MAIN_APP_TOKEN) return;
-  ghiNhanGoi('vercel');
-  const metaRes = await fetch(`${APP_URL}/api/overtime-export?meta=1`, {
-    headers: { Authorization: `Bearer ${AGENT_SECRET}` },
-  });
-  if (!metaRes.ok) throw new Error(`overtime meta HTTP ${metaRes.status}`);
-  const meta = await metaRes.json();
 
-  let due;
-  if (meta.fp) {
-    due = meta.fp !== lastOtFp;
-    otNoFpWarned = false;
+  // Cửa kiểm: hỏi Supabase trước. Vân tay KHÔNG đổi ⇒ khỏi gọi Vercel.
+  // Đây là chỗ cắt 774 lượt/ngày còn lại.
+  const fpSb = await vanTayTangCaTuSupabase();
+  if (fpSb !== null) {
+    if (fpSb === lastOtFp) return;                 // không đổi → dừng, 0 lượt Vercel
+    // Có đổi → rơi xuống dưới, kéo gói đầy đủ qua Vercel như cũ.
   } else {
-    due = Date.now() - lastOtPullAt > OT_FALLBACK_MS;
-    if (!otNoFpWarned) {
-      console.warn(
-        `[${new Date().toISOString()}] Overtime: chưa có hàm vân tay (migration 19)` +
-          ' — tạm kéo 30 phút/lần',
-      );
-      otNoFpWarned = true;
-    }
+    // Không hỏi được Supabase → giữ nguyên đường cũ: hỏi ?meta=1 qua Vercel.
+    ghiNhanGoi('vercel');
+    const metaRes = await fetch(`${APP_URL}/api/overtime-export?meta=1`, {
+      headers: { Authorization: `Bearer ${AGENT_SECRET}` },
+    });
+    if (!metaRes.ok) throw new Error(`overtime meta HTTP ${metaRes.status}`);
+    const metaCu = await metaRes.json();
+    const dueCu = metaCu.fp
+      ? metaCu.fp !== lastOtFp
+      : Date.now() - lastOtPullAt > OT_FALLBACK_MS;
+    if (!dueCu) return;
   }
-  if (!due) return;
+
+  // ⚠ Tới được đây nghĩa là ĐÃ quyết định phải kéo — cả hai nhánh trên đều đã
+  // `return` khi không cần. TUYỆT ĐỐI không đánh giá lại điều kiện ở đây: bản
+  // nháp đầu của tôi giữ lại khối `let due = …` cũ, và khi đường Supabase hỏng
+  // (fpSb = null) nó rơi vào nhánh `OT_FALLBACK_MS` rồi `return` — nuốt mất lần
+  // kéo mà nhánh trên vừa xác định là CẦN. Lỗi im lặng, không log gì.
+  const meta = { fp: fpSb };
+  otNoFpWarned = false;
 
   ghiNhanGoi('vercel');
   const res = await fetch(`${APP_URL}/api/overtime-export`, {
