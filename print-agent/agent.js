@@ -573,7 +573,7 @@ async function pushNvlStock(force = false) {
   });
   // Cuộn ĐANG Ở LINE = nguồn chọn của tab TRẢ KHO ⇒ phải theo kịp tồn, KHÔNG để
   // nhịp 6 giờ (rà 28/7: 8 cuộn vừa xuất 18:06 chưa có trong danh sách trả, còn
-  // cuộn đã trả thì vẫn nằm đó tới 6 tiếng). Đo thật gói này 217 KB, tồn đổi
+  // cuộn đã trả thì vẫn nằm đó tới 6 tiếng). Đo lại 07/08/2026: gói này nay 358,7 KB (phình theo số cuộn ở line), tồn đổi
   // ~2 lần/ngày ⇒ thêm ~0,5 MB/ngày, không đáng kể so với quota 5 GB.
   const line = await mainGet('/api/ot/stock?branch=nvl&include=line');
   await otFetch('/api/nvl-stock', {
