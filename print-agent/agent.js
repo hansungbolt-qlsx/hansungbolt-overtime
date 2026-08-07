@@ -3,7 +3,7 @@
 // Poll app mỗi POLL_INTERVAL_MS để lấy job in mới, render PDF, gửi máy in.
 
 import 'dotenv/config';
-import { writeFileSync, unlinkSync, existsSync, mkdirSync } from 'fs';
+import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -25,6 +25,10 @@ const {
   // In DCCD qua app chính (localhost) — user 13/7
   MAIN_APP_URL,
   MAIN_APP_TOKEN,
+  // Nối THẲNG Supabase cho hàng đợi in — thêm 07/08/2026.
+  // Thiếu 2 biến này thì agent tự quay về đường Vercel như cũ (xem SB_ON).
+  SUPABASE_URL,
+  SUPABASE_SERVICE_KEY,
 } = process.env;
 
 // Validate config
@@ -36,7 +40,115 @@ for (const [k, v] of Object.entries(required)) {
   }
 }
 
-const POLL_MS = Number(POLL_INTERVAL_MS);
+// Giá trị thô từ .env — được áp hai chốt sàn ở dưới (xem POLL_MS), sau khi đã
+// biết SB_ON, vì sàn khác nhau tuỳ agent hỏi Supabase hay hỏi Vercel.
+const _pollThoLenh = Number(POLL_INTERVAL_MS);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NỐI THẲNG SUPABASE CHO HÀNG ĐỢI IN — 07/08/2026
+//
+// Vì sao: đo trên nhật ký Vercel ngày 07/08 — agent hỏi `/api/print-jobs` mỗi
+// 4,31 giây (3 s ngủ + 1,31 s mỗi lượt), tức **835 lượt/giờ = 88% toàn bộ lượt
+// gọi hàm của cả tháng**, để nhận ~5 lệnh in mỗi ngày. Tỷ lệ 1 lệnh in trên
+// 1.380 lượt hỏi. Gói Hobby chỉ có 4 giờ CPU cho mỗi 30 ngày và **KHÔNG có ngày
+// reset** (cửa sổ trượt) ⇒ đã lên 75% và không tự hết.
+//
+// Cách sửa: đọc `print_jobs` THẲNG từ Supabase. Vercel trở lại đúng vai trò
+// "tên miền cho người dùng truy cập" như anh Hữu chốt 07/08/2026.
+//
+// Vì sao phải dùng service_role: `docs/sql/11-print-jobs.sql` có
+// ENABLE ROW LEVEL SECURITY và toàn bộ 22 file SQL KHÔNG có `CREATE POLICY` nào
+// → đã thử thật: khoá anon đọc `print_jobs` trả về `[]`. Chỉ service_role vượt
+// được RLS. Khoá này vốn đã nằm trên máy này trong `.env.local`.
+//
+// An toàn: thiếu 1 trong 2 biến thì SB_ON = false và mọi thứ chạy y như cũ.
+// ─────────────────────────────────────────────────────────────────────────────
+const SB_ON = Boolean(SUPABASE_URL && SUPABASE_SERVICE_KEY);
+
+// ⚠️ HAI CHỐT AN TOÀN CỦA NHỊP POLL — 07/08/2026
+//
+// 1. SÀN THEO ĐÍCH. Hỏi Supabase thì nhanh bao nhiêu cũng được (không có hạn mức
+//    đếm truy vấn, chỉ tốn egress ~3% ở nhịp 3 giây). Nhưng nếu mất 2 biến
+//    SUPABASE_* thì agent quay về hỏi VERCEL — mà ở đó 3 giây = 835 lượt/giờ =
+//    đúng cái đã đẩy hạn mức lên 75%. Nên đường lui BỊ ÉP chậm tối thiểu 15 giây.
+//    Hỏng cấu hình khi đó chỉ làm in chậm, KHÔNG làm chết dịch vụ.
+//
+// 2. SÀN TUYỆT ĐỐI 1 GIÂY. Trước đây là `Number(POLL_INTERVAL_MS)` trần trụi:
+//    gõ sai .env (vd "15 000" hay "3s") → NaN → setTimeout(NaN) chạy ngay lập tức
+//    → vòng lặp không nghỉ, đốt hết hạn mức trong một buổi mà không ai biết.
+const POLL_MS = SB_ON
+  ? Math.max(1_000, _pollThoLenh || 3_000)
+  : Math.max(15_000, _pollThoLenh || 15_000);
+if (POLL_MS !== _pollThoLenh) {
+  console.log(`⚠ POLL_INTERVAL_MS="${POLL_INTERVAL_MS}" bị điều chỉnh → dùng ${POLL_MS}ms`
+    + (SB_ON ? '' : ' (đường lui qua Vercel — ép sàn 15 giây để giữ hạn mức)'));
+}
+
+// TTL 2 phút — PHẢI giữ đúng bằng `lib/print-jobs-expire.ts` bên app.
+// Đổi một bên mà quên bên kia là lệnh in hết hạn vẫn chạy ra giấy.
+const PRINT_JOB_TTL_MS = 2 * 60_000;
+
+// Đếm lượt gọi ra ngoài, ghi ra file cho bản tin sức khỏe buổi sáng đọc.
+//
+// ⚠️ PHẢI NẠP LẠI FILE KHI KHỞI ĐỘNG. Bản đầu của bộ đếm này giữ số trong bộ nhớ,
+// nên watchdog dựng lại agent (mỗi 5 phút nếu nó chết) là số của NGÀY về 0 →
+// bản tin sức khỏe báo 0,0% trong khi thực tế có thể đang cao. Đếm sai theo hướng
+// "yên tâm giả" thì tệ hơn không đếm.
+const DEM_FILE = join(AGENT_DIR, 'dem-luot-goi.json');
+const dem = {
+  ngay: '', gio: -1, tu_luc: new Date().toISOString(),
+  vercel_gio: 0, supabase_gio: 0, vercel_ngay: 0, supabase_ngay: 0,
+};
+
+(function napLaiBoDem() {
+  try {
+    const cu = JSON.parse(readFileSync(DEM_FILE, 'utf8'));
+    if (cu.ngay === new Date().toISOString().slice(0, 10)) {
+      dem.ngay = cu.ngay;
+      dem.vercel_ngay = Number(cu.vercel_ngay) || 0;
+      dem.supabase_ngay = Number(cu.supabase_ngay) || 0;
+      dem.tu_luc = cu.tu_luc || dem.tu_luc;
+      console.log(`Bộ đếm lượt gọi: nạp lại của hôm nay — Vercel ${dem.vercel_ngay}, `
+        + `Supabase ${dem.supabase_ngay} (tính từ ${dem.tu_luc})`);
+    }
+  } catch { /* chưa có file hoặc file hỏng → đếm từ 0, không sao */ }
+})();
+
+function ghiNhanGoi(dich) {
+  const t = new Date();
+  const ngay = t.toISOString().slice(0, 10);
+  const gio = t.getUTCHours();
+  if (dem.ngay !== ngay) {
+    dem.ngay = ngay; dem.vercel_ngay = 0; dem.supabase_ngay = 0;
+    dem.tu_luc = t.toISOString();
+  }
+  if (dem.gio !== gio) { dem.gio = gio; dem.vercel_gio = 0; dem.supabase_gio = 0; }
+  if (dich === 'vercel') { dem.vercel_gio++; dem.vercel_ngay++; }
+  else { dem.supabase_gio++; dem.supabase_ngay++; }
+  try {
+    writeFileSync(DEM_FILE, JSON.stringify({ ...dem, cap_nhat: t.toISOString() }, null, 2));
+  } catch { /* đếm hỏng KHÔNG được làm chết vòng in */ }
+}
+
+/** Gọi PostgREST của Supabase. Ném lỗi nếu không 2xx. */
+async function sb(path, opts = {}) {
+  ghiNhanGoi('supabase');
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...opts,
+    headers: {
+      apikey: SUPABASE_SERVICE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+      ...(opts.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    throw new Error(`Supabase ${res.status} ${t}`.slice(0, 200));
+  }
+  return res;
+}
+
 const TMP_DIR = join(tmpdir(), 'hansungbolt-print');
 if (!existsSync(TMP_DIR)) mkdirSync(TMP_DIR, { recursive: true });
 
@@ -47,6 +159,7 @@ let sessionCookie = null;
 
 async function login() {
   console.log(`[${new Date().toISOString()}] Login as ${LOGIN_USERNAME}...`);
+  ghiNhanGoi('vercel');
   const res = await fetch(`${APP_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -73,28 +186,89 @@ async function login() {
 // -----------------------------------------------------------
 // Print jobs API
 // -----------------------------------------------------------
-async function pollPendingJobs() {
-  const res = await fetch(`${APP_URL}/api/print-jobs?status=pending`, {
-    headers: { Authorization: `Bearer ${AGENT_SECRET}` },
+/** Dọn lệnh in quá hạn — bản sao Y HỆT `lib/print-jobs-expire.ts` bên app.
+ *
+ * Vì sao agent phải tự làm: trước 07/08/2026 route `GET /api/print-jobs` của
+ * Vercel dọn giúp TRƯỚC khi trả danh sách, nên agent không bao giờ nhận được
+ * lệnh đã hết hạn. Đọc thẳng Supabase thì không còn ai dọn hộ ⇒ nếu bỏ bước này,
+ * agent tắt 10 phút rồi bật lại sẽ IN RA lệnh cũ — đúng cái bug đã trả giá 11/7.
+ */
+// Dọn mỗi 30 giây là đủ (TTL là 2 phút) — chạy mỗi lượt poll thì tốn 3 lượt gọi
+// Supabase thay vì 1, mà không sớm hơn được phút nào.
+const DON_MOI_MS = 30_000;
+let lanDonCuoi = 0;
+
+async function donJobHetHan() {
+  if (Date.now() - lanDonCuoi < DON_MOI_MS) return;
+  lanDonCuoi = Date.now();
+  const cutoff = new Date(Date.now() - PRINT_JOB_TTL_MS).toISOString();
+  const patch = JSON.stringify({
+    status: 'error',
+    finished_at: new Date().toISOString(),
+    error_message: 'Quá 2 phút chưa in được — lệnh đã tự hủy, hãy gửi lại',
   });
-  if (!res.ok) {
-    throw new Error(`Poll HTTP ${res.status}`);
+  const h = { Prefer: 'return=minimal' };
+  // `cutoff` do toISOString() sinh ra nên kết thúc bằng 'Z' — đã thử: dạng
+  // '+00:00' làm PostgREST trả HTTP 400 (dấu + bị hiểu là khoảng trắng trong URL).
+  await sb(`print_jobs?status=eq.pending&created_at=lt.${cutoff}`,
+    { method: 'PATCH', body: patch, headers: h });
+  await sb(`print_jobs?status=eq.printing&started_at=lt.${cutoff}`,
+    { method: 'PATCH', body: patch, headers: h });
+}
+
+async function pollPendingJobs() {
+  if (!SB_ON) {
+    // Đường cũ qua Vercel — chỉ chạy khi thiếu biến Supabase.
+    ghiNhanGoi('vercel');
+    const res = await fetch(`${APP_URL}/api/print-jobs?status=pending`, {
+      headers: { Authorization: `Bearer ${AGENT_SECRET}` },
+    });
+    if (!res.ok) {
+      throw new Error(`Poll HTTP ${res.status}`);
+    }
+    const { jobs } = await res.json();
+    return jobs ?? [];
   }
-  const { jobs } = await res.json();
-  return jobs ?? [];
+  await donJobHetHan();
+  const res = await sb(
+    'print_jobs?status=eq.pending'
+    + '&select=id,type,ref_id,requested_by,status,created_at'
+    + '&order=created_at.asc&limit=5',
+  );
+  return (await res.json()) ?? [];
 }
 
 async function updateJob(id, status, errorMessage) {
-  const res = await fetch(`${APP_URL}/api/print-jobs/${id}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${AGENT_SECRET}`,
-    },
-    body: JSON.stringify({ status, error_message: errorMessage }),
-  });
-  if (!res.ok) {
-    console.error(`Update job ${id} failed: ${res.status}`);
+  // Ba dòng dưới PHẢI khớp `app/api/print-jobs/[id]/route.ts` — lệch là nút In
+  // trên điện thoại báo sai trạng thái, và TTL mất mốc `started_at` để tính.
+  const patch = { status };
+  if (status === 'printing') patch.started_at = new Date().toISOString();
+  if (status === 'done' || status === 'error') patch.finished_at = new Date().toISOString();
+  if (status === 'error' && errorMessage) patch.error_message = errorMessage;
+
+  if (!SB_ON) {
+    ghiNhanGoi('vercel');
+    const res = await fetch(`${APP_URL}/api/print-jobs/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${AGENT_SECRET}`,
+      },
+      body: JSON.stringify({ status, error_message: errorMessage }),
+    });
+    if (!res.ok) {
+      console.error(`Update job ${id} failed: ${res.status}`);
+    }
+    return;
+  }
+  try {
+    await sb(`print_jobs?id=eq.${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+      headers: { Prefer: 'return=minimal' },
+    });
+  } catch (e) {
+    console.error(`Update job ${id} failed: ${e.message}`);
   }
 }
 
@@ -224,6 +398,7 @@ async function renderPDF(job) {
 const KHSX_SHEET = { khsx_tong: 'KHSX tổng', khsx_homnay: 'KHSX hôm nay' };
 
 async function printKhsx(job) {
+  ghiNhanGoi('vercel');
   const res = await fetch(`${APP_URL}/api/plan-files/${job.ref_id}/download`, {
     headers: { Cookie: `session=${sessionCookie}` },
   });
@@ -290,6 +465,7 @@ async function pushDccdCatalog() {
   });
   if (!res.ok) throw new Error(`lots-all-local HTTP ${res.status}`);
   const d = await res.json();
+  ghiNhanGoi('vercel');
   const up = await fetch(`${APP_URL}/api/dccd-lots`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Cookie: `session=${sessionCookie}` },
@@ -348,8 +524,14 @@ async function mainGet(path) {
 }
 
 async function otFetch(path, init = {}) {
-  const doIt = () =>
-    fetch(`${APP_URL}${path}`, {
+  // ⚠ Đếm PHẢI nằm TRONG doIt vì doIt được gọi lại khi gặp 401 (login lại rồi thử
+  // lần hai) — đặt ngoài thì đếm thiếu. Và phải là khối `{ … return … }`: viết
+  // arrow không ngoặc rồi chèn thêm câu lệnh thì câu đầu thành thân hàm, hàm trả
+  // về undefined, và `res.status` ở dưới nổ "Cannot read properties of undefined".
+  // Đúng lỗi đã xảy ra thật lúc 16:47 ngày 07/08/2026.
+  const doIt = () => {
+    ghiNhanGoi('vercel');
+    return fetch(`${APP_URL}${path}`, {
       ...init,
       headers: {
         ...(init.headers || {}),
@@ -357,6 +539,7 @@ async function otFetch(path, init = {}) {
         Cookie: `session=${sessionCookie}`,
       },
     });
+  };
   let res = await doIt();
   if (res.status === 401) {
     await login();
@@ -548,6 +731,7 @@ let otNoFpWarned = false;
 
 async function syncOvertimeOnce() {
   if (!MAIN_APP_URL || !MAIN_APP_TOKEN) return;
+  ghiNhanGoi('vercel');
   const metaRes = await fetch(`${APP_URL}/api/overtime-export?meta=1`, {
     headers: { Authorization: `Bearer ${AGENT_SECRET}` },
   });
@@ -570,6 +754,7 @@ async function syncOvertimeOnce() {
   }
   if (!due) return;
 
+  ghiNhanGoi('vercel');
   const res = await fetch(`${APP_URL}/api/overtime-export`, {
     headers: { Authorization: `Bearer ${AGENT_SECRET}` },
   });
