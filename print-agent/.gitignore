@@ -2,3 +2,6 @@
 node_modules/
 *.log
 *.log.old
+# So lieu chay (bo dem luot goi ra ngoai) — khong commit
+dem-luot-goi.json
+agent-err.log.truoc-va
