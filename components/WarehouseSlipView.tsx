@@ -194,6 +194,41 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
     setScan(null);
   }, []);
 
+  /**
+   * ĐỔI BỐI CẢNH (nhánh / ngày) ⇒ DỐC RỔ NGAY.
+   *
+   * 🪤 Vá lỗi THẬT 08/08/2026 — xem `docs/DE-XUAT.md` mục B30.
+   * Phiếu `ot-2026-08-08-issue-aux-1` sinh ra đã mang **27 dòng NGUYÊN LIỆU**.
+   * Nguyên nhân: `lines` là MỘT rổ dùng chung cho cả 4 tổ hợp (Xuất/Trả ×
+   * NVL/Phụ liệu). Đổi tab chỉ đổi `branch`, KHÔNG dốc rổ — mà rổ chỉ được dốc
+   * khi `loadSlip()` nạp THÀNH CÔNG. Sáng 08/08 lần nạp tab Phụ liệu không xong
+   * (mạng chớp / treo); nhánh `catch` chỉ `setErr()`, không đụng `lines` ⇒ 27
+   * dòng NVL nằm lại từ 08:51 tới 11:08 — **hơn 2 giờ**, không phải tranh chấp
+   * vài giây. Anh Cường thêm dòng washer vào đúng rổ đó rồi bấm Lưu ⇒ 28 dòng
+   * vào phiếu phụ liệu.
+   * Bằng chứng khép kín: `batch_seq` của dòng washer = **9** = max(8)+1; nếu nạp
+   * thành công thì rổ đã rỗng và nó phải bằng **1**.
+   *
+   * ⚠ CỐ Ý KHÔNG dốc rổ trong `catch` của `loadSlip`. Sau mỗi lần Lưu, hàm đó
+   * chạy lại; nếu lần nạp ĐÓ lỗi mà mình xoá `lines` thì phiếu vừa lưu trông như
+   * trống rỗng → người dùng gõ lại từ đầu → **GHI TRÙNG**, tệ hơn lỗi đang vá.
+   * Dốc rổ ở ĐÚNG chỗ đổi bối cảnh là đủ: nạp được hay không thì rổ cũng rỗng.
+   *
+   * ⚠ Không mất dữ liệu: dòng chưa Lưu vốn đã bị mất khi lần nạp thành công ghi
+   * đè — nay chỉ mất sớm hơn vài giây, ngay lúc đổi tab.
+   *
+   * `kind` KHÔNG cần xử ở đây: nó là **prop**, và `RegisterLayout` render hai tab
+   * ở hai vị trí khác nhau nên đổi Xuất↔Trả là tháo component rồi dựng lại ⇒
+   * state tự về rỗng. Đã kiểm 10/08/2026.
+   */
+  const xoaBoiCanh = useCallback(() => {
+    setLines([]);
+    setSlip(null);
+    setSlipNote('');
+    setPast([]);
+    setEvents([]);
+  }, []);
+
   const loadSlip = useCallback(async () => {
     setErr('');
     try {
@@ -692,7 +727,7 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
           <button
             key={b}
             type="button"
-            onClick={() => { setBranch(b); resetForm(); setMsg(''); setErr(''); }}
+            onClick={() => { setBranch(b); xoaBoiCanh(); resetForm(); setMsg(''); setErr(''); }}
             className={`py-2.5 rounded-xl text-sm font-semibold border transition ${
               branch === b
                 ? 'bg-brand-teal text-white border-brand-teal shadow-md shadow-brand-teal/30'
@@ -711,13 +746,13 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
           type="date"
           value={viewDate}
           max={todayVN()}
-          onChange={(e) => { setViewDate(e.target.value || todayVN()); resetForm(); setMsg(''); setErr(''); }}
+          onChange={(e) => { setViewDate(e.target.value || todayVN()); xoaBoiCanh(); resetForm(); setMsg(''); setErr(''); }}
           className="px-3 py-2 border border-gray-300 rounded-md text-brand-navy"
         />
         {!isToday && (
           <button
             type="button"
-            onClick={() => { setViewDate(todayVN()); resetForm(); setMsg(''); setErr(''); }}
+            onClick={() => { setViewDate(todayVN()); xoaBoiCanh(); resetForm(); setMsg(''); setErr(''); }}
             className="px-3 py-2 rounded-lg bg-brand-teal text-white text-sm font-semibold"
           >
             ↩ Về hôm nay
