@@ -130,6 +130,8 @@ export async function PATCH(req: Request) {
   const body = await req.json().catch(() => null);
   const items: Array<{
     id?: string; coil_id?: number | null; coil_no?: string; lot_no?: string; slip_uid?: string;
+    /** Phụ liệu chốt MỘT PHẦN: số trước khi trừ, và phần dư phải giữ lại. */
+    prev_qty?: number; remain_qty?: number;
   }> = Array.isArray(body?.items) ? body.items : [];
   if (items.length === 0) {
     return NextResponse.json({ error: 'Thiếu items' }, { status: 400 });
@@ -141,6 +143,43 @@ export async function PATCH(req: Request) {
   const skipped: string[] = [];
   for (const it of items) {
     if (!it.id) continue;
+
+    // ── CHỐT MỘT PHẦN (chỉ phụ liệu) — user chốt 10/08/2026, phương án A ──
+    //
+    // Bản cũ chốt 60K của dòng tạm 100K rồi đánh dấu CẢ DÒNG là 'merged' (bảng
+    // không có cột `merged_qty`) ⇒ 40K đã vào máy KHÔNG được ghi ở đâu, tồn app
+    // cao hơn thực tế 40K vĩnh viễn. Đây là lỗi DUY NHẤT mà app chính không thể
+    // bắt khi duyệt — vì con số đó không tồn tại để mà kiểm.
+    //
+    // Nay: giữ dòng ở 'waiting' và TRỪ phần đã chốt. Không cần cột mới.
+    // `created_at` giữ nguyên ⇒ đồng hồ "treo >24h" vẫn chạy từ lúc hàng vào máy,
+    // nên bản tin sáng vẫn soi được phần dư.
+    //
+    // `.eq('qty', prev_qty)` = CHỐT CHẶN LẠC QUAN: chỉ trừ khi số hiện tại đúng
+    // bằng số lúc người dùng bấm ⇒ gửi lại lần hai KHÔNG trừ hai lần. An toàn với
+    // dữ liệu thật: đo 10/08/2026 toàn bộ 184 dòng nhập/xuất phụ liệu đều là SỐ
+    // NGUYÊN, không có số thập phân để lệch khi so bằng.
+    const con = Number(it.remain_qty);
+    if (Number.isFinite(con) && con > 0) {
+      const truoc = Number(it.prev_qty);
+      if (!Number.isFinite(truoc) || truoc <= con) {
+        return NextResponse.json(
+          { error: 'Chốt một phần cần prev_qty > remain_qty > 0' }, { status: 400 },
+        );
+      }
+      const { data, error } = await supabaseAdmin
+        .from('nvl_temp_lines')
+        .update({ qty: con, updated_at: new Date().toISOString() })
+        .eq('id', it.id)
+        .eq('status', 'waiting')
+        .eq('qty', truoc)
+        .select('id');
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      if (data && data.length > 0) done.push(it.id);
+      else skipped.push(it.id);
+      continue;
+    }
+
     const { data, error } = await supabaseAdmin
       .from('nvl_temp_lines')
       .update({

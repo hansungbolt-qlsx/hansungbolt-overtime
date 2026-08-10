@@ -22,7 +22,7 @@ writeFileSync(join(dir, 'nvl-slips.ts'), readFileSync('lib/nvl-slips.ts', 'utf8'
 writeFileSync(join(dir, 'nvl-temp.ts'), readFileSync('lib/nvl-temp.ts', 'utf8'));
 execSync(`npx tsc "${join(dir, 'nvl-temp.ts')}" --target es2022 --module es2022 --moduleResolution bundler --outDir "${dir}"`,
   { stdio: 'inherit' });
-const { matchTempLine, matchAllTempLines, lotEq, kgEq, isStale } =
+const { matchTempLine, matchAllTempLines, lotEq, kgEq, isStale, phanBoAux } =
   await import(`file://${join(dir, 'nvl-temp.js')}`);
 
 let pass = 0, fail = 0;
@@ -197,6 +197,123 @@ console.log('\n=== 15. Cảnh báo treo quá 24h ===');
   check('25h = treo', isStale(old), true);
   check('3h = chưa treo', isStale(fresh), false);
   check('đã chốt thì không tính treo', isStale({ ...old, status: 'merged' }), false);
+}
+
+console.log('\n=== 16. CHIA TỒN cho dòng tạm PHỤ LIỆU (phanBoAux) — user chốt 10/08 ===');
+{
+  // Dòng tạm phụ liệu: không có cuộn, không có lot. Chỉ mã + số lượng.
+  const pl = (id, code, qty) => ({
+    id, branch: 'aux', real_date: '2026-08-07', department: 'Rolling',
+    material_code: code, lot_typed: null, qty, unit: 'EA',
+    status: 'waiting', created_at: new Date().toISOString(),
+  });
+  const gon = (r) => r.map((a) => [a.line.id, a.chot, a.du]);
+
+  // -- Ca cơ bản --
+  check('tồn ĐỦ → chốt hết, không dư',
+    gon(phanBoAux([pl('a', 'W1', 100)], new Map([['W1', 100]]))), [['a', 100, 0]]);
+  check('tồn THỪA → chốt hết, không dư',
+    gon(phanBoAux([pl('a', 'W1', 100)], new Map([['W1', 300]]))), [['a', 100, 0]]);
+  check('tồn THIẾU → chốt phần có, GIỮ phần dư (đây là lỗi mất 40K)',
+    gon(phanBoAux([pl('a', 'W1', 100)], new Map([['W1', 60]]))), [['a', 60, 40]]);
+  check('tồn 0 → không chốt gì, giữ nguyên cả dòng',
+    gon(phanBoAux([pl('a', 'W1', 100)], new Map([['W1', 0]]))), [['a', 0, 100]]);
+  check('mã không có trong bảng tồn → coi như 0',
+    gon(phanBoAux([pl('a', 'W9', 100)], new Map())), [['a', 0, 100]]);
+
+  // -- Ca cộng đôi: HAI dòng CÙNG MÃ. Bản cũ cho cả hai lấy min(qty, tồn). --
+  check('2 dòng cùng mã, tồn đủ cho 1,5 → dòng đầu full, dòng sau phần còn lại',
+    gon(phanBoAux([pl('a', 'W1', 120), pl('b', 'W1', 120)], new Map([['W1', 180]]))),
+    [['a', 120, 0], ['b', 60, 60]]);
+  check('2 dòng cùng mã, tồn chỉ đủ dòng đầu → dòng sau chốt 0',
+    gon(phanBoAux([pl('a', 'W1', 120), pl('b', 'W1', 120)], new Map([['W1', 120]]))),
+    [['a', 120, 0], ['b', 0, 120]]);
+  check('3 dòng cùng mã, tồn 0 → cả ba chốt 0',
+    gon(phanBoAux([pl('a', 'W1', 10), pl('b', 'W1', 10), pl('c', 'W1', 10)],
+      new Map([['W1', 0]]))), [['a', 0, 10], ['b', 0, 10], ['c', 0, 10]]);
+
+  // -- Mã khác nhau thì không ăn tồn của nhau --
+  check('2 mã khác nhau → độc lập',
+    gon(phanBoAux([pl('a', 'W1', 100), pl('b', 'W2', 100)],
+      new Map([['W1', 100], ['W2', 40]]))), [['a', 100, 0], ['b', 40, 60]]);
+
+  // -- Dòng NVL phải bị BỎ QUA (NVL chốt nguyên cuộn, không chốt một phần) --
+  const nvlLine = { ...pl('n', 'STS430-3.2', 500), branch: 'nvl' };
+  check('bỏ qua dòng nhánh nvl',
+    gon(phanBoAux([nvlLine, pl('a', 'W1', 10)], new Map([['W1', 10]]))), [['a', 10, 0]]);
+
+  // -- Không được đổi Map của bên gọi --
+  const ton = new Map([['W1', 100]]);
+  phanBoAux([pl('a', 'W1', 60)], ton);
+  check('KHÔNG sửa Map tồn của bên gọi', ton.get('W1'), 100);
+
+  // -- Tổng bất biến: chốt + dư luôn = số gốc --
+  const r = phanBoAux([pl('a', 'W1', 120), pl('b', 'W1', 120)], new Map([['W1', 150]]));
+  check('bất biến: chốt + dư = số gốc từng dòng',
+    r.map((a) => a.chot + a.du), [120, 120]);
+  check('không chốt vượt tồn (tổng chốt ≤ tồn)',
+    r.reduce((s, a) => s + a.chot, 0) <= 150, true);
+}
+
+console.log('\n=== 17. KHOÁ DÂY NỐI của F4 (phép kiểm MÃ NGUỒN) ===');
+{
+  // Vì sao kiểm mã nguồn: lỗi 07/08 và lỗi cộng đôi đều nằm ở CHỖ NỐI, không
+  // nằm trong hàm thuần. `tsc` không bắt được "đọc lại tồn trong vòng lặp" hay
+  // "quên gửi remain_qty", và repo không có bộ chạy thử DOM.
+  // ⚠ PHẢI bỏ dòng chú thích trước khi soi. Bản đầu của phép kiểm này báo đỏ oan
+  // vì chính chú thích "Bản cũ đọc lại `auxStock.get(code)`..." khớp chuỗi cần
+  // tìm. Soi mã nguồn thì phải soi MÃ, không soi chữ giải thích.
+  const boComment = (s) => s.split('\n')
+    .filter((l) => !l.trim().startsWith('//') && !l.trim().startsWith('*'))
+    .join('\n');
+
+  const panel = boComment(readFileSync('components/TempSlipPanel.tsx', 'utf8'));
+  const api = boComment(readFileSync('app/api/nvl-temp/route.ts', 'utf8'));
+
+  // ⚠ Mốc kết thúc phải là dòng CODE, không phải dòng chú thích: đã bỏ comment
+  // nên mốc `// ---- Render` không còn tồn tại ⇒ indexOf trả −1 ⇒ lát cắt ăn gần
+  // hết file và phép kiểm báo đỏ oan (đã dính đúng lỗi này).
+  const iMerge = panel.indexOf('async function confirmMerge');
+  const iHet = panel.indexOf('if (notReady) return null;', iMerge);
+  const thanMerge = iMerge >= 0 && iHet > iMerge ? panel.slice(iMerge, iHet) : '';
+  check('tìm được confirmMerge (lát cắt có mốc đầu VÀ mốc cuối hợp lệ)',
+    thanMerge.length > 0 && thanMerge.length < 6000, true);
+
+  // (a) Phải LẤY phần đã chia, KHÔNG đọc lại tồn trong vòng lặp
+  check('confirmMerge dùng phanBo.find (phần đã chia)',
+    thanMerge.includes('phanBo.find('), true);
+  check('confirmMerge KHÔNG đọc lại auxStock.get trong vòng lặp',
+    thanMerge.includes('auxStock.get('), false);
+
+  // (b) Phải gửi cả prev_qty và remain_qty — thiếu prev_qty là mất chốt chặn
+  check('gửi remain_qty (phần dư) lên máy chủ', thanMerge.includes('remain_qty:'), true);
+  check('gửi prev_qty (chốt chặn lạc quan)', thanMerge.includes('prev_qty:'), true);
+
+  // (c) Phải soi skipped — bỏ sót mà im lặng là lần sau ghi ĐÔI
+  check('đọc d.skipped sau khi PATCH', /Array\.isArray\(d\.skipped\)/.test(thanMerge), true);
+
+  // (d) Máy chủ: nhánh chốt một phần phải GIỮ waiting và có chốt chặn theo qty
+  const iPatch = api.indexOf('export async function PATCH');
+  const thanPatch = iPatch >= 0
+    ? api.slice(iPatch, api.indexOf('export async function DELETE', iPatch)) : '';
+  check('tìm được PATCH', thanPatch.length > 0, true);
+  // ⚠ ĐỪNG chỉ canh chuỗi 'it.remain_qty': để lại `void it.remain_qty;` là chuỗi
+  // vẫn còn mà nhánh đã chết. Phải canh CÂU LỆNH ĐỌC giá trị vào biến điều kiện,
+  // và canh cả điều kiện rẽ nhánh. (Phép phá M1 lọt qua bản đầu đúng vì lỗi này.)
+  check('PATCH thật sự ĐỌC remain_qty vào biến điều kiện',
+    /const\s+\w+\s*=\s*Number\(it\.remain_qty\)/.test(thanPatch), true);
+  check('PATCH rẽ nhánh theo biến đó (isFinite && > 0)',
+    /Number\.isFinite\(\w+\)\s*&&\s*\w+\s*>\s*0/.test(thanPatch), true);
+  check("PATCH chốt chặn theo .eq('qty', truoc)",
+    thanPatch.includes(".eq('qty', truoc)"), true);
+  check("PATCH nhánh một phần vẫn .eq('status','waiting')",
+    (thanPatch.match(/\.eq\('status', 'waiting'\)/g) || []).length >= 2, true);
+  // Nhánh một phần TUYỆT ĐỐI không được đặt status='merged'
+  const iCon = thanPatch.indexOf('it.remain_qty');
+  const nhanhCon = iCon >= 0 ? thanPatch.slice(iCon, thanPatch.indexOf('continue;', iCon)) : '';
+  check('nhánh một phần KHÔNG đánh dấu merged',
+    nhanhCon.includes("status: 'merged'"), false);
+  check('nhánh một phần CÓ cập nhật qty', /update\(\{\s*qty:\s*con/.test(nhanhCon), true);
 }
 
 console.log(`\n========================================\nPASS ${pass} · FAIL ${fail}\n`);

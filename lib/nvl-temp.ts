@@ -157,6 +157,60 @@ export function matchAllTempLines(lines: TempLine[], coils: StockCoil[]): TempMa
   return out;
 }
 
+// ===========================================================================
+// CHIA TỒN CHO CÁC DÒNG TẠM PHỤ LIỆU (user chốt 10/08/2026 — phương án A)
+//
+// Vá HAI lỗi, cả hai đều nằm ở `confirmMerge` bản cũ:
+//
+// 1. CHỐT MỘT PHẦN LÀM MẤT PHẦN DƯ — lỗi duy nhất KHÔNG ai phát hiện được.
+//    Bản cũ: `q2 = min(qty, tồn)`, chốt q2 rồi đánh dấu CẢ DÒNG là 'merged'
+//    (bảng không có cột `merged_qty`). Dòng tạm 100K mà kho chỉ nhập 60K ⇒ chốt
+//    60K, còn 40K ĐÃ VÀO MÁY thì không được ghi ở đâu cả ⇒ tồn app cao hơn thực
+//    tế 40K, vĩnh viễn, không một cảnh báo nào.
+//    ⚠ App chính KHÔNG thể bắt ca này: không có bản ghi nào để mà kiểm. Mọi ca
+//    xuất-đôi khác đều bị cửa `want > have` bên app chính chặn khi duyệt, riêng
+//    ca này thì không — vì con số đó đơn giản là KHÔNG TỒN TẠI.
+//    ⇒ Nay trả về `du` để bên gọi GIỮ phần dư ở dòng tạm (status vẫn 'waiting').
+//
+// 2. HAI DÒNG CÙNG MÃ CÙNG LẤY HẾT TỒN — bản cũ đọc `auxStock.get(code)` LẠI TỪ
+//    ĐẦU trong mỗi vòng lặp. Hai dòng 120K, tồn 150K ⇒ cả hai đều lấy
+//    min(120K,150K)=120K ⇒ chốt 240K trên tồn 150K. (Ca này app chính CÓ chặn khi
+//    duyệt — "Vượt tồn kho" — nên không im lặng, nhưng vẫn phải sửa.)
+//    ⇒ Ở đây tồn được TRỪ DẦN theo thứ tự dòng.
+// ===========================================================================
+
+/** Một dòng tạm phụ liệu: chốt được bao nhiêu, còn treo lại bao nhiêu. */
+export type AuxAlloc = {
+  line: TempLine;
+  /** Số chốt được NGAY BÂY GIỜ theo tồn còn lại. 0 = chưa chốt được gì. */
+  chot: number;
+  /** Phần còn thiếu tồn — PHẢI giữ lại ở dòng tạm, không được bỏ. */
+  du: number;
+};
+
+/**
+ * Chia tồn phụ liệu cho các dòng tạm — dòng ĐỨNG TRƯỚC lấy trước (FIFO theo
+ * thứ tự ghi, đúng tinh thần "ai vào máy trước thì ghi trước").
+ *
+ * Chỉ xét dòng nhánh `aux`; dòng NVL bỏ qua (NVL chốt nguyên cuộn, không có
+ * khái niệm chốt một phần).
+ *
+ * `stock` = tồn hiện tại theo mã, lấy từ ảnh chụp tồn app chính đẩy xuống.
+ * Hàm này KHÔNG đổi `stock` của bên gọi (tự sao một bản để trừ dần).
+ */
+export function phanBoAux(rows: TempLine[], stock: Map<string, number>): AuxAlloc[] {
+  const con = new Map(stock);
+  const out: AuxAlloc[] = [];
+  for (const r of rows) {
+    if (r.branch !== 'aux') continue;
+    const have = Math.max(0, con.get(r.material_code) ?? 0);
+    const chot = Math.min(r.qty, have);
+    con.set(r.material_code, have - chot);
+    out.push({ line: r, chot, du: Math.max(0, r.qty - chot) });
+  }
+  return out;
+}
+
 /** Dòng tạm treo quá ngưỡng này (giờ) thì bôi đỏ — user chốt 31/7: 24h. */
 export const TEMP_STALE_HOURS = 24;
 

@@ -6,7 +6,8 @@ import {
   type Branch, type Department, type SlipLine, type StockAux, type StockCoil,
 } from '@/lib/nvl-slips';
 import {
-  isStale, kgEq, matchAllTempLines, type TempLine, type TempMatch,
+  isStale, kgEq, matchAllTempLines, phanBoAux,
+  type TempLine, type TempMatch,
 } from '@/lib/nvl-temp';
 
 // ===========================================================================
@@ -130,15 +131,23 @@ export default function TempSlipPanel({
     return m;
   }, [auxMats]);
 
-  /** Dòng đã sẵn sàng chốt (NVL: có cuộn để ghép · PL: đủ tồn). */
+  /** Phụ liệu: chia tồn cho từng dòng, TRỪ DẦN — xem `phanBoAux`.
+   *  Phải tính ở đây (không tính lại trong `confirmMerge`) để con số hiện trên
+   *  màn hình và con số lúc chốt LUÔN là một. */
+  const phanBo = useMemo(
+    () => (isNvl ? [] : phanBoAux(rows, auxStock)),
+    [isNvl, rows, auxStock],
+  );
+
+  /** Dòng đã sẵn sàng chốt (NVL: có cuộn để ghép · PL: còn tồn ĐƯỢC CHIA cho nó).
+   *  ⚠ Bản cũ lọc `tồn > 0` cho từng dòng độc lập ⇒ hai dòng cùng mã đều được coi
+   *  là "sẵn sàng" dù tồn chỉ đủ cho một. Nay lọc theo phần ĐÃ CHIA. */
   const ready = useMemo(() => {
     if (isNvl) {
       return matches.filter((m) => (override[m.line.id] ?? m.pick?.id ?? 0) > 0);
     }
-    return rows
-      .filter((r) => (auxStock.get(r.material_code) ?? 0) > 0)
-      .map((r) => ({ line: r } as TempMatch));
-  }, [isNvl, matches, rows, auxStock, override]);
+    return phanBo.filter((a) => a.chot > 0).map((a) => ({ line: a.line } as TempMatch));
+  }, [isNvl, matches, phanBo, override]);
 
   const nStale = rows.filter((r) => isStale(r)).length;
 
@@ -264,7 +273,11 @@ export default function TempSlipPanel({
 
     const time = hhmmVN();
     const newLines: SlipLine[] = [];
-    const patch: Array<{ id: string; coil_id?: number; coil_no?: string; lot_no?: string }> = [];
+    const patch: Array<{
+      id: string; coil_id?: number; coil_no?: string; lot_no?: string;
+      /** Phụ liệu chốt một phần: số trước khi trừ (chốt chặn lạc quan) và phần dư. */
+      prev_qty?: number; remain_qty?: number;
+    }> = [];
 
     for (const m of ready) {
       const ln = m.line;
@@ -286,23 +299,29 @@ export default function TempSlipPanel({
         });
         patch.push({ id: ln.id, coil_id: c.id, coil_no: c.coil_no, lot_no: c.lot_no });
       } else {
-        const stock = auxStock.get(ln.material_code) ?? 0;
-        const q2 = Math.min(ln.qty, stock);
-        if (!(q2 > 0)) continue;
-        if (q2 < ln.qty && !window.confirm(
-          `${ln.material_code}: tồn hiện có ${fmtQty(stock)} nhưng dòng tạm ghi ${fmtQty(ln.qty)}.\n\n`
-          + `Chốt ${fmtQty(q2)} theo tồn thật?`,
+        // Phụ liệu: lấy phần ĐÃ CHIA ở `phanBo` — KHÔNG đọc lại tồn ở đây.
+        // ⚠ Bản cũ đọc lại `auxStock.get(code)` trong mỗi vòng nên hai dòng cùng
+        // mã đều lấy `min(qty, tồn)` ⇒ chốt vượt tồn.
+        const a = phanBo.find((x) => x.line.id === ln.id);
+        if (!a || a.chot <= 0) continue;
+        // Chốt một phần: phần dư GIỮ LẠI ở phiếu tạm (không mất khỏi sổ nữa).
+        if (a.du > 0 && !window.confirm(
+          `${ln.material_code}: dòng tạm ghi ${fmtQty(ln.qty)} nhưng tồn chia được `
+          + `${fmtQty(a.chot)}.\n\nChốt ${fmtQty(a.chot)} bây giờ, còn `
+          + `${fmtQty(a.du)} GIỮ LẠI ở phiếu tạm để chốt sau?`,
         )) continue;
         newLines.push({
           batch_seq: 1, batch_time: time, batch_user: '',
           department: ln.department,
           material_code: ln.material_code,
           material_name: ln.material_name ?? '', material_spec: ln.material_spec ?? '',
-          qty: q2, unit: ln.unit,
+          qty: a.chot, unit: ln.unit,
           note: ln.note || null, reason: null,
           real_date: ln.real_date,
         });
-        patch.push({ id: ln.id });
+        // `prev_qty` = chốt chặn lạc quan: máy chủ chỉ trừ khi số hiện tại ĐÚNG
+        // bằng số này ⇒ gửi lại lần hai không trừ hai lần.
+        patch.push({ id: ln.id, prev_qty: ln.qty, remain_qty: a.du });
       }
     }
 
@@ -320,6 +339,16 @@ export default function TempSlipPanel({
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Đánh dấu đã chốt thất bại');
       setMsg(`Đã đưa ${newLines.length} dòng vào phiếu hôm nay`);
+      // ⚠ PHẢI soi `skipped`. Máy chủ chỉ trừ/đánh dấu khi dòng còn 'waiting' VÀ
+      // số lượng đúng như lúc bấm (chốt chặn lạc quan). Bỏ sót mà im lặng thì dòng
+      // ĐÃ vào phiếu hôm nay trong khi phiếu tạm vẫn nguyên ⇒ lần sau chốt lại là
+      // GHI ĐÔI. Bản cũ không hề đọc trường này.
+      const bo: string[] = Array.isArray(d.skipped) ? d.skipped : [];
+      if (bo.length > 0) {
+        setErr(`⚠ ${bo.length} dòng tạm KHÔNG cập nhật được (có thể vừa được chốt ở `
+          + 'máy khác). Dòng ĐÃ vào phiếu hôm nay — soi lại khối phiếu tạm bên dưới, '
+          + 'ĐỪNG chốt lại những dòng đó.');
+      }
       setChecking(false); setOverride({});
       await load();
     } catch (e) {
