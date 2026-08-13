@@ -202,12 +202,20 @@ export async function POST(req: Request) {
   //
   // ⚠ BẮT BUỘC có `base_n_lines` khi gộp vào phiếu cũ. Cho qua khi thiếu thì lỗ
   // hổng vẫn mở với mọi tab đang mở bản cũ — mà thiệt hại một lần là 7.491 Kg.
+  // Dòng đang có TRƯỚC khi ghi đè — dùng cho cả chốt phiên bản lẫn ảnh chụp
+  // an toàn ở cuối hàm (xem "LƯỚI AN TOÀN").
+  let truocKhiGhi: Array<Record<string, unknown>> = [];
   if (reuse) {
-    const { count, error: cntErr } = await supabaseAdmin
+    const { data: dangCo, error: cntErr } = await supabaseAdmin
       .from('nvl_slip_lines')
-      .select('id', { count: 'exact', head: true })
-      .eq('slip_id', prev!.id);
+      // ⚠ Phải là MỘT chuỗi literal — nối bằng `+` thì supabase-js không suy ra
+      //   được kiểu, trả về GenericStringError[] và tsc báo lỗi.
+      .select('batch_seq, batch_time, department, material_code, material_name, material_spec, coil_id, coil_no, lot_no, qty, unit, note, reason')
+      .eq('slip_id', prev!.id)
+      .order('seq_no');
     if (cntErr) return NextResponse.json({ error: cntErr.message }, { status: 500 });
+    truocKhiGhi = dangCo ?? [];
+    const count = truocKhiGhi.length;
 
     const base = Number(body.base_n_lines);
     if (!Number.isInteger(base) || base < 0) {
@@ -217,12 +225,12 @@ export async function POST(req: Request) {
         code: 'BASE_MISSING',
       }, { status: 409 });
     }
-    if ((count ?? 0) !== base) {
+    if (count !== base) {
       return NextResponse.json({
         error: `Phiếu trên máy chủ đang có ${count} dòng, máy anh chỉ biết ${base} dòng. `
              + 'Chưa lưu gì cả để khỏi mất dòng — bấm Tải lại rồi ghi tiếp.',
         code: 'VERSION_MISMATCH',
-        server_n_lines: count ?? 0,
+        server_n_lines: count,
         client_base: base,
       }, { status: 409 });
     }
@@ -293,6 +301,22 @@ export async function POST(req: Request) {
       n_lines: lines.length,
       n_batches: new Set(lines.map((l) => l.batch_seq)).size,
       total_qty: Number(lines.reduce((s, l) => s + l.qty, 0).toFixed(3)),
+      // ══ LƯỚI AN TOÀN (13/08/2026) ═══════════════════════════════════════════
+      // Chụp lại NỘI DUNG dòng CŨ khi lần lưu này làm phiếu NGẮN ĐI.
+      //
+      // Vì sao cần: ngày 13/08 nhật ký chỉ ghi 3 con số đếm, nên biết mất 27 dòng
+      // mà KHÔNG biết mất cuộn nào. Cứu được 19/30 dòng chỉ nhờ bản chụp Supabase
+      // 2 giờ/lần tình cờ chụp lúc 10:00 — 11 dòng rơi vào khe giữa hai lần chụp
+      // thì mất vĩnh viễn (autovacuum dọn sau 14 giây).
+      //
+      // Vì sao CHỈ chụp khi ngắn đi, không chụp mọi lần:
+      //   · thêm dòng thì trạng thái cũ là tập con của mới → không cần chụp
+      //   · `detail` được điện thoại tải về ở mục Lịch sử (30 mục/lần); chụp mọi
+      //     lần là mỗi lần mở màn tải thêm ~100 KB, đốt egress Supabase vô ích
+      //   · đo trên lịch sử thật: chỉ 2 lần phiếu ngắn đi trong 33 phiếu
+      // Chốt phiên bản ở trên đã chặn ca ngoài ý muốn; lưới này để dành cho ca
+      // người dùng CỐ Ý xoá rồi tiếc, hoặc một lỗi khác mình chưa biết.
+      ...(truocKhiGhi.length > lines.length ? { truoc: truocKhiGhi } : {}),
     },
   });
 

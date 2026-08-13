@@ -73,6 +73,19 @@ async function demDong() {
   return (await r2.json()).length;
 }
 
+/** Nhật ký mới nhất của phiếu kiểm thử. */
+async function nhatKyMoiNhat() {
+  const r = await fetch(
+    `${SB}/rest/v1/nvl_day_slips?slip_date=eq.${NGAY}&select=uid`,
+    { headers: { apikey: KEY, Authorization: `Bearer ${KEY}` } });
+  const s = await r.json();
+  if (!s.length) return null;
+  const r2 = await fetch(
+    `${SB}/rest/v1/nvl_slip_events?slip_uid=eq.${s[0].uid}&order=at.desc&limit=1&select=*`,
+    { headers: { apikey: KEY, Authorization: `Bearer ${KEY}` } });
+  return (await r2.json())[0] ?? null;
+}
+
 async function don() {
   const r = await fetch(`${SB}/rest/v1/nvl_day_slips?slip_date=eq.${NGAY}&select=id,uid`,
     { headers: { apikey: KEY, Authorization: `Bearer ${KEY}` } });
@@ -131,6 +144,24 @@ try {
   r = await luu([dong(1, 100), dong(1, 200), dong(3, 77)], 3);
   kiem(r.status === 409, 'trả 409', `status=${r.status}`);
   kiem(await demDong() === 2, '2 dòng vẫn còn nguyên');
+
+  console.log('\n7. LƯỚI AN TOÀN — lần lưu làm NGẮN ĐI phải chụp lại dòng cũ');
+  const e5 = await nhatKyMoiNhat();
+  kiem(Array.isArray(e5?.detail?.truoc), 'nhật ký của bước 5 có khoá `truoc`',
+       `truoc=${e5?.detail?.truoc ? `${e5.detail.truoc.length} dòng` : 'KHÔNG CÓ'}`);
+  kiem(e5?.detail?.truoc?.length === 3,
+       'chụp đúng 3 dòng CŨ (trước khi rút còn 2)');
+  const kg5 = (e5?.detail?.truoc ?? []).reduce((s, l) => s + Number(l.qty), 0);
+  kiem(kg5 === 350, 'tổng Kg dòng cũ đúng 350 (100+200+50)', `đo được ${kg5}`);
+  kiem((e5?.detail?.truoc ?? []).every((l) => l.material_code && l.coil_no !== undefined),
+       'mỗi dòng chụp có mã NVL và số cuộn — đủ để dựng lại');
+
+  console.log('\n8. Lần lưu THÊM dòng thì KHÔNG chụp (khỏi phình nhật ký)');
+  r = await luu([dong(1, 100), dong(1, 200), dong(2, 60)], 2);
+  kiem(r.status === 200, 'lưu được 3 dòng', `status=${r.status}`);
+  const e8 = await nhatKyMoiNhat();
+  kiem(e8?.detail?.truoc === undefined, 'nhật ký KHÔNG có khoá `truoc`',
+       `truoc=${JSON.stringify(e8?.detail?.truoc)}`);
 } finally {
   console.log('\nDọn dữ liệu kiểm thử…');
   await don();
