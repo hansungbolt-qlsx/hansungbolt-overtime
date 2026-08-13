@@ -111,6 +111,37 @@ export async function POST(req: Request) {
     }
   }
 
+  // ══ CHẶN XOÁ TRẮNG KHSX (13/08/2026) ═════════════════════════════════════
+  // Rà soát sau sự cố mất 27 dòng phiếu xuất NVL. `delete` ngay dưới chạy VÔ
+  // ĐIỀU KIỆN, còn ghi lại thì `if (records.length > 0)` — nên `records` rỗng là
+  // xoá sạch kế hoạch hôm đó khỏi điện thoại tổ trưởng mà không ghi lại gì.
+  //
+  // ⚠ KHÔNG phải "file thiếu dòng" (anh Hữu hỏi đúng chỗ này 13/08). File KHSX
+  // vẫn đủ dòng, nhưng vòng lặp trên BỎ QUA TỪNG DÒNG — chỉ đẩy vào `warnings` —
+  // khi mã máy không có trong bảng `equipments`. Ba đường tới `records = 0`:
+  // đổi tên máy trên KHSX · thêm máy mới chưa đăng ký bên app tăng ca · truy vấn
+  // danh sách máy trả về thiếu.
+  //
+  // Nguy hơn nữa: app chính chỉ kiểm `status != 200` (`overtime_sync.py`), nên
+  // vẫn báo "Đã đồng bộ … 0 dòng / 0 máy" y như một lần thành công.
+  //
+  // ⇒ Đọc ra 0 dòng thì DỪNG, giữ nguyên kế hoạch cũ, và báo lỗi rõ.
+  if (records.length === 0) {
+    return NextResponse.json(
+      {
+        error:
+          'Không dòng nào khớp danh sách máy — KHÔNG xoá kế hoạch cũ. '
+          + (warnings.length
+            ? `${warnings.slice(0, 5).join(' · ')}`
+              + (warnings.length > 5 ? ` … (+${warnings.length - 5} cảnh báo nữa)` : '')
+            : 'Sheet không có dòng nào đọc được.'),
+        code: 'PLAN_EMPTY',
+        warnings,
+      },
+      { status: 400 },
+    );
+  }
+
   const { error: delErr } = await supabaseAdmin
     .from('daily_plans')
     .delete()
@@ -119,11 +150,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: delErr.message }, { status: 500 });
   }
 
-  if (records.length > 0) {
-    const { error: insErr } = await supabaseAdmin.from('daily_plans').insert(records);
-    if (insErr) {
-      return NextResponse.json({ error: insErr.message }, { status: 500 });
-    }
+  const { error: insErr } = await supabaseAdmin.from('daily_plans').insert(records);
+  if (insErr) {
+    return NextResponse.json({ error: insErr.message }, { status: 500 });
   }
 
   // -----------------------------------------------------------
