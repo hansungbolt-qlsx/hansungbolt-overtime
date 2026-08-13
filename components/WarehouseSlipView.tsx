@@ -147,6 +147,17 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
   // lại, tách hẳn khỏi phần đang soạn. Ngày làm nhiều đợt thì xếp thu gọn hết ở đây.
   const [past, setPast] = useState<Array<{ slip: Slip; lines: SlipLine[] }>>([]);
   const [lines, setLines] = useState<SlipLine[]>([]);
+  /**
+   * Số dòng MÁY CHỦ đang có, theo lần nạp gần nhất. Gửi kèm mỗi lần Lưu để máy
+   * chủ đối chiếu (xem khối "CHỐT PHIÊN BẢN" trong `app/api/nvl-slips/route.ts`).
+   *
+   * `null` = CHƯA nạp được phiếu ⇒ CẤM lưu. Đây là chốt then chốt của vá 13/08:
+   * `loading` KHÔNG bắt được ca này, vì `loadSlip()` tự nuốt lỗi trong `catch`
+   * còn effect vẫn đặt `loadedFor` sau `Promise.all` ⇒ `loading` về false kể cả
+   * khi nạp THẤT BẠI. Lúc đó rổ rỗng mà nút Lưu vẫn bấm được — đúng ca 10:46:53
+   * ngày 13/08 làm mất 27 dòng / 7.192 Kg.
+   */
+  const [srvCount, setSrvCount] = useState<number | null>(null);
   const [events, setEvents] = useState<SlipEvent[]>([]);
   const [slipNote, setSlipNote] = useState('');
 
@@ -227,6 +238,7 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
     setSlipNote('');
     setPast([]);
     setEvents([]);
+    setSrvCount(null);   // chưa biết máy chủ có gì → cấm lưu tới khi nạp xong
   }, []);
 
   const loadSlip = useCallback(async () => {
@@ -261,8 +273,15 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
       setSlipNote(editing?.slip.note ?? '');
       setLines(editing?.lines ?? []);
       setEvents(d.events ?? []);
+      // Nạp THÀNH CÔNG → ghi mốc đối chiếu. Kể cả khi không có phiếu nào đang
+      // soạn thì mốc vẫn là 0 (khác hẳn `null` = chưa biết gì).
+      setSrvCount(editing?.lines.length ?? 0);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Lỗi tải phiếu');
+      // ⚠ Nạp HỎNG → xoá mốc để nút Lưu bị khoá. Cố ý KHÔNG dốc `lines` ở đây
+      // (xem chú thích `xoaBoiCanh`): dòng vừa lưu mà biến mất thì người dùng gõ
+      // lại từ đầu → ghi trùng. Khoá nút thì an toàn mà không mất gì.
+      setSrvCount(null);
     }
   }, [kind, branch, viewDate]);
 
@@ -663,15 +682,25 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
    * Phiếu hôm nay đã gửi rồi thì API tự mở phiếu mới (seq kế tiếp) — đúng thiết kế.
    */
   async function mergeTempLines(newLines: SlipLine[]): Promise<boolean> {
+    if (srvCount === null) {                       // cùng lý do như trong `save()`
+      setErr('Chưa tải được phiếu hôm nay — bấm 🔄 Tải lại rồi chốt dòng tạm lại.');
+      return false;
+    }
     const nextBatch = (lines.length ? Math.max(...lines.map((l) => l.batch_seq)) : 0) + 1;
     const all = [...lines, ...newLines.map((l) => ({ ...l, batch_seq: nextBatch }))];
     try {
       const r = await fetch('/api/nvl-slips', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind, branch, send: false, note: slipNote, lines: all }),
+        body: JSON.stringify({
+          kind, branch, send: false, note: slipNote, lines: all, base_n_lines: srvCount,
+        }),
       });
       const d = await r.json();
+      if (r.status === 409) {
+        await loadSlip();
+        throw new Error(d.error || 'Phiếu trên máy chủ đã đổi — đã tải lại giúp anh.');
+      }
       if (!r.ok) throw new Error(d.error || 'Lưu thất bại');
       await loadSlip();
       return true;
@@ -684,14 +713,29 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
   // ---- Lưu / Gửi --------------------------------------------------------
   async function save(send: boolean) {
     if (lines.length === 0) { setErr('Phiếu chưa có dòng nào'); return; }
+    // Vá 13/08/2026: chưa nạp được phiếu thì TUYỆT ĐỐI không lưu — lưu lúc này là
+    // gửi lên một rổ thiếu, mà máy chủ lưu bằng cách xoá sạch rồi ghi lại.
+    if (srvCount === null) {
+      setErr('Chưa tải được phiếu từ máy chủ nên chưa lưu được — bấm 🔄 Tải lại '
+           + 'rồi thử lại. Dòng đã lưu trước đó vẫn còn nguyên.');
+      return;
+    }
     setSaving(true); setErr(''); setMsg('');
     try {
       const r = await fetch('/api/nvl-slips', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind, branch, send, note: slipNote, lines }),
+        body: JSON.stringify({
+          kind, branch, send, note: slipNote, lines, base_n_lines: srvCount,
+        }),
       });
       const d = await r.json();
+      // Máy chủ TỪ CHỐI vì lệch mốc → nạp lại ngay để người dùng thấy bản thật.
+      // Không có dòng nào bị xoá ở phía máy chủ.
+      if (r.status === 409) {
+        await loadSlip();
+        throw new Error(d.error || 'Phiếu trên máy chủ đã đổi — đã tải lại giúp anh.');
+      }
       if (!r.ok) throw new Error(d.error || 'Lưu thất bại');
       setMsg(
         send
@@ -930,8 +974,29 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
       )}
 
 
-      {/* Thêm dòng — chỉ khi đang ở HÔM NAY */}
-      {isToday && (
+      {/* Vá 13/08/2026 — CHƯA NẠP ĐƯỢC PHIẾU thì che luôn phần thêm dòng.
+          Không chỉ khoá nút Lưu: để người dùng gõ xong cả một bó rồi mới báo
+          "không lưu được" là bắt họ gõ lại từ đầu. Che sớm + nút Tải lại to rõ. */}
+      {isToday && srvCount === null && (
+        <div className="bg-rose-50 border-2 border-rose-300 rounded-xl p-4 space-y-2">
+          <div className="font-bold text-rose-800">⚠ Chưa tải được phiếu hôm nay</div>
+          <p className="text-sm text-rose-700 leading-relaxed">
+            Mạng chập hoặc máy chủ chưa trả lời. Tạm khoá phần thêm dòng và nút Lưu
+            để không ghi đè mất dòng đã lưu trước đó. <b>Dữ liệu cũ vẫn còn nguyên
+            trên máy chủ.</b>
+          </p>
+          <button
+            type="button"
+            onClick={() => { setErr(''); loadSlip(); }}
+            className="px-4 py-2.5 rounded-lg bg-rose-600 text-white font-bold"
+          >
+            🔄 Tải lại phiếu
+          </button>
+        </div>
+      )}
+
+      {/* Thêm dòng — chỉ khi đang ở HÔM NAY và ĐÃ nạp được phiếu */}
+      {isToday && srvCount !== null && (
       <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-4 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="font-bold text-brand-navy">
@@ -1460,7 +1525,7 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
         <div className={`mt-3 ${isToday ? '' : 'hidden'}`}>
           <button
             type="button"
-            disabled={saving || lines.length === 0 || !isToday}
+            disabled={saving || lines.length === 0 || !isToday || srvCount === null}
             onClick={() => save(false)}
             className="w-full py-3 rounded-xl bg-brand-navy text-white font-bold disabled:opacity-40"
           >
@@ -1473,7 +1538,7 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
             </p>
             <button
               type="button"
-              disabled={saving || lines.length === 0 || !isToday}
+              disabled={saving || lines.length === 0 || !isToday || srvCount === null}
               onClick={() => {
                 if (
                   window.confirm(

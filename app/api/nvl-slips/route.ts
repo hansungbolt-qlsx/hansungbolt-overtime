@@ -183,6 +183,52 @@ export async function POST(req: Request) {
   const seq = reuse ? prev!.seq : (prev ? prev.seq + 1 : 1);
   const uid = reuse ? prev!.uid : slipUid(date, kind, branch, seq);
 
+  // ══ CHỐT PHIÊN BẢN — vá lỗi MẤT 27 DÒNG ngày 13/08/2026 ═══════════════════
+  // Ca thật: phiếu `ot-2026-08-13-issue-nvl-1` có 30 dòng / 7.491 Kg lúc 10:35:19;
+  // lần Lưu 10:46:53 đè xuống còn 3 dòng. Điện thoại lúc đó giữ rổ RỖNG (chứng
+  // minh: 3 dòng mới mang `batch_seq = 1`, nếu rổ có 30 dòng thì phải là 12), mà
+  // ngay dưới kia là `delete()` toàn bộ rồi `insert()` lại theo rổ đó.
+  //
+  // Rổ rỗng có thể do: đổi tab (component bị tháo dựng lại) · `loadSlip()` lỗi ·
+  // gõ trước khi nạp xong · máy khác đang mở trang cũ. BA-BỐN lối, nhưng CHUNG
+  // một cửa: máy chủ nhận rổ thiếu rồi xoá sạch. Chặn ở đây là chặn hết.
+  //
+  // Cách chặn: máy gửi kèm `base_n_lines` = số dòng nó NHẬN VỀ từ máy chủ ở lần
+  // nạp gần nhất. Lệch với số dòng thật ⇒ TỪ CHỐI, KHÔNG xoá gì.
+  //   · rổ rỗng vì nạp hỏng  → base 0  vs thật 30 → chặn
+  //   · thêm dòng bình thường → base 19 vs thật 19 → cho qua
+  //   · người dùng bấm ✕ xoá dòng → base vẫn 19, vẫn cho qua (xoá là cố ý)
+  //   · hai máy cùng sửa      → máy sau lệch → chặn, bắt tải lại
+  //
+  // ⚠ BẮT BUỘC có `base_n_lines` khi gộp vào phiếu cũ. Cho qua khi thiếu thì lỗ
+  // hổng vẫn mở với mọi tab đang mở bản cũ — mà thiệt hại một lần là 7.491 Kg.
+  if (reuse) {
+    const { count, error: cntErr } = await supabaseAdmin
+      .from('nvl_slip_lines')
+      .select('id', { count: 'exact', head: true })
+      .eq('slip_id', prev!.id);
+    if (cntErr) return NextResponse.json({ error: cntErr.message }, { status: 500 });
+
+    const base = Number(body.base_n_lines);
+    if (!Number.isInteger(base) || base < 0) {
+      return NextResponse.json({
+        error: 'Máy đang chạy bản cũ nên chưa gửi được mốc đối chiếu. '
+             + 'Vui lòng tải lại trang (F5) rồi lưu lại — phiếu trên máy chủ vẫn nguyên.',
+        code: 'BASE_MISSING',
+      }, { status: 409 });
+    }
+    if ((count ?? 0) !== base) {
+      return NextResponse.json({
+        error: `Phiếu trên máy chủ đang có ${count} dòng, máy anh chỉ biết ${base} dòng. `
+             + 'Chưa lưu gì cả để khỏi mất dòng — bấm Tải lại rồi ghi tiếp.',
+        code: 'VERSION_MISMATCH',
+        server_n_lines: count ?? 0,
+        client_base: base,
+      }, { status: 409 });
+    }
+  }
+  // ══════════════════════════════════════════════════════════════════════════
+
   const patch = {
     uid,
     slip_date: date,
