@@ -1,7 +1,8 @@
 /**
- * Bật `next dev` tạm, chạy bài kiểm chốt phiên bản, rồi tắt máy chủ.
+ * Bật `next dev` tạm, chạy MỘT bài kiểm, rồi tắt máy chủ.
  * Dùng khi không bật được tiến trình nền riêng.
- *   node scripts/test/chay_kiem_chot_phien_ban.mjs
+ *   node scripts/test/chay_kiem_chot_phien_ban.mjs [duong/dan/bai-kiem.mjs]
+ * Không truyền gì thì chạy bài chốt phiên bản (mặc định cũ).
  */
 import { spawn } from 'node:child_process';
 import { setTimeout as ngu } from 'node:timers/promises';
@@ -40,11 +41,15 @@ if (!san) {
 }
 console.log(`Máy chủ đã lên ở ${GOC}\n`);
 
-const kt = spawn(process.execPath, ['scripts/test/chot_phien_ban_verify.mjs', GOC],
-                 { stdio: 'inherit' });
+const BAI = process.argv[2] || 'scripts/test/chot_phien_ban_verify.mjs';
+const kt = spawn(process.execPath, [BAI, GOC], { stdio: 'inherit' });
 const ma = await new Promise((res) => kt.on('exit', res));
 
 console.log('\nTắt máy chủ…');
-sv.kill('SIGKILL');
+// ⚠ PHẢI là tatHan(), KHÔNG phải sv.kill(): trên Windows `sv` chỉ là vỏ shell,
+// giết nó thì `next dev` thật sống tiếp và giữ cổng 3210 → lần chạy sau có hai
+// máy chủ chồng nhau, bài kiểm treo. Đường LỖI ở trên đã dùng đúng từ 13/08,
+// nhưng đường THÀNH CÔNG này vẫn sót lại — sửa 14/08/2026.
+tatHan(sv.pid);
 await ngu(1500);
 process.exit(ma ?? 1);

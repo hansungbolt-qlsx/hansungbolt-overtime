@@ -85,12 +85,37 @@ export async function GET(req: Request) {
   }
   if (!slips || slips.length === 0) return NextResponse.json({ ok: true, slips: [] });
 
-  const { data: lines, error: lErr } = await supabaseAdmin
+  // ══ TRẦN 1.000 DÒNG CỦA POSTGREST — CẮT ÂM THẦM (đo 14/08/2026) ══════════
+  //
+  // Đo thật trên chính dự án này: bảng `daily_plans` có 1.961 dòng, một lệnh
+  // select không điều kiện trả về ĐÚNG 1.000 dòng — không lỗi, không cờ báo.
+  // `limit=2000` và `Range: 0-4999` đều KHÔNG vượt được: trần đặt ở máy chủ
+  // Supabase chứ không phải mặc định của thư viện.
+  //
+  // Ở riêng chỗ này trần đó nguy hiểm: dòng bị cắt ⇒ agent đẩy sang app chính
+  // một phiếu THIẾU DÒNG ⇒ `receive_slip` ghi đè phiếu chờ duyệt bằng bản ngắn
+  // ⇒ duyệt xong TRỪ TỒN THIẾU. Đúng hình dạng thiệt hại 13/08 (mất 27 dòng /
+  // 7.192 Kg), chỉ khác cửa vào.
+  //
+  // Hàng đợi thực tế còn rất xa trần (đo 14/08: 0 phiếu chờ; 464 dòng cho TOÀN
+  // BỘ 34 phiếu từ trước tới nay) ⇒ đây là chốt PHÒNG XA. Nhưng nó gần như miễn
+  // phí: `count` về ngay trong lần gọi này, không thêm chuyến nào.
+  const { data: lines, error: lErr, count } = await supabaseAdmin
     .from('nvl_slip_lines')
-    .select('*')
+    .select('*', { count: 'exact' })
     .in('slip_id', slips.map((s) => s.id))
     .order('seq_no');
   if (lErr) return NextResponse.json({ error: lErr.message }, { status: 500 });
+  if (count != null && count !== (lines?.length ?? 0)) {
+    // THÀ KHÔNG ĐẨY GÌ còn hơn đẩy phiếu thiếu dòng. Trả lỗi ⇒ agent không nhận
+    // được phiếu nào ⇒ `synced_at` của mọi phiếu vẫn NULL ⇒ không phiếu nào rời
+    // hàng đợi, vòng sau đẩy lại đầy đủ.
+    return NextResponse.json({
+      error: `Máy chủ chỉ trả ${lines?.length ?? 0}/${count} dòng (trần 1.000 của Supabase) `
+           + '— KHÔNG đẩy phiếu nào để khỏi mất dòng. Cần duyệt bớt phiếu đang chờ.',
+      code: 'LINES_TRUNCATED',
+    }, { status: 500 });
+  }
 
   const byslip = new Map<string, typeof lines>();
   for (const l of lines ?? []) {
@@ -143,10 +168,32 @@ export async function POST(req: Request) {
     .select('id, status, main_refs, reject_reason, line_errors')
     .eq('uid', uid).single();
 
+  // ══ GIỮ PHIẾU TRONG HÀNG ĐỢI KHI APP CHÍNH LỖI TẠM THỜI (rà soát 14/08/2026) ══
+  //
+  // `synced_at` trước đây đóng dấu ở MỌI lượt ghi ngược — kể cả lượt agent gọi
+  // CHỈ để báo lỗi. Mà `synced_at IS NULL` chính là điều kiện duy nhất giữ phiếu
+  // trong hàng đợi (xem GET ở trên). Ghép hai điều đó lại:
+  //
+  //   app chính trả 500  →  agent gọi lượt "báo lỗi"  →  đóng dấu đã-đồng-bộ
+  //   →  phiếu RỜI HÀNG ĐỢI VĨNH VIỄN
+  //   →  điện thoại vẫn hiện 'đã gửi' + dòng đỏ, app chính KHÔNG HỀ CÓ phiếu
+  //   →  tồn không bao giờ bị trừ, không cổng nào báo.
+  //
+  // `app/routers/ot_api.py:70` bắt MỌI ngoại lệ ngoài ValueError → 500, nên cửa
+  // này mở với bất kỳ trục trặc nhất thời nào của app chính (khoá CSDL, hết bộ
+  // nhớ, lỗi lạ trong build_preview…).
+  //
+  // ⚠ Đo 14/08/2026 trước khi vá: 34/34 phiếu ở Supabase đều CÓ MẶT bên app
+  //   chính, 0 phiếu mang lỗi seq=0 ⇒ lỗ hổng này CHƯA TỪNG CẮN. Vá vì cơ chế
+  //   sai, không phải vì đã mất dữ liệu — và vì nó mất im lặng nếu cắn.
+  //
+  // Lỗi NGHIỆP VỤ (422 — "phiếu đã duyệt rồi") vẫn đóng dấu như cũ: đẩy lại bao
+  // nhiêu lần cũng nhận đúng câu trả lời đó, giữ lại chỉ tổ quay vòng vô ích.
+  const keepQueued = body.keep_queued === true;
   const patch: Record<string, unknown> = {
-    synced_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
+  if (!keepQueued) patch.synced_at = new Date().toISOString();
   // 'draft' = app chính đã XOÁ phiếu thật → phiếu quay về "như chưa gửi" để nhân
   // viên kho kiểm lại rồi gửi lại (user chốt 28/7).
   const ALLOWED = ['draft', 'pending', 'approved', 'rejected'];

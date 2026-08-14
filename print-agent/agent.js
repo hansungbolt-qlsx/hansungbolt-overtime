@@ -664,7 +664,14 @@ async function pushNvlSlips(sweep) {
   const { slips } = await otFetch(`/api/nvl-slips/sync${qs}`);
   if (!slips || slips.length === 0) return;
   for (const s of slips) {
-    if (!s.lines || s.lines.length === 0) continue;
+    if (!s.lines || s.lines.length === 0) {
+      // Không thể xảy ra qua đường bình thường (POST /api/nvl-slips chặn phiếu
+      // rỗng). Bỏ qua IM LẶNG là giấu một bất thường — in ra để còn thấy được.
+      console.error(
+        `[${new Date().toISOString()}] Phiếu ${s.uid} KHÔNG có dòng nào — bỏ qua, thử lại vòng sau`,
+      );
+      continue;
+    }
     const res = await fetch(`${MAIN_APP_URL}/api/ot/slip`, {
       method: 'POST',
       headers: { 'X-Agent-Token': MAIN_APP_TOKEN, 'Content-Type': 'application/json' },
@@ -684,11 +691,25 @@ async function pushNvlSlips(sweep) {
     if (!res.ok || !d?.ok) {
       // 422 = phiếu sai (vd đã duyệt rồi) → ghi ngược lý do để nhân viên thấy
       const detail = d?.detail || `app chính HTTP ${res.status}`;
+      // ⚠ 422 là PHÁN QUYẾT NGHIỆP VỤ — đẩy lại cũng nhận đúng câu đó ⇒ đóng dấu
+      //   đã-đồng-bộ, cho phiếu rời hàng đợi. MỌI mã khác (500, 502, 401…) là
+      //   trục trặc NHẤT THỜI của app chính ⇒ phải GIỮ PHIẾU LẠI để vòng sau đẩy
+      //   tiếp. Thiếu chốt này thì một cú 500 làm phiếu biến mất vĩnh viễn khỏi
+      //   app chính trong khi điện thoại vẫn báo 'đã gửi' (rà soát 14/08/2026,
+      //   xem chú thích dài ở `app/api/nvl-slips/sync/route.ts`).
+      const tamThoi = res.status !== 422;
       await otFetch('/api/nvl-slips/sync', {
         method: 'POST',
-        body: JSON.stringify({ uid: s.uid, line_errors: [{ seq: 0, error: detail }] }),
+        body: JSON.stringify({
+          uid: s.uid,
+          line_errors: [{ seq: 0, error: detail }],
+          keep_queued: tamThoi,
+        }),
       });
-      console.error(`[${new Date().toISOString()}] Phiếu ${s.uid} bị từ chối nhận: ${detail}`);
+      console.error(
+        `[${new Date().toISOString()}] Phiếu ${s.uid} bị từ chối nhận: ${detail}`
+        + (tamThoi ? ' — GIỮ trong hàng đợi, sẽ thử lại' : ' — lỗi nghiệp vụ, ngừng đẩy'),
+      );
       continue;
     }
     await otFetch('/api/nvl-slips/sync', {
