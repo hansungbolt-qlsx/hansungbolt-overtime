@@ -14,7 +14,8 @@ import BarcodeScanButton from './BarcodeScanButton';
 import TempSlipPanel from './TempSlipPanel';
 import {
   BRANCH_LABEL, DEPARTMENTS, KIND_LABEL, RETURN_REASONS, RETURN_REASON_DEFAULT,
-  RETURN_REASON_OTHER, defaultDepartment, matchAux, matchNvl, supShort,
+  RETURN_REASON_OTHER, defaultDepartment, demDongChuaLuu, hoiTruocKhiRoiDi,
+  matchAux, matchNvl, supShort,
   type Branch, type Department, type Kind, type SlipLine,
   type StockAux, type StockCoil,
 } from '@/lib/nvl-slips';
@@ -130,7 +131,9 @@ const STATUS_UI: Record<string, { label: string; cls: string }> = {
   rejected: { label: '❌ Bị từ chối', cls: 'bg-rose-50 text-rose-800 border-rose-300' },
 };
 
-export default function WarehouseSlipView({ kind }: { kind: Kind }) {
+export default function WarehouseSlipView(
+  { kind, onChuaLuu }: { kind: Kind; onChuaLuu?: (soDong: number) => void },
+) {
   const [branch, setBranch] = useState<Branch>('nvl');
   // Ngày đang xem — mặc định hôm nay. Xem ngày khác thì CHỈ ĐỌC (user 28/7):
   // ô soạn luôn ghi vào phiếu của HÔM NAY nên không được sửa phiếu ngày cũ ở đây.
@@ -158,6 +161,12 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
    * ngày 13/08 làm mất 27 dòng / 7.192 Kg.
    */
   const [srvCount, setSrvCount] = useState<number | null>(null);
+  /**
+   * Giỏ có thay đổi CHƯA gửi lên máy chủ hay chưa (vá 14/08/2026).
+   * Bật khi thêm/xoá dòng · tắt sau mỗi lần nạp lại thành công (nạp lại chạy
+   * ngay sau khi Lưu xong, nên Lưu thành công cũng tắt cờ này).
+   */
+  const [chuaLuu, setChuaLuu] = useState(false);
   const [events, setEvents] = useState<SlipEvent[]>([]);
   const [slipNote, setSlipNote] = useState('');
 
@@ -239,6 +248,7 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
     setPast([]);
     setEvents([]);
     setSrvCount(null);   // chưa biết máy chủ có gì → cấm lưu tới khi nạp xong
+    setChuaLuu(false);   // giỏ vừa dốc thì không còn gì chưa lưu để mà tiếc
   }, []);
 
   const loadSlip = useCallback(async () => {
@@ -276,6 +286,10 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
       // Nạp THÀNH CÔNG → ghi mốc đối chiếu. Kể cả khi không có phiếu nào đang
       // soạn thì mốc vẫn là 0 (khác hẳn `null` = chưa biết gì).
       setSrvCount(editing?.lines.length ?? 0);
+      // Giỏ vừa được đặt lại đúng bằng bản trên máy chủ ⇒ không còn gì chưa lưu.
+      // Nạp lại chạy ngay sau mỗi lần Lưu thành công, nên đây cũng là chỗ tắt cờ
+      // sau khi Lưu — khỏi phải nhớ tắt ở hai nơi.
+      setChuaLuu(false);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Lỗi tải phiếu');
       // ⚠ Nạp HỎNG → xoá mốc để nút Lưu bị khoá. Cố ý KHÔNG dốc `lines` ở đây
@@ -345,6 +359,21 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
   const khsxActive =
     isNvl && kind === 'issue' && !!khsx?.has_data && khsx.date === todayVN();
   const khsxSet = useMemo(() => new Set(khsx?.codes ?? []), [khsx]);
+
+  // Số dòng đang treo chưa lưu (vá 14/08/2026). Công thức tách sang
+  // `lib/nvl-slips.ts` để có bài kiểm tự động — xem `demDongChuaLuu`.
+  const soChuaLuu = demDongChuaLuu(chuaLuu, lines.length, srvCount);
+
+  // Báo ngược lên `RegisterLayout` để nó chặn được nút chuyển tab — nút đó nằm
+  // bên ngoài màn này. Dọn về 0 khi tháo component, nếu không thì tab kế tiếp
+  // thừa hưởng con số cũ và hỏi lại một cách vô cớ.
+  useEffect(() => {
+    onChuaLuu?.(soChuaLuu);
+    return () => onChuaLuu?.(0);
+  }, [soChuaLuu, onChuaLuu]);
+
+  /** Cửa chung cho mọi thao tác ĐỔI BỐI CẢNH ngay trong màn này. */
+  const roiDiDuoc = useCallback(() => hoiTruocKhiRoiDi(soChuaLuu), [soChuaLuu]);
 
   // Không setState đồng bộ trong effect (cascading render) — `loading` suy ra từ
   // "đã nạp xong cho tổ hợp nào", chỉ set sau khi await xong.
@@ -666,11 +695,15 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
       }]);
     }
     resetForm();
+    // Đặt sau if/else nên đúng cho CẢ nguyên liệu lẫn phụ liệu, và chỉ chạy khi
+    // đã thêm được thật (mọi nhánh lỗi ở trên đều `return` trước khi tới đây).
+    setChuaLuu(true);
     setMsg('Đã thêm vào phiếu — nhớ bấm Lưu hoặc Gửi');
   }
 
   function removeLine(i: number) {
     setLines((p) => p.filter((_, idx) => idx !== i));
+    setChuaLuu(true);
   }
 
   /**
@@ -771,7 +804,13 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
           <button
             key={b}
             type="button"
-            onClick={() => { setBranch(b); xoaBoiCanh(); resetForm(); setMsg(''); setErr(''); }}
+            // ⚠ Cửa gây sự cố 08/08 (dòng NVL lạc sang phiếu phụ liệu) và là một
+            //   trong hai cửa làm mất 6 dòng S18A ngày 14/08. Hỏi TRƯỚC khi dốc giỏ.
+            onClick={() => {
+              if (b === branch) return;
+              if (!roiDiDuoc()) return;
+              setBranch(b); xoaBoiCanh(); resetForm(); setMsg(''); setErr('');
+            }}
             className={`py-2.5 rounded-xl text-sm font-semibold border transition ${
               branch === b
                 ? 'bg-brand-teal text-white border-brand-teal shadow-md shadow-brand-teal/30'
@@ -790,13 +829,21 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
           type="date"
           value={viewDate}
           max={todayVN()}
-          onChange={(e) => { setViewDate(e.target.value || todayVN()); xoaBoiCanh(); resetForm(); setMsg(''); setErr(''); }}
+          onChange={(e) => {
+            const d = e.target.value || todayVN();
+            if (d === viewDate) return;
+            if (!roiDiDuoc()) return;
+            setViewDate(d); xoaBoiCanh(); resetForm(); setMsg(''); setErr('');
+          }}
           className="px-3 py-2 border border-gray-300 rounded-md text-brand-navy"
         />
         {!isToday && (
           <button
             type="button"
-            onClick={() => { setViewDate(todayVN()); xoaBoiCanh(); resetForm(); setMsg(''); setErr(''); }}
+            onClick={() => {
+              if (!roiDiDuoc()) return;
+              setViewDate(todayVN()); xoaBoiCanh(); resetForm(); setMsg(''); setErr('');
+            }}
             className="px-3 py-2 rounded-lg bg-brand-teal text-white text-sm font-semibold"
           >
             ↩ Về hôm nay
@@ -976,8 +1023,25 @@ export default function WarehouseSlipView({ kind }: { kind: Kind }) {
 
       {/* Vá 13/08/2026 — CHƯA NẠP ĐƯỢC PHIẾU thì che luôn phần thêm dòng.
           Không chỉ khoá nút Lưu: để người dùng gõ xong cả một bó rồi mới báo
-          "không lưu được" là bắt họ gõ lại từ đầu. Che sớm + nút Tải lại to rõ. */}
-      {isToday && srvCount === null && (
+          "không lưu được" là bắt họ gõ lại từ đầu. Che sớm + nút Tải lại to rõ.
+
+          ⚠ SỬA 14/08/2026 — PHẢI có `!loading`. Bản 13/08 chỉ soi `srvCount === null`,
+          mà `srvCount` KHỞI TẠO bằng null ⇒ khung đỏ này hiện ở MỌI lần mở màn,
+          suốt thời gian nạp (~3 giây), kèm dòng chữ "Phiếu hôm nay — 0 dòng".
+          Hai cái hại:
+            · anh Cường ngày nào cũng thấy phiếu "trống rỗng" rồi tự khỏi sau 3 giây;
+            · nên lần nạp HỎNG THẬT trông y hệt lúc bình thường ⇒ chuông báo động
+              tự làm mình mất thiêng (trái luật cảnh báo anh Hữu chốt 07/08:
+              chỉ in thứ CẦN LÀM).
+          `loading` = `loadedFor !== kind|branch|viewDate`, chỉ bật lên sau khi lần
+          nạp ĐÃ CHẠY XONG (thành hay bại) ⇒ `!loading && srvCount === null` đúng
+          bằng "đã thử nạp và THẤT BẠI". */}
+      {isToday && loading && (
+        <div className="rounded-xl border border-slate-300 bg-slate-50 p-4 text-slate-600 text-sm font-semibold">
+          ⏳ Đang tải phiếu hôm nay…
+        </div>
+      )}
+      {isToday && !loading && srvCount === null && (
         <div className="bg-rose-50 border-2 border-rose-300 rounded-xl p-4 space-y-2">
           <div className="font-bold text-rose-800">⚠ Chưa tải được phiếu hôm nay</div>
           <p className="text-sm text-rose-700 leading-relaxed">

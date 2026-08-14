@@ -9,6 +9,7 @@ import TodayOvertimeCard from './TodayOvertimeCard';
 import PlanView from './PlanView';
 import StopReasonsView from './StopReasonsView';
 import WarehouseSlipView from './WarehouseSlipView';
+import { hoiTruocKhiRoiDi } from '@/lib/nvl-slips';
 
 const todayISO = () => {
   const d = new Date();
@@ -92,6 +93,15 @@ export default function RegisterLayout({
 
   const [activeTab, setActiveTab] = useState<Tab>(defaultTab);
   const [labelsDate, setLabelsDate] = useState(todayISO());
+  /**
+   * Số dòng phiếu kho đang treo CHƯA LƯU, do `WarehouseSlipView` báo lên
+   * (vá 14/08/2026 — mất 6 dòng S18A của anh Cường).
+   *
+   * Nút chuyển tab nằm ở ĐÂY, còn giỏ dòng nằm trong màn kho; mà chạm tab là
+   * React tháo luôn màn kho ⇒ dòng chưa lưu bay sạch, không kịp cảnh báo gì.
+   * Nên cờ phải chạy ngược lên đây thì mới chặn được ĐÚNG LÚC — trước khi đổi tab.
+   */
+  const [khoChuaLuu, setKhoChuaLuu] = useState(0);
 
   const tabs: Array<{ key: Tab; label: string; color: 'teal' | 'navy' | 'green' | 'red' }> = [];
   if (showOvertimeTab) tabs.push({ key: 'overtime', label: 'Đăng ký tăng ca', color: 'teal' });
@@ -156,7 +166,13 @@ export default function RegisterLayout({
             <button
               key={t.key}
               type="button"
-              onClick={() => setActiveTab(t.key)}
+              onClick={() => {
+                if (t.key === activeTab) return;
+                // Đang ở màn kho mà còn dòng chưa lưu → hỏi trước. Huỷ thì ở lại,
+                // giỏ còn nguyên để bấm Lưu.
+                if (!hoiTruocKhiRoiDi(khoChuaLuu)) return;
+                setActiveTab(t.key);
+              }}
               className={`py-2.5 rounded-xl text-sm font-semibold transition border ${
                 active ? activeCls : inactiveCls
               }`}
@@ -187,8 +203,8 @@ export default function RegisterLayout({
 
       {activeTab === 'stops' && <StopReasonsView readOnly={isQlsx} />}
 
-      {activeTab === 'wh_out' && <WarehouseSlipView kind="issue" />}
-      {activeTab === 'wh_in' && <WarehouseSlipView kind="return" />}
+      {activeTab === 'wh_out' && <WarehouseSlipView kind="issue" onChuaLuu={setKhoChuaLuu} />}
+      {activeTab === 'wh_in' && <WarehouseSlipView kind="return" onChuaLuu={setKhoChuaLuu} />}
     </>
   );
 }

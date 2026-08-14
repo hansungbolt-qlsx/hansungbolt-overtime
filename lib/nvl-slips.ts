@@ -22,6 +22,59 @@ export function nowVNTime(): string {
   return new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(11, 16);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// GIỮ DÒNG CHƯA LƯU — vá lỗi THẬT 14/08/2026 (mất 6 dòng S18A của anh Cường)
+//
+// Giỏ dòng đang gõ CHỈ nằm trong bộ nhớ trang. Rời màn là React tháo component
+// (`RegisterLayout` render theo `activeTab && <View/>`) hoặc `xoaBoiCanh()` dốc
+// giỏ ⇒ dòng chưa Lưu bay sạch, KHÔNG một lời cảnh báo nào.
+//
+// Bằng chứng khép kín từ chính dữ liệu hôm đó — mỗi dòng mang giờ nó được gõ,
+// nhật ký cho giờ nó được lưu:
+//     Scm 5.45  gõ 09:13  → lưu 09:13:45   ✅ sống
+//     Scm 5.65  gõ 10:35  → lưu 10:35:58   ✅ sống
+//     S18A 4.85 gõ ~10:36 → CHUYỂN TAB      ❌ mất 3 dòng
+//     Trả 430   gõ 10:41  → lưu 10:41:41   ✅ sống
+//     S18A 4.95 gõ >10:41 → rời màn         ❌ mất 3 dòng
+// Bấm Lưu trong cùng một phút thì sống 3/3; rời đi trước khi Lưu thì mất 2/2.
+//
+// ⚠ Hai quyết định của anh Hữu (14/08) — đừng tự đảo:
+//   1. KHÔNG chặn cứng. Mạng xưởng chập thì Lưu không được, chặn cứng là NHỐT
+//      nhân viên kho trong tab. Chọn "vẫn đi" phải luôn đi được.
+//   2. KHÔNG cất giỏ xuống bộ nhớ máy — chấp nhận mất dòng chưa lưu khi khoá
+//      màn / trình duyệt dọn trang / tải lại. Đổi lại: không giỏ nào sống sót
+//      qua lần đổi nhánh ⇒ KHÔNG THỂ tái diễn sự cố 08/08 (27 dòng NVL chui
+//      vào phiếu phụ liệu — xem `xoaBoiCanh` trong WarehouseSlipView).
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Số dòng đang treo chưa lưu. 0 = đi đâu cũng an toàn, không hỏi gì.
+ *
+ * @param chuaLuu   giỏ có thay đổi chưa gửi lên máy chủ hay chưa
+ * @param trongGio  số dòng đang có trong giỏ
+ * @param mayChu    số dòng máy chủ đang giữ (`null` = chưa nạp được)
+ */
+export function demDongChuaLuu(
+  chuaLuu: boolean, trongGio: number, mayChu: number | null,
+): number {
+  if (!chuaLuu) return 0;
+  // Chưa nạp được phiếu ⇒ không biết máy chủ có gì ⇒ coi CẢ GIỎ là đang treo.
+  // Thà nói thừa còn hơn nói thiếu: hỏi nhầm chỉ tốn một cú bấm, bỏ sót là mất dòng.
+  if (mayChu == null) return Math.max(1, trongGio);
+  // Xoá bớt dòng thì phần dôi ≤ 0 nhưng VẪN là thay đổi chưa lưu ⇒ tính là 1.
+  return Math.max(1, trongGio - mayChu);
+}
+
+/** Hỏi lại trước khi rời màn khi còn dòng chưa lưu. Trả `true` = cho đi. */
+export function hoiTruocKhiRoiDi(soDongChuaLuu: number): boolean {
+  if (soDongChuaLuu <= 0) return true;
+  return window.confirm(
+    `⚠ CÒN ${soDongChuaLuu} DÒNG CHƯA LƯU\n\n`
+    + 'Rời khỏi đây là mất hết, phải gõ lại từ đầu.\n\n'
+    + 'Bấm HUỶ để ở lại bấm Lưu — bấm OK để vẫn đi.',
+  );
+}
+
 /** Khoá idempotent gửi sang app chính. Cùng uid = ghi đè bản đang chờ duyệt. */
 export function slipUid(date: string, kind: Kind, branch: Branch, seq: number): string {
   return `ot-${date}-${kind}-${branch}-${seq}`;
