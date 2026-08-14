@@ -367,15 +367,21 @@ export default function TempSlipPanel({
     : 'chưa có dòng nào';
 
   return (
-    // MÀU CAM = KHU VỰC TẠM (user chốt 31/7). Phiếu xuất kho chính nền trắng
-    // chữ xanh navy; khối này cam + vạch cam bên trái để nhìn phát biết ngay
-    // đang ở vùng "hàng chưa nhập kho", không nhầm với phiếu thật.
+    // NỀN VÀNG CHỮ ĐEN = KHU VỰC TẠM (anh Hữu chốt 14/08/2026).
+    //
+    // ⚠ ĐỔI MÀU 14/08. Bản cũ (31/7) dùng cam nhạt `bg-amber-50` + chữ
+    // `text-amber-800` — TRÙNG Y HỆT bảng màu thẻ "📤 Đã gửi — chờ duyệt"
+    // (`STATUS_UI.pending` bên WarehouseSlipView cũng `bg-amber-50 text-amber-800
+    // border-amber-300`). Hai khối nằm sát nhau trên màn điện thoại, nhìn ra cùng
+    // một màu kem ⇒ không phân biệt được đâu là VÙNG TẠM, đâu là PHIẾU THẬT ĐÃ GỬI.
+    // Nay vàng đặc + chữ đen: rạch ròi từ xa, không phải đọc chữ mới biết.
+    //
     // Hai trạng thái CẦN CHÚ Ý vẫn thắng màu nền: xanh = đã có tồn (chốt được),
-    // đỏ = có dòng treo quá 24h.
+    // đỏ = có dòng treo quá 24h. KHÔNG đụng hai màu đó — chúng mang nghĩa riêng.
     <div className={`rounded-xl border border-l-4 overflow-hidden ${
       ready.length > 0 ? 'border-emerald-400 border-l-emerald-500 bg-emerald-50'
         : nStale > 0 ? 'border-rose-400 border-l-rose-500 bg-rose-50'
-          : 'border-amber-300 border-l-amber-500 bg-amber-50'
+          : 'border-yellow-500 border-l-yellow-600 bg-yellow-300'
     }`}>
       <button
         type="button"
@@ -384,7 +390,7 @@ export default function TempSlipPanel({
       >
         <span className={`font-bold text-sm ${
           ready.length > 0 ? 'text-emerald-800'
-            : nStale > 0 ? 'text-rose-800' : 'text-amber-800'
+            : nStale > 0 ? 'text-rose-800' : 'text-black'
         }`}>
           🕓 Phiếu xuất kho tạm — Hàng chưa nhập kho
         </span>
@@ -399,8 +405,8 @@ export default function TempSlipPanel({
               {nStale} treo &gt;24h
             </span>
           )}
-          <span className="text-xs text-amber-900/70">{badge}</span>
-          <span className="text-amber-700">{open ? '▲' : '▼'}</span>
+          <span className="text-xs text-black/70">{badge}</span>
+          <span className="text-black">{open ? '▲' : '▼'}</span>
         </span>
       </button>
 
@@ -409,7 +415,7 @@ export default function TempSlipPanel({
           {err && <p className="text-sm text-rose-700 font-semibold">⛔ {err}</p>}
           {msg && <p className="text-sm text-emerald-700 font-semibold">✓ {msg}</p>}
 
-          <p className="text-xs text-amber-900/80 leading-relaxed">
+          <p className="text-xs text-black/80 leading-relaxed">
             Dùng khi hàng về gấp, đưa vào máy trước lúc kho nhập lên app.
             Ghi <b>mỗi cuộn một dòng</b> (lot + Kg đọc trên tem). Khi app chính nhập kho xong,
             quay lại đây bấm <b>Kiểm tra</b> để chốt cuộn rồi đưa vào phiếu hôm nay.
@@ -421,7 +427,7 @@ export default function TempSlipPanel({
 
           {/* ---- Danh sách dòng đang chờ ---- */}
           {rows.length === 0 ? (
-            <p className="text-sm text-amber-900/70">Chưa có dòng tạm nào.</p>
+            <p className="text-sm text-black/70">Chưa có dòng tạm nào.</p>
           ) : (
             <ul className="divide-y border border-black/5 rounded-lg bg-white">
               {rows.map((r) => {
