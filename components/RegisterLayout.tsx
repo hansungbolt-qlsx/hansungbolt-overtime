@@ -9,7 +9,7 @@ import TodayOvertimeCard from './TodayOvertimeCard';
 import PlanView from './PlanView';
 import StopReasonsView from './StopReasonsView';
 import WarehouseSlipView from './WarehouseSlipView';
-import { hoiTruocKhiRoiDi } from '@/lib/nvl-slips';
+import { chanNeuChuaLuu } from '@/lib/nvl-slips';
 
 const todayISO = () => {
   const d = new Date();
@@ -101,7 +101,7 @@ export default function RegisterLayout({
    * React tháo luôn màn kho ⇒ dòng chưa lưu bay sạch, không kịp cảnh báo gì.
    * Nên cờ phải chạy ngược lên đây thì mới chặn được ĐÚNG LÚC — trước khi đổi tab.
    */
-  const [khoChuaLuu, setKhoChuaLuu] = useState(0);
+  const [khoChuaLuu, setKhoChuaLuu] = useState('');
 
   const tabs: Array<{ key: Tab; label: string; color: 'teal' | 'navy' | 'green' | 'red' }> = [];
   if (showOvertimeTab) tabs.push({ key: 'overtime', label: 'Đăng ký tăng ca', color: 'teal' });
@@ -168,9 +168,9 @@ export default function RegisterLayout({
               type="button"
               onClick={() => {
                 if (t.key === activeTab) return;
-                // Đang ở màn kho mà còn dòng chưa lưu → hỏi trước. Huỷ thì ở lại,
-                // giỏ còn nguyên để bấm Lưu.
-                if (!hoiTruocKhiRoiDi(khoChuaLuu)) return;
+                // Đang ở màn kho mà còn việc dở (dòng chưa Lưu, hoặc cuộn mới
+                // tick chưa bấm ➕) → CHẶN HẲN, hộp một nút, bắt quay lại xử lý.
+                if (!chanNeuChuaLuu(khoChuaLuu)) return;
                 setActiveTab(t.key);
               }}
               className={`py-2.5 rounded-xl text-sm font-semibold transition border ${

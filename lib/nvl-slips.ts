@@ -39,8 +39,9 @@ export function nowVNTime(): string {
 // Bấm Lưu trong cùng một phút thì sống 3/3; rời đi trước khi Lưu thì mất 2/2.
 //
 // ⚠ Hai quyết định của anh Hữu (14/08) — đừng tự đảo:
-//   1. KHÔNG chặn cứng. Mạng xưởng chập thì Lưu không được, chặn cứng là NHỐT
-//      nhân viên kho trong tab. Chọn "vẫn đi" phải luôn đi được.
+//   1. ⚠ ĐÃ ĐẢO trong cùng ngày. Bản TRƯA: "không chặn cứng, phải có nút vẫn đi".
+//      Bản CHIỀU (hiệu lực): **CHẶN HẲN, một nút** — xem `chanNeuChuaLuu` để
+//      biết đủ lý do. Đừng khôi phục nút "vẫn đi".
 //   2. KHÔNG cất giỏ xuống bộ nhớ máy — chấp nhận mất dòng chưa lưu khi khoá
 //      màn / trình duyệt dọn trang / tải lại. Đổi lại: không giỏ nào sống sót
 //      qua lần đổi nhánh ⇒ KHÔNG THỂ tái diễn sự cố 08/08 (27 dòng NVL chui
@@ -59,20 +60,70 @@ export function demDongChuaLuu(
 ): number {
   if (!chuaLuu) return 0;
   // Chưa nạp được phiếu ⇒ không biết máy chủ có gì ⇒ coi CẢ GIỎ là đang treo.
-  // Thà nói thừa còn hơn nói thiếu: hỏi nhầm chỉ tốn một cú bấm, bỏ sót là mất dòng.
-  if (mayChu == null) return Math.max(1, trongGio);
-  // Xoá bớt dòng thì phần dôi ≤ 0 nhưng VẪN là thay đổi chưa lưu ⇒ tính là 1.
-  return Math.max(1, trongGio - mayChu);
+  // Thà nói thừa còn hơn nói thiếu: chặn nhầm tốn một cú bấm, bỏ sót là mất dòng.
+  if (mayChu == null) return Math.max(0, trongGio);
+
+  const doi = trongGio - mayChu;
+  if (doi > 0) return doi;          // có dòng THÊM chưa lưu → đúng số bị mất
+
+  // ⚠ BẪY ĐÃ TRÁNH ĐƯỢC (phát hiện 14/08 lúc dựng bài kiểm, TRƯỚC khi deploy):
+  // bản đầu viết `Math.max(1, trongGio - mayChu)`, tức giỏ rỗng vẫn trả 1. Ghép
+  // với cửa CHẶN HẲN thì thành bẫy chết: thêm một dòng rồi đổi ý XOÁ nó đi ⇒
+  // giỏ rỗng ⇒ vẫn bị chặn ⇒ mà phiếu rỗng thì Lưu cũng không được ("Phiếu chưa
+  // có dòng nào") ⇒ KHÔNG CÒN ĐƯỜNG NÀO RA KHỎI TAB.
+  // Nay: giỏ rỗng = chẳng còn gì để mất = cho đi.
+  //
+  // Vẫn giữ cảnh báo cho ca "xoá 1 thêm 1" (số không đổi nhưng có dòng mới sẽ
+  // mất) — lúc đó giỏ còn dòng nên Lưu được, không kẹt.
+  return trongGio > 0 ? 1 : 0;
 }
 
-/** Hỏi lại trước khi rời màn khi còn dòng chưa lưu. Trả `true` = cho đi. */
-export function hoiTruocKhiRoiDi(soDongChuaLuu: number): boolean {
-  if (soDongChuaLuu <= 0) return true;
-  return window.confirm(
-    `⚠ CÒN ${soDongChuaLuu} DÒNG CHƯA LƯU\n\n`
-    + 'Rời khỏi đây là mất hết, phải gõ lại từ đầu.\n\n'
-    + 'Bấm HUỶ để ở lại bấm Lưu — bấm OK để vẫn đi.',
-  );
+/**
+ * Câu cảnh báo khi còn việc dở. Trả chuỗi RỖNG nghĩa là sạch, đi đâu cũng được.
+ *
+ * @param soDongChuaLuu  dòng đã vào giỏ nhưng chưa bấm Lưu
+ * @param soDangChon     cuộn đang tick / mục đang gõ dở, CHƯA bấm "Thêm vào phiếu"
+ * @param danhTu         'CUỘN' cho nguyên liệu · 'MỤC' cho phụ liệu
+ */
+export function canhBaoChuaLuu(
+  soDongChuaLuu: number, soDangChon: number, danhTu = 'CUỘN',
+): string {
+  const ve: string[] = [];
+  if (soDongChuaLuu > 0) ve.push(`${soDongChuaLuu} DÒNG CHƯA LƯU`);
+  if (soDangChon > 0) ve.push(`${soDangChon} ${danhTu} ĐANG CHỌN DỞ`);
+  if (ve.length === 0) return '';
+  return `⚠ CÒN ${ve.join(' và ')}\n\n`
+    + 'Bấm OK để QUAY LẠI, rồi bấm "➕ Thêm vào phiếu" và "Lưu phiếu".\n'
+    + 'Không cần nữa thì bỏ tích / xoá dòng — xong mới chuyển tab được.';
+}
+
+/**
+ * Cửa CHẶN trước khi rời màn. Trả `true` = cho đi, `false` = giữ lại.
+ *
+ * ⚠ ĐẢO QUYẾT ĐỊNH 14/08/2026 — anh Hữu đổi từ "hỏi rồi cho chọn" sang "CHẶN HẲN".
+ * Bản trưa dùng hộp hai nút (Huỷ / Vẫn đi). Anh Hữu chốt lại buổi chiều:
+ * chỉ MỘT nút, bắt quay lại xử lý cho xong mới được đi.
+ *
+ * Lý do đảo — nút "Vẫn đi" CHÍNH LÀ chỗ hỏng: người làm kho gặp hộp thoại mỗi
+ * ngày vài chục lần sẽ bấm cho qua theo phản xạ, y như khung đỏ báo động giả đã
+ * phải gỡ sáng cùng ngày. Một nút thì KHÔNG CÒN đường mất dữ liệu bằng phản xạ;
+ * muốn bỏ phải bỏ tích / xoá dòng — làm ngay trên màn, NHÌN THẤY thứ mình bỏ.
+ *
+ * Lo ban đầu "chặn cứng là nhốt nhân viên kho lúc mạng chập" đã cân lại và thấy
+ * nhẹ: rời tab là việc KHÔNG bắt buộc, chỗ đang làm dở nằm ngay tại tab đó; mà
+ * mất mạng thì các tab khác cũng không tải được. Lối thoát luôn còn: bỏ tích,
+ * xoá dòng, hoặc "➕ Thêm vào phiếu" rồi Lưu.
+ *
+ * ⚠ Vì sao lời nhắn chỉ đường "➕ Thêm vào phiếu" chứ không chỉ "bỏ tích":
+ * `onScan` (quét tem) CỘNG THÊM tick mà KHÔNG xoá tick cũ, trong khi màn chỉ
+ * hiện cuộn của `pickedCode` ⇒ tick mã cũ có thể nằm ngoài tầm nhìn, bỏ tích
+ * không tới. Nhưng "➕ Thêm vào phiếu" gom TOÀN BỘ cuộn đang tick kể cả cuộn
+ * không hiện, nên đường đó LUÔN thoát được — không ai bị kẹt.
+ */
+export function chanNeuChuaLuu(canhBao: string): boolean {
+  if (!canhBao) return true;
+  window.alert(canhBao);   // hộp MỘT nút — không có đường "vẫn đi"
+  return false;
 }
 
 /** Khoá idempotent gửi sang app chính. Cùng uid = ghi đè bản đang chờ duyệt. */

@@ -14,8 +14,8 @@ import BarcodeScanButton from './BarcodeScanButton';
 import TempSlipPanel from './TempSlipPanel';
 import {
   BRANCH_LABEL, DEPARTMENTS, KIND_LABEL, RETURN_REASONS, RETURN_REASON_DEFAULT,
-  RETURN_REASON_OTHER, defaultDepartment, demDongChuaLuu, hoiTruocKhiRoiDi,
-  matchAux, matchNvl, supShort,
+  RETURN_REASON_OTHER, canhBaoChuaLuu, chanNeuChuaLuu, defaultDepartment,
+  demDongChuaLuu, matchAux, matchNvl, supShort,
   type Branch, type Department, type Kind, type SlipLine,
   type StockAux, type StockCoil,
 } from '@/lib/nvl-slips';
@@ -132,7 +132,7 @@ const STATUS_UI: Record<string, { label: string; cls: string }> = {
 };
 
 export default function WarehouseSlipView(
-  { kind, onChuaLuu }: { kind: Kind; onChuaLuu?: (soDong: number) => void },
+  { kind, onChuaLuu }: { kind: Kind; onChuaLuu?: (canhBao: string) => void },
 ) {
   const [branch, setBranch] = useState<Branch>('nvl');
   // Ngày đang xem — mặc định hôm nay. Xem ngày khác thì CHỈ ĐỌC (user 28/7):
@@ -360,20 +360,34 @@ export default function WarehouseSlipView(
     isNvl && kind === 'issue' && !!khsx?.has_data && khsx.date === todayVN();
   const khsxSet = useMemo(() => new Set(khsx?.codes ?? []), [khsx]);
 
-  // Số dòng đang treo chưa lưu (vá 14/08/2026). Công thức tách sang
-  // `lib/nvl-slips.ts` để có bài kiểm tự động — xem `demDongChuaLuu`.
+  // ── VIỆC CÒN DỞ — hai tầng, cả hai đều phải chặn (anh Hữu chốt 14/08 chiều) ──
+  //
+  // Tầng 1 — đã bấm "➕ Thêm vào phiếu", chưa bấm Lưu  → `soChuaLuu`
+  // Tầng 2 — MỚI TICK CUỘN, chưa bấm ➕                → `soDangChon`
+  //
+  // ⚠ Tầng 2 là chỗ DỄ QUÊN NHẤT và trước 14/08 chiều KHÔNG có gì che: tick xong
+  // 5 cuộn thì trong đầu đã là "xong rồi", nút ➕ cảm giác thừa. Đo trên chính bản
+  // production: tick 1 cuộn rồi chạm tab khác → 0 cảnh báo, quay lại còn 0 tick.
+  // Ở tab TRẢ KHO ổ `ticked` còn giữ cả SỐ KG GÕ TAY từng cuộn ⇒ mất là mất số
+  // liệu thật, không chỉ mất công tick.
   const soChuaLuu = demDongChuaLuu(chuaLuu, lines.length, srvCount);
+  const soDangChon = isNvl
+    ? Object.keys(ticked).length
+    // Phụ liệu không có cuộn: việc dở là ô SỐ LƯỢNG vừa gõ. Chỉ chọn mã mà chưa
+    // gõ số thì chưa có gì để mất → không chặn, khỏi phiền vô cớ.
+    : (auxQty.trim() ? 1 : 0);
+  const canhBao = canhBaoChuaLuu(soChuaLuu, soDangChon, isNvl ? 'CUỘN' : 'MỤC');
 
   // Báo ngược lên `RegisterLayout` để nó chặn được nút chuyển tab — nút đó nằm
-  // bên ngoài màn này. Dọn về 0 khi tháo component, nếu không thì tab kế tiếp
-  // thừa hưởng con số cũ và hỏi lại một cách vô cớ.
+  // bên ngoài màn này. Dọn về rỗng khi tháo component, nếu không thì tab kế tiếp
+  // thừa hưởng câu cảnh báo cũ và chặn một cách vô cớ.
   useEffect(() => {
-    onChuaLuu?.(soChuaLuu);
-    return () => onChuaLuu?.(0);
-  }, [soChuaLuu, onChuaLuu]);
+    onChuaLuu?.(canhBao);
+    return () => onChuaLuu?.('');
+  }, [canhBao, onChuaLuu]);
 
   /** Cửa chung cho mọi thao tác ĐỔI BỐI CẢNH ngay trong màn này. */
-  const roiDiDuoc = useCallback(() => hoiTruocKhiRoiDi(soChuaLuu), [soChuaLuu]);
+  const roiDiDuoc = useCallback(() => chanNeuChuaLuu(canhBao), [canhBao]);
 
   // Không setState đồng bộ trong effect (cascading render) — `loading` suy ra từ
   // "đã nạp xong cho tổ hợp nào", chỉ set sau khi await xong.
