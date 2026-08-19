@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   defaultDepartment, matchAux, matchNvl,
   type Branch, type Department, type SlipLine, type StockAux, type StockCoil,
@@ -56,6 +56,18 @@ export default function TempSlipPanel({
 }) {
   const isNvl = branch === 'nvl';
 
+  /**
+   * NHÁNH ĐANG MỞ — để VỨT gói về muộn. Cùng luật với `loadSlip`/`loadStock`
+   * trong `WarehouseSlipView` (vá 19/08/2026).
+   *
+   * 🪤 Khối này KHÔNG bị tháo khi đổi nhánh — nó chỉ nhận `branch` qua thuộc tính
+   * rồi vẽ lại. Nên nếu gói dòng tạm của nhánh CŨ về muộn, nó vẫn nằm trong khối,
+   * và bấm "Chốt" là đẩy dòng NGUYÊN LIỆU vào phiếu PHỤ LIỆU — ra đúng hậu quả
+   * sự cố 18/08, chỉ khác đường vào. Vá 19/08 lần đầu bỏ sót đúng chỗ này.
+   */
+  const nhanhRef = useRef(branch);
+  nhanhRef.current = branch;
+
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<TempLine[]>([]);
   const [merged, setMerged] = useState<TempLine[]>([]);
@@ -81,10 +93,12 @@ export default function TempSlipPanel({
   const [override, setOverride] = useState<Record<string, number>>({});
 
   const load = useCallback(async () => {
+    const cua = branch;                      // gói này nạp CHO nhánh nào
     setErr('');
     try {
       const r = await fetch(`/api/nvl-temp?branch=${branch}`);
       const d = await r.json();
+      if (nhanhRef.current !== cua) return;  // 🛑 về muộn, đã đổi nhánh → BỎ
       if (!r.ok) {
         // Bảng chưa có (migration 22 chưa chạy) → ẩn khối, KHÔNG báo lỗi.
         if (/does not exist|schema cache|relation|nvl_temp_lines/i.test(d.error || '')) {
@@ -97,11 +111,16 @@ export default function TempSlipPanel({
       setRows((d.waiting ?? []).map((x: TempLine) => ({ ...x, qty: Number(x.qty) })));
       setMerged((d.merged ?? []).map((x: TempLine) => ({ ...x, qty: Number(x.qty) })));
     } catch (e) {
+      if (nhanhRef.current !== cua) return;
       setErr(e instanceof Error ? e.message : 'Lỗi tải phiếu tạm');
     }
   }, [branch]);
 
   // Nạp lại mỗi khi mở màn / đổi nhánh — user không phải nhớ bấm làm mới.
+  // Đổi nhánh ⇒ DỐC KHỐI NGAY rồi mới nạp lại. Cùng lý lẽ với `xoaBoiCanh`
+  // bên `WarehouseSlipView`: để nguyên dòng tạm của nhánh cũ trong lúc chờ nạp
+  // là mời người dùng bấm Chốt nhầm nhánh.
+  useEffect(() => { setRows([]); setMerged([]); setErr(''); setMsg(''); }, [branch]);
   useEffect(() => { void load(); }, [load]);
 
   // ---- Đối chiếu với tồn hiện có ----------------------------------------

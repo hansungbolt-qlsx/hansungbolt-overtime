@@ -889,24 +889,35 @@ export default function WarehouseSlipView(
           }}
           className="px-3 py-2 border border-gray-300 rounded-md text-brand-navy"
         />
-        {!isToday && (
-          <button
-            type="button"
-            onClick={() => {
-              if (!roiDiDuoc()) return;
-              setViewDate(todayVN()); xoaBoiCanh(); resetForm(); setMsg(''); setErr('');
-            }}
-            className="px-3 py-2 rounded-lg bg-brand-teal text-white text-sm font-semibold"
-          >
-            ↩ Về hôm nay
-          </button>
-        )}
+        {/* 🚫 NÚT "↩ Về hôm nay" ĐÃ BỎ — anh Hữu chốt 19/08/2026: bớt một cửa
+            đổi bối cảnh thì bớt một chỗ có thể sai. Muốn về hôm nay thì chọn
+            ngày hiện tại ngay trên ô ngày bên cạnh — cùng một đường, đã có cửa
+            hỏi và dốc rổ y hệt. ĐỪNG dựng lại nút này. */}
       </div>
 
       {!isToday && (
         <div className="rounded-lg bg-slate-100 border border-slate-300 text-slate-700 text-sm p-2.5">
           Đang xem lại phiếu ngày <b>{ddmm(viewDate)}</b> — <b>chỉ để xem</b>, không
-          ghi thêm được. Muốn ghi thì bấm “Về hôm nay”.
+          sửa và không ghi thêm được. Muốn ghi thì <b>chọn ngày hôm nay</b> ở ô ngày
+          phía trên.
+        </div>
+      )}
+
+      {/* PHIẾU BỊ TỪ CHỐI CỦA NGÀY CŨ — anh Hữu chốt 19/08/2026 phải nói thẳng.
+          Vì sao cần: hai luật của chính app đá nhau —
+            · 28/07: xem ngày khác hôm nay = CHỈ ĐỌC (ô soạn luôn ghi vào phiếu HÔM NAY)
+            · 29/07: phiếu bị TỪ CHỐI thì mở lại để sửa rồi gửi lại
+          Luật sau ngầm giả định phiếu là của hôm nay. Phiếu gửi 18/08 mà sáng 19/08
+          mới bị từ chối thì KHÔNG AI SỬA ĐƯỢC — đúng ca đã xảy ra. App phải nói ra
+          điều đó thay vì để người dùng xoá một hồi rồi mới phát hiện không lưu được. */}
+      {!isToday && slip?.status === 'rejected' && (
+        <div className="rounded-lg bg-rose-50 border-2 border-rose-300 text-rose-900 text-sm p-3">
+          <b>Phiếu này bị từ chối và là phiếu của ngày cũ — CHỈ XEM, không sửa được.</b>
+          <div className="mt-1">
+            Muốn xuất lại số hàng này thì <b>chọn ngày hôm nay</b> ở ô ngày phía trên
+            rồi <b>tạo phiếu mới</b>. Phiếu cũ cứ để nguyên — nó đã bị từ chối nên
+            <b> không trừ tồn kho</b>, chỉ còn là dấu vết.
+          </div>
         </div>
       )}
 
@@ -1538,9 +1549,11 @@ export default function WarehouseSlipView(
       {/* Dòng đã có */}
       <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-4">
         <h3 className="font-bold text-brand-navy mb-2">
+          {/* ⚠ Anh Hữu chốt 19/08: xem ngày cũ thì TUYỆT ĐỐI không được in chữ
+              "hôm nay" — nó làm người dùng tưởng đang sửa phiếu hôm nay. */}
           {past.length > 0
             ? `Phiếu mới #${slip?.seq ?? past[past.length - 1].slip.seq + 1}`
-            : 'Phiếu hôm nay'}
+            : (isToday ? 'Phiếu hôm nay' : `Phiếu ngày ${ddmm(viewDate)}`)}
           {' — '}{lines.length} dòng
           {lines.length > 0 && ` · ${fmtQty(lines.reduce((s, l) => s + l.qty, 0))} ${lines[0].unit}`}
         </h3>
@@ -1606,7 +1619,13 @@ export default function WarehouseSlipView(
                       )}
                       <div className="text-right whitespace-nowrap">
                         <div className="font-semibold">{fmtQty(l.qty)} {l.unit}</div>
-                        {(
+                        {/* CHỈ hiện khi đang ở HÔM NAY (anh Hữu chốt 19/08).
+                            Xem ngày cũ là chỉ-đọc, mà trước đây vẫn cho bấm Xoá:
+                            xoá xong KHÔNG lưu được (ô soạn bị ẩn theo ngày), lại
+                            còn bị cửa "còn việc chưa lưu" chặn không cho rời màn
+                            ⇒ người dùng KẸT, chỉ thoát được bằng tải lại trang.
+                            Đúng chỗ làm anh Cường mất công sáng 19/08. */}
+                        {isToday && (
                           <button
                             type="button"
                             onClick={() => removeLine(i)}
