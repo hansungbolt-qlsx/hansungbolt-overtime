@@ -9,7 +9,7 @@
 // 1 component dùng cho CẢ Xuất kho lẫn Trả kho (khác nhau ở `kind`), mỗi cái có
 // 2 nhánh Nguyên liệu / Phụ liệu — đúng cấu trúc user chốt.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import BarcodeScanButton from './BarcodeScanButton';
 import TempSlipPanel from './TempSlipPanel';
 import {
@@ -141,6 +141,32 @@ export default function WarehouseSlipView(
   const isToday = viewDate === todayVN();
   const [loadedFor, setLoadedFor] = useState('');
   const loading = loadedFor !== `${kind}|${branch}|${viewDate}`;
+
+  /**
+   * BỐI CẢNH ĐANG MỞ (Xuất/Trả × NVL/Phụ liệu × ngày) — dùng để VỨT phản hồi VỀ MUỘN.
+   *
+   * 🪤 Vá lỗi THẬT 18/08/2026 — phiếu `ot-2026-08-18-issue-aux-1` sinh ra mang
+   * **16 dòng NGUYÊN LIỆU**, y hệt sự cố 08/08 nhưng theo đường khác.
+   * Bản vá 10/08 (`xoaBoiCanh` dốc rổ khi đổi nhánh) làm ĐÚNG phần của nó. Cái
+   * còn thiếu: `loadSlip()`/`loadStock()` KHÔNG có cách huỷ, nên gói của nhánh
+   * CŨ về sau vẫn `setLines(...)` đè lên rổ vừa dốc.
+   *
+   * Diễn biến thật (nhật ký máy chủ): 13:2x anh Cường MỞ LẠI màn Xuất kho —
+   * màn luôn mở ở nhánh Nguyên liệu và nạp gói NẶNG (phiếu 16 dòng + cuộn tồn +
+   * master + KHSX). Anh bấm ngay sang Phụ liệu; gói phụ liệu NHẸ về trước, gói
+   * nguyên liệu về sau và đổ 16 dòng NVL vào rổ. 13:22 anh thêm 1 dòng phụ liệu
+   * — đợt của nó là **8** = max(7)+1, đúng dấu vân tay rổ chưa sạch. 13:23 bấm
+   * Lưu ⇒ 17 dòng vào phiếu phụ liệu.
+   * ⚠ KHÔNG cần mạng chập chờn: gói NVL vốn nặng hơn gói phụ liệu nhiều lần.
+   * Lần lưu NVL gần nhất trước đó là **10:35** — cách gần 3 tiếng, nên đây KHÔNG
+   * phải chuyện "lưu xong rồi đổi tab".
+   *
+   * Gán NGAY trong lúc render (không qua `useEffect`) để lúc hiệu ứng nạp của
+   * nhánh mới chạy thì dấu đã là nhánh mới — khỏi phụ thuộc thứ tự các hiệu ứng.
+   */
+  const boiCanh = `${kind}|${branch}|${viewDate}`;
+  const boiCanhRef = useRef(boiCanh);
+  boiCanhRef.current = boiCanh;
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
@@ -252,12 +278,15 @@ export default function WarehouseSlipView(
   }, []);
 
   const loadSlip = useCallback(async () => {
+    const cua = `${kind}|${branch}|${viewDate}`;    // gói này nạp CHO bối cảnh nào
     setErr('');
     try {
       const r = await fetch(
         `/api/nvl-slips?kind=${kind}&branch=${branch}&date=${viewDate}`,
       );
       const d = await r.json();
+      // 🛑 VỀ MUỘN — người dùng đã đổi nhánh/ngày. Bỏ trọn gói này, KHÔNG đụng rổ.
+      if (boiCanhRef.current !== cua) return;
       if (!r.ok) throw new Error(d.error || 'Không tải được phiếu');
       const num = (ls: Array<SlipLine & { qty: string | number }>) =>
         (ls ?? []).map((l) => ({ ...l, qty: Number(l.qty) }));
@@ -291,6 +320,9 @@ export default function WarehouseSlipView(
       // sau khi Lưu — khỏi phải nhớ tắt ở hai nơi.
       setChuaLuu(false);
     } catch (e) {
+      // Gói của bối cảnh CŨ mà hỏng thì cũng phải im: đặt `srvCount = null` ở đây
+      // sẽ khoá oan nút Lưu của nhánh người dùng đang đứng.
+      if (boiCanhRef.current !== cua) return;
       setErr(e instanceof Error ? e.message : 'Lỗi tải phiếu');
       // ⚠ Nạp HỎNG → xoá mốc để nút Lưu bị khoá. Cố ý KHÔNG dốc `lines` ở đây
       // (xem chú thích `xoaBoiCanh`): dòng vừa lưu mà biến mất thì người dùng gõ
@@ -300,6 +332,7 @@ export default function WarehouseSlipView(
   }, [kind, branch, viewDate]);
 
   const loadStock = useCallback(async () => {
+    const cua = `${kind}|${branch}|${viewDate}`;    // cùng luật với `loadSlip`
     try {
       // nvl_khsx chỉ cần cho XUẤT nguyên liệu (user 30/7: trả kho + phụ liệu
       // không cảnh báo) — gói bé (~1 KB) nên đi cùng chuyến hỏi mốc.
@@ -335,6 +368,8 @@ export default function WarehouseSlipView(
         }
       }
 
+      // 🛑 VỀ MUỘN → bỏ. Không thì danh sách cuộn của nhánh cũ đè lên màn đang mở.
+      if (boiCanhRef.current !== cua) return;
       if (isNvl) {
         setCoils((cached[stockPart] ?? []) as StockCoil[]);
         setNvlMaster((cached.nvl_master ?? []) as MasterNvl[]);
@@ -350,9 +385,12 @@ export default function WarehouseSlipView(
         setStockAt(dm.parts?.aux?.pushed_at ?? '');
       }
     } catch (e) {
+      if (boiCanhRef.current !== cua) return;
       setErr(e instanceof Error ? e.message : 'Lỗi tải tồn kho');
     }
-  }, [isNvl, stockPart, kind]);
+    // `branch` + `viewDate` PHẢI có trong danh sách này — `cua` đọc chúng, thiếu
+    // là `cua` mang giá trị cũ và phép so bối cảnh trở thành vô nghĩa.
+  }, [isNvl, stockPart, kind, branch, viewDate]);
 
   // Cảnh báo KHSX chỉ BẬT khi: xuất NVL + có dữ liệu + đúng ngày hôm nay
   // (danh sách của hôm qua mà đem soi hôm nay là báo ảo).

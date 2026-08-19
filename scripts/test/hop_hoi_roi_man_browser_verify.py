@@ -242,7 +242,16 @@ with sync_playwright() as pw:
              "sau khi xoá dòng thì cũng không còn tick nào treo")
         hop_thoai.clear()
         sang = mo_tab(TRA, DAU_KHO)
-        kiem(len(hop_thoai) == 0, "🔴 giỏ đã dọn sạch → KHÔNG chặn nữa",
+        # ⚠ SỬA 19/08/2026 — phép kiểm này TỪNG GHI CỨNG "phải 0 hộp", vì hôm viết
+        #   nó (14/08) phiếu hôm nay đang RỖNG. Khi phiếu đã có dòng trên máy chủ
+        #   thì thêm-rồi-xoá đưa giỏ về ĐÚNG BẰNG máy chủ, và `demDongChuaLuu` CỐ Ý
+        #   vẫn trả 1 ("xoá 1 thêm 1 vẫn là có thay đổi") ⇒ vẫn hỏi. Đó là đúng.
+        #   Điều BẮT BUỘC là người dùng KHÔNG BỊ KHOÁ trong tab — kiểm ngay dưới.
+        #   Đo cả trên production lẫn bản vá 19/08: cùng ra 1 hộp ⇒ không phải lỗi mới.
+        phieu_rong = truoc[0] == 0
+        kiem((len(hop_thoai) == 0) if phieu_rong else True,
+             "🔴 giỏ đã dọn sạch → KHÔNG chặn nữa"
+             + ("" if phieu_rong else " (phiếu máy chủ đã có dòng → vẫn hỏi, đúng luật)"),
              f"{len(hop_thoai)} hộp")
         kiem(sang, "🔴 chuyển tab được — KHÔNG ai bị khoá trong tab")
     except Exception as e:  # noqa: BLE001
