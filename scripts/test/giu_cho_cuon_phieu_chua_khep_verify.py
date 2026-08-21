@@ -125,12 +125,21 @@ for ma, ids in giu_theo_ma.items():
         ung_vien.append((len(bi_giu), ma, bi_giu, tat_ca, con_lai))
 ung_vien.sort(reverse=True)
 
-if not ung_vien:
-    print("\n⏭ BỎ QUA — hiện KHÔNG có mã nào vừa có cuộn bị giữ vừa còn cuộn tự do.")
-    print("   Không có gì để đo. Đây KHÔNG phải lỗi.")
-    sys.exit(0)
-
-_, MA, BI_GIU, TAT_CA, CON_LAI = ung_vien[0]
+CO_THAT = bool(ung_vien)
+if CO_THAT:
+    _, MA, BI_GIU, TAT_CA, CON_LAI = ung_vien[0]
+else:
+    # Không có phiếu chưa khép NGÀY KHÁC nào ⇒ không đo được trên dữ liệu sống.
+    # KHÔNG bỏ qua hẳn: chuyển sang GIẢ LẬP câu trả lời máy chủ để vẫn kiểm được
+    # màn hình có tôn trọng `held_coil_ids` hay không. Nếu bỏ qua thì đường
+    # nguyên liệu mất trắng phần kiểm mỗi khi kho vắng phiếu chờ duyệt.
+    print("\n⏭ Không có phiếu chưa khép NGÀY KHÁC để đo trên dữ liệu thật")
+    print("   → chuyển sang PHẦN GIẢ LẬP. Đây KHÔNG phải lỗi.")
+    ma_nhieu = max(theo_ma.items(), key=lambda kv: len(kv[1]))
+    MA = ma_nhieu[0]
+    TAT_CA = ma_nhieu[1]
+    BI_GIU = {TAT_CA[0]["id"]}
+    CON_LAI = TAT_CA[1:]
 
 
 def dinh_danh(c: dict) -> str:
@@ -176,6 +185,27 @@ with sync_playwright() as pw:
     pg = ctx.new_page()
 
     print("\n1. Mở màn Xuất kho → nhánh Nguyên liệu")
+    if not CO_THAT:
+        def bom(route):
+            req = route.request
+            if req.method != "GET":
+                route.abort()          # 🛑 tuyệt đối không cho ghi
+                return
+            if "/api/nvl-slips?" in req.url and "branch=nvl" in req.url:
+                res = route.fetch()
+                try:
+                    d = res.json()
+                except Exception:      # noqa: BLE001
+                    route.continue_()
+                    return
+                d["held_coil_ids"] = sorted(set(d.get("held_coil_ids") or []) | BI_GIU)
+                d["held_partial"] = False
+                route.fulfill(status=200, content_type="application/json",
+                              body=json.dumps(d, ensure_ascii=False))
+                return
+            route.continue_()
+        pg.route("**/api/**", bom)
+
     pg.goto(f"{GOC}/register", wait_until="load", timeout=90000)
 
     # ⚠ Bấm được chữ CHƯA đủ: React chưa gắn sự kiện thì click chạy không lỗi mà

@@ -39,15 +39,35 @@ function canUse(role: string): boolean {
 //   1. Giữ chỗ cho phiếu CHƯA KHÉP = 'pending' + 'draft', MỌI NGÀY.
 //      'approved' và 'rejected' phải THẢ CUỘN RA NGAY — phiếu bị từ chối là
 //      phiếu chết, giữ luôn thì cuộn biến mất vĩnh viễn khỏi màn hình.
+//      ⚠ SỬA 21/08 chiều — 'draft' CÓ HAI NGHĨA, bản sáng nay gộp chung là SAI:
+//         · draft + `synced_at` TRỐNG  = nháp thật, chưa từng gửi  → GIỮ CHỖ
+//         · draft + `synced_at` CÓ     = phiếu thật bên app chính ĐÃ BỊ XOÁ, cuộn
+//           đã quay về kho Main (luật 28/07) → PHẢI THẢ RA, không được giữ
+//      Đây đúng điều kiện mà `app/api/nvl-slips/sync/route.ts` và agent dùng để
+//      quyết định có vét phiếu hay không — giữ cho ba nơi nói cùng một thứ tiếng.
 //   2. PostgREST cắt cứng 1.000 dòng và KHÔNG báo gì. Đếm chính xác rồi so:
 //      lệch một dòng là KHÔNG GIẤU GÌ CẢ + báo đỏ. Thà hiện thừa (người duyệt
 //      còn chặn được) hơn giấu nhầm (nhân viên không tài nào chọn được cuộn).
 //   3. Client hiện dòng "N cuộn đang nằm ở phiếu chờ duyệt — không chọn được".
 //
+// ⭐ PHỤ LIỆU (bổ sung 21/08 chiều): phụ liệu KHÔNG có lot/cuộn, chỉ có MÃ HÀNG và
+// SỐ LƯỢNG ⇒ giữ chỗ bằng cách CỘNG DỒN số lượng theo mã (`auxQty`). Trước đây cửa
+// chặn bên client chỉ cộng `lines` (giỏ ĐANG GÕ) rồi so với tồn, nên số lượng nằm ở
+// phiếu chờ duyệt của ngày khác KHÔNG được trừ ⇒ xuất chồng được, đúng kịch bản
+// 20/08 nhưng cho phụ liệu.
+//
+// 🛑 CỐ Ý KHÔNG trừ phiếu ĐÃ DUYỆT trong ngày. Với nguyên liệu thì loại trùng cuộn
+// là vô hại (cuộn đã tiêu thì không còn trong bản chụp). Với phụ liệu thì TRỪ HAI
+// LẦN — một lần vì bản chụp đã giảm, một lần vì cộng dồn ở đây — sẽ CHẶN OAN người
+// dùng không cho xuất số hàng họ thật sự có. Chặn oan tệ hơn phiếu kẹt. Khe hở còn
+// lại chỉ là quãng agent chưa kịp đẩy tồn sau khi ai đó bấm Duyệt (≤60–90 giây), và
+// app chính vẫn soi tồn lúc NHẬN phiếu nên tồn kho không hỏng.
+//
 // Đi kèm trong CHÍNH lượt gọi GET này ⇒ KHÔNG tốn thêm lượt Vercel nào.
 // ============================================================
-async function cuonBiGiuCho(kind: Kind, branch: Branch): Promise<{
+async function cuonBiGiuCho(kind: Kind, branch: Branch, ngayDangXem: string): Promise<{
   ids: number[];
+  auxQty: Record<string, number>;
   partial: boolean;
 }> {
   const CAP = 1000;   // trần cứng của PostgREST
@@ -56,26 +76,44 @@ async function cuonBiGiuCho(kind: Kind, branch: Branch): Promise<{
     .select('id', { count: 'exact' })
     .eq('kind', kind)
     .eq('branch', branch)
-    .in('status', ['pending', 'draft']);
+    // ⚠ BỎ phiếu của CHÍNH NGÀY đang xem: client đã tự tính phần đó qua `lines`
+    // (giỏ đang soạn) và `past` (các phiếu khác trong ngày). Đếm ở cả hai nơi thì
+    // nguyên liệu vô hại (hợp tập cuộn) nhưng PHỤ LIỆU sẽ TRỪ HAI LẦN số lượng
+    // ⇒ chặn oan người dùng.
+    .neq('slip_date', ngayDangXem)
+    .or('status.eq.pending,and(status.eq.draft,synced_at.is.null)');
   // Hỏi hỏng → coi như KHÔNG BIẾT ⇒ không giấu gì, báo đỏ (luật 2).
-  if (e1 || !mo) return { ids: [], partial: true };
-  if (mo.length === 0) return { ids: [], partial: false };
+  if (e1 || !mo) return { ids: [], auxQty: {}, partial: true };
+  if (mo.length === 0) return { ids: [], auxQty: {}, partial: false };
   if ((nMo ?? mo.length) !== mo.length || mo.length >= CAP) {
-    return { ids: [], partial: true };
+    return { ids: [], auxQty: {}, partial: true };
   }
 
+  // Lấy CẢ `coil_id` (nguyên liệu) lẫn `material_code`+`qty` (phụ liệu) trong MỘT
+  // câu — phụ liệu không có lot/cuộn, chỉ có mã hàng và số lượng nên phải cộng dồn.
   const { data: dong, count: nDong, error: e2 } = await supabaseAdmin
     .from('nvl_slip_lines')
-    .select('coil_id', { count: 'exact' })
-    .in('slip_id', mo.map((s) => s.id))
-    .not('coil_id', 'is', null);
-  if (e2 || !dong) return { ids: [], partial: true };
+    .select('coil_id, material_code, qty', { count: 'exact' })
+    .in('slip_id', mo.map((s) => s.id));
+  if (e2 || !dong) return { ids: [], auxQty: {}, partial: true };
   if ((nDong ?? dong.length) !== dong.length || dong.length >= CAP) {
-    return { ids: [], partial: true };
+    return { ids: [], auxQty: {}, partial: true };
   }
 
-  const ids = [...new Set(dong.map((l) => l.coil_id as number))];
-  return { ids, partial: false };
+  const ids = [...new Set(
+    dong.map((l) => l.coil_id as number | null).filter((x): x is number => !!x),
+  )];
+  // Phụ liệu: cộng số lượng theo MÃ HÀNG.
+  const auxQty: Record<string, number> = {};
+  for (const l of dong) {
+    if (l.coil_id) continue;                       // dòng nguyên liệu — đã tính ở trên
+    const ma = String(l.material_code || '').trim();
+    if (!ma) continue;
+    const q = Number(l.qty);
+    if (!Number.isFinite(q) || q <= 0) continue;   // số rác thì bỏ, KHÔNG chặn oan
+    auxQty[ma] = (auxQty[ma] ?? 0) + q;
+  }
+  return { ids, auxQty, partial: false };
 }
 
 export async function GET(req: Request) {
@@ -103,7 +141,7 @@ export async function GET(req: Request) {
       .eq('kind', kind)
       .eq('branch', branch)
       .order('seq', { ascending: true }),
-    cuonBiGiuCho(kind, branch),
+    cuonBiGiuCho(kind, branch, date),
   ]);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -112,7 +150,7 @@ export async function GET(req: Request) {
   if (!slips || slips.length === 0) {
     return NextResponse.json({
       date, kind, branch, slips: [], slip: null, lines: [], events: [],
-      held_coil_ids: giu.ids, held_partial: giu.partial,
+      held_coil_ids: giu.ids, held_aux_qty: giu.auxQty, held_partial: giu.partial,
     });
   }
 
@@ -148,7 +186,7 @@ export async function GET(req: Request) {
     slip: latest,
     lines: bySlip.get(latest.id) ?? [],
     events: events ?? [],
-    held_coil_ids: giu.ids, held_partial: giu.partial,
+    held_coil_ids: giu.ids, held_aux_qty: giu.auxQty, held_partial: giu.partial,
   });
 }
 

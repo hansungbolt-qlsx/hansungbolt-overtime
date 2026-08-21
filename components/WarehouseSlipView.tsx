@@ -204,6 +204,8 @@ export default function WarehouseSlipView(
    * dòng của PostgREST, hoặc hỏi hỏng) ⇒ luật 2: KHÔNG GIẤU GÌ CẢ + báo đỏ.
    */
   const [heldCoilIds, setHeldCoilIds] = useState<number[]>([]);
+  /** Phụ liệu không có lot/cuộn → giữ chỗ bằng SỐ LƯỢNG cộng dồn theo mã hàng. */
+  const [heldAuxQty, setHeldAuxQty] = useState<Record<string, number>>({});
   const [heldPartial, setHeldPartial] = useState(false);
 
   // Tồn app chính đẩy xuống
@@ -292,6 +294,7 @@ export default function WarehouseSlipView(
     // không thì mang danh sách của nhánh cũ đi giấu cuộn của nhánh mới.
     // An toàn vì `srvCount = null` cũng ẩn luôn khối "Thêm dòng" cho tới khi nạp xong.
     setHeldCoilIds([]);
+    setHeldAuxQty({});
     setHeldPartial(false);
   }, []);
 
@@ -332,6 +335,9 @@ export default function WarehouseSlipView(
       setEvents(d.events ?? []);
       // Cuộn bị giữ chỗ bởi phiếu chưa khép (mọi ngày) — máy chủ tính sẵn.
       setHeldCoilIds(Array.isArray(d.held_coil_ids) ? d.held_coil_ids : []);
+      setHeldAuxQty(
+        d.held_aux_qty && typeof d.held_aux_qty === 'object' ? d.held_aux_qty : {},
+      );
       setHeldPartial(d.held_partial === true);
       // Nạp THÀNH CÔNG → ghi mốc đối chiếu. Kể cả khi không có phiếu nào đang
       // soạn thì mốc vẫn là 0 (khác hẳn `null` = chưa biết gì).
@@ -535,6 +541,23 @@ export default function WarehouseSlipView(
     ].filter(Boolean) as number[]);
     return heldCoilIds.filter((id) => !trongTam.has(id)).length;
   }, [heldCoilIds, heldPartial, lines, past]);
+
+  /**
+   * Số lượng PHỤ LIỆU của mã đang chọn đang bị phiếu CHƯA KHÉP giữ chỗ.
+   * ① phiếu chờ duyệt khác trong ngày  ② phiếu chưa khép của NGÀY KHÁC (máy chủ
+   * tính sẵn). KHÔNG tính giỏ đang gõ — phần đó người dùng đang nhìn thấy rồi.
+   * `heldPartial` = máy chủ đếm không chắc ⇒ không trừ gì, để băng đỏ lo.
+   */
+  const soLuongBiGiu = useMemo(() => {
+    if (isNvl || !pickedCode) return 0;
+    const choDuyetHomNay = past
+      .filter((p) => p.slip.status === 'pending')
+      .flatMap((p) => p.lines)
+      .filter((l) => l.material_code === pickedCode)
+      .reduce((s, l) => s + l.qty, 0);
+    const ngayKhac = heldPartial ? 0 : (heldAuxQty[pickedCode] ?? 0);
+    return choDuyetHomNay + ngayKhac;
+  }, [isNvl, pickedCode, past, heldAuxQty, heldPartial]);
 
   /**
    * ⭐ BẢN CHỤP TỒN CÓ ĐÁNG TIN KHÔNG — anh Hữu chốt 21/08/2026.
@@ -815,13 +838,29 @@ export default function WarehouseSlipView(
         if (pickedAux.stock <= 0) {
           setErr(`${pickedAux.code}: hết tồn kho — không xuất được`); return;
         }
+        // ⭐ SỬA 21/08 chiều — trước đây chỉ cộng `lines` (GIỎ ĐANG GÕ) rồi so với
+        // tồn, nên số lượng đang nằm ở phiếu CHỜ DUYỆT không được trừ ⇒ xuất chồng
+        // được, đúng kịch bản 20/08 nhưng cho phụ liệu. Nay cộng đủ ba phần:
+        //   ① giỏ đang gõ  ② phiếu CHỜ DUYỆT khác trong ngày  ③ phiếu chưa khép
+        //   của NGÀY KHÁC (máy chủ tính sẵn, xem `cuonBiGiuCho`)
+        // ⚠ KHÔNG cộng phiếu đã DUYỆT: bản chụp tồn đã trừ rồi, cộng nữa là trừ hai
+        //   lần ⇒ chặn oan. Chặn oan tệ hơn phiếu kẹt.
         const already = lines
           .filter((l) => l.material_code === pickedAux.code)
           .reduce((s, l) => s + l.qty, 0);
-        if (already + qty > pickedAux.stock) {
+        const choDuyetHomNay = past
+          .filter((p) => p.slip.status === 'pending')
+          .flatMap((p) => p.lines)
+          .filter((l) => l.material_code === pickedAux.code)
+          .reduce((s, l) => s + l.qty, 0);
+        // Máy chủ đếm không chắc (đụng trần 1.000 dòng) → KHÔNG trừ, để băng đỏ lo.
+        const ngayKhac = heldPartial ? 0 : (heldAuxQty[pickedAux.code] ?? 0);
+        const daGiu = choDuyetHomNay + ngayKhac;
+        if (already + daGiu + qty > pickedAux.stock) {
           setErr(
-            `Vượt tồn kho: phiếu này đã có ${fmtQty(already)}, thêm ${fmtQty(qty)} ` +
-              `> tồn ${fmtQty(pickedAux.stock)} ${pickedAux.unit}`,
+            `Vượt tồn kho: phiếu này đã có ${fmtQty(already)}`
+            + (daGiu > 0 ? `, phiếu chờ duyệt đang giữ ${fmtQty(daGiu)}` : '')
+            + `, thêm ${fmtQty(qty)} > tồn ${fmtQty(pickedAux.stock)} ${pickedAux.unit}`,
           );
           return;
         }
@@ -1634,6 +1673,17 @@ export default function WarehouseSlipView(
             {!isReturn && pickedAux.stock <= 0 && (
               <p className="mt-1 text-sm text-rose-600 font-semibold">
                 Hết tồn kho — không xuất được
+              </p>
+            )}
+            {/* ⭐ 21/08 chiều — nói RÕ phần tồn đang bị phiếu chờ duyệt giữ chỗ, để
+                người dùng hiểu vì sao "còn tồn 500" mà chỉ xuất được 200. */}
+            {!isReturn && soLuongBiGiu > 0 && pickedAux.stock > 0 && (
+              <p className="mt-1 text-sm font-semibold text-brand-navy">
+                🔒 {fmtQty(soLuongBiGiu)} {pickedAux.unit} đang nằm ở phiếu chờ duyệt
+                {' — còn dùng được '}
+                <span className={EMPH}>
+                  {fmtQty(Math.max(0, pickedAux.stock - soLuongBiGiu))} {pickedAux.unit}
+                </span>
               </p>
             )}
           </div>
