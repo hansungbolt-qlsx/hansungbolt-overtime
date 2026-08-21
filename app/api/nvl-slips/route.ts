@@ -26,6 +26,58 @@ function canUse(role: string): boolean {
   return role === 'qlsx' || role === 'admin';
 }
 
+// ============================================================
+// CUỘN ĐANG BỊ GIỮ CHỖ — anh Hữu chốt 21/08/2026
+//
+// Sự cố 20/08: anh Giang duyệt phiếu 19/08 lúc 07:30 → cuộn MAN-12 bị trừ bên
+// app chính. Bản chụp tồn trên điện thoại vẫn là bản CŨ (agent chưa được khởi
+// động vì chưa ai đăng nhập máy) ⇒ 07:54 cuộn đó vẫn hiện ra và được tick lần
+// hai. Trước đây điện thoại chỉ tự loại cuộn của phiếu CÙNG NGÀY, nên phiếu
+// chờ duyệt của hôm trước không giữ được chỗ.
+//
+// BA LUẬT anh Hữu chốt:
+//   1. Giữ chỗ cho phiếu CHƯA KHÉP = 'pending' + 'draft', MỌI NGÀY.
+//      'approved' và 'rejected' phải THẢ CUỘN RA NGAY — phiếu bị từ chối là
+//      phiếu chết, giữ luôn thì cuộn biến mất vĩnh viễn khỏi màn hình.
+//   2. PostgREST cắt cứng 1.000 dòng và KHÔNG báo gì. Đếm chính xác rồi so:
+//      lệch một dòng là KHÔNG GIẤU GÌ CẢ + báo đỏ. Thà hiện thừa (người duyệt
+//      còn chặn được) hơn giấu nhầm (nhân viên không tài nào chọn được cuộn).
+//   3. Client hiện dòng "N cuộn đang nằm ở phiếu chờ duyệt — không chọn được".
+//
+// Đi kèm trong CHÍNH lượt gọi GET này ⇒ KHÔNG tốn thêm lượt Vercel nào.
+// ============================================================
+async function cuonBiGiuCho(kind: Kind, branch: Branch): Promise<{
+  ids: number[];
+  partial: boolean;
+}> {
+  const CAP = 1000;   // trần cứng của PostgREST
+  const { data: mo, count: nMo, error: e1 } = await supabaseAdmin
+    .from('nvl_day_slips')
+    .select('id', { count: 'exact' })
+    .eq('kind', kind)
+    .eq('branch', branch)
+    .in('status', ['pending', 'draft']);
+  // Hỏi hỏng → coi như KHÔNG BIẾT ⇒ không giấu gì, báo đỏ (luật 2).
+  if (e1 || !mo) return { ids: [], partial: true };
+  if (mo.length === 0) return { ids: [], partial: false };
+  if ((nMo ?? mo.length) !== mo.length || mo.length >= CAP) {
+    return { ids: [], partial: true };
+  }
+
+  const { data: dong, count: nDong, error: e2 } = await supabaseAdmin
+    .from('nvl_slip_lines')
+    .select('coil_id', { count: 'exact' })
+    .in('slip_id', mo.map((s) => s.id))
+    .not('coil_id', 'is', null);
+  if (e2 || !dong) return { ids: [], partial: true };
+  if ((nDong ?? dong.length) !== dong.length || dong.length >= CAP) {
+    return { ids: [], partial: true };
+  }
+
+  const ids = [...new Set(dong.map((l) => l.coil_id as number))];
+  return { ids, partial: false };
+}
+
 export async function GET(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
@@ -43,18 +95,24 @@ export async function GET(req: Request) {
   // ⚠ Trước 28/7 chỉ trả phiếu seq lớn nhất → phiếu đã duyệt buổi sáng BIẾN MẤT
   // khỏi điện thoại ngay khi mở phiếu thứ hai. Ngày làm 3-4 đợt là không còn đối
   // chiếu được đã xuất bao nhiêu. Giờ trả hết, client tự tách lịch sử / đang soạn.
-  const { data: slips, error } = await supabaseAdmin
-    .from('nvl_day_slips')
-    .select('*')
-    .eq('slip_date', date)
-    .eq('kind', kind)
-    .eq('branch', branch)
-    .order('seq', { ascending: true });
+  const [{ data: slips, error }, giu] = await Promise.all([
+    supabaseAdmin
+      .from('nvl_day_slips')
+      .select('*')
+      .eq('slip_date', date)
+      .eq('kind', kind)
+      .eq('branch', branch)
+      .order('seq', { ascending: true }),
+    cuonBiGiuCho(kind, branch),
+  ]);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  // ⚠ Cuộn bị giữ chỗ PHẢI trả cả ở nhánh "hôm nay chưa có phiếu nào" — đúng
+  // kịch bản sáng 20/08: hôm nay trắng phiếu, cuộn bị giữ nằm ở phiếu HÔM QUA.
   if (!slips || slips.length === 0) {
     return NextResponse.json({
       date, kind, branch, slips: [], slip: null, lines: [], events: [],
+      held_coil_ids: giu.ids, held_partial: giu.partial,
     });
   }
 
@@ -90,6 +148,7 @@ export async function GET(req: Request) {
     slip: latest,
     lines: bySlip.get(latest.id) ?? [],
     events: events ?? [],
+    held_coil_ids: giu.ids, held_partial: giu.partial,
   });
 }
 

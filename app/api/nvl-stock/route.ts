@@ -25,6 +25,36 @@ export const runtime = 'nodejs';
 
 const PARTS = ['nvl_main', 'nvl_line', 'nvl_master', 'aux', 'nvl_khsx'] as const;
 
+// ============================================================
+// NHỊP TIM CỦA AGENT — anh Hữu chốt 21/08/2026
+//
+// Vì sao KHÔNG đo tuổi của `pushed_at`: agent CHỈ đẩy tồn khi tồn ĐỔI
+// (`if (version === lastStockVersion && !heavyDue) return;`). Sáng vắng việc thì
+// `pushed_at` cũ hàng giờ một cách HỢP LỆ ⇒ báo theo tuổi dữ liệu là báo động
+// giả, mà báo giả nhiều lần thì "đỏ mất thiêng". Anh Hữu đã bác đúng đề nghị
+// sai này của Claude ngày 20/08.
+//
+// Cái đo được thật: agent ghi đè file catalog DCCD **mỗi 10 phút, VÔ ĐIỀU KIỆN**
+// (`pushDccdCatalog` trong print-agent/agent.js — không có nhánh "không đổi thì
+// thôi"). Vậy thời điểm sửa file đó CHÍNH LÀ nhịp tim, độ phân giải 10 phút,
+// KHÔNG phải sửa agent lấy một dòng, KHÔNG thêm lượt ghi nào.
+//
+// Nhịp tim tắt cũng có nghĩa app chính không với tới được (`pushDccdCatalog` gọi
+// app chính trước) — mà app chính chết thì tồn cũng không đẩy được ⇒ vẫn là
+// báo ĐÚNG, không phải báo thừa.
+// ============================================================
+async function nhipTimAgent(): Promise<string | null> {
+  try {
+    const { data } = await supabaseAdmin.storage
+      .from('plan-files')
+      .list('', { search: 'dccd-lots.json', limit: 1 });
+    const f = data?.find((o) => o.name === 'dccd-lots.json');
+    return (f?.updated_at as string | undefined) ?? null;
+  } catch {
+    return null;   // hỏi hỏng → coi như KHÔNG BIẾT, client tự xử (không báo bừa)
+  }
+}
+
 export async function GET(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
@@ -41,9 +71,14 @@ export async function GET(req: Request) {
   // không rời khỏi Supabase (tiết kiệm cả băng thông lẫn thời gian mở màn).
   const metaOnly = url.searchParams.get('meta') === '1';
   const tbl = supabaseAdmin.from('nvl_stock_snapshot');
-  const { data, error } = metaOnly
-    ? await tbl.select('part, n, pushed_at').in('part', parts)
-    : await tbl.select('part, payload, n, pushed_at').in('part', parts);
+  // Nhịp tim đi kèm CHÍNH lượt hỏi mốc đã có ⇒ không thêm lượt Vercel nào.
+  // Chỉ hỏi ở lượt `meta` (lượt tải gói nặng không cần, tránh việc thừa).
+  const [{ data, error }, agentAt] = await Promise.all([
+    metaOnly
+      ? tbl.select('part, n, pushed_at').in('part', parts)
+      : tbl.select('part, payload, n, pushed_at').in('part', parts),
+    metaOnly ? nhipTimAgent() : Promise.resolve(null),
+  ]);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const out: Record<string, unknown> = {};
@@ -52,7 +87,7 @@ export async function GET(req: Request) {
       ? { n: row.n, pushed_at: row.pushed_at }
       : { payload: row.payload, n: row.n, pushed_at: row.pushed_at };
   }
-  return NextResponse.json({ ok: true, meta: metaOnly, parts: out });
+  return NextResponse.json({ ok: true, meta: metaOnly, parts: out, agent_at: agentAt });
 }
 
 export async function POST(req: Request) {

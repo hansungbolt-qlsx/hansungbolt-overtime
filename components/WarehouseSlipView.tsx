@@ -195,6 +195,16 @@ export default function WarehouseSlipView(
   const [chuaLuu, setChuaLuu] = useState(false);
   const [events, setEvents] = useState<SlipEvent[]>([]);
   const [slipNote, setSlipNote] = useState('');
+  /**
+   * CUỘN ĐANG BỊ GIỮ CHỖ bởi phiếu CHƯA KHÉP (chờ duyệt / nháp) của MỌI NGÀY —
+   * anh Hữu chốt 21/08/2026 sau sự cố 20/08 (cuộn MAN-12 bị tick lần hai).
+   * Máy chủ tính, xem khối chú thích dài ở `app/api/nvl-slips/route.ts`.
+   *
+   * `heldPartial = true` nghĩa là máy chủ KHÔNG đếm chắc được (đụng trần 1.000
+   * dòng của PostgREST, hoặc hỏi hỏng) ⇒ luật 2: KHÔNG GIẤU GÌ CẢ + báo đỏ.
+   */
+  const [heldCoilIds, setHeldCoilIds] = useState<number[]>([]);
+  const [heldPartial, setHeldPartial] = useState(false);
 
   // Tồn app chính đẩy xuống
   const [coils, setCoils] = useState<StockCoil[]>([]);
@@ -204,6 +214,9 @@ export default function WarehouseSlipView(
   const [auxMats, setAuxMats] = useState<StockAux[]>([]);
   const [nvlMaster, setNvlMaster] = useState<MasterNvl[]>([]);
   const [stockAt, setStockAt] = useState<string>('');
+  // Nhịp tim của agent trên PC (thời điểm nó ghi đè catalog DCCD — mỗi 10 phút,
+  // vô điều kiện). Xem khối chú thích ở `app/api/nvl-stock/route.ts`.
+  const [agentAt, setAgentAt] = useState<string>('');
 
   // Form thêm dòng
   const [q, setQ] = useState('');
@@ -275,6 +288,11 @@ export default function WarehouseSlipView(
     setEvents([]);
     setSrvCount(null);   // chưa biết máy chủ có gì → cấm lưu tới khi nạp xong
     setChuaLuu(false);   // giỏ vừa dốc thì không còn gì chưa lưu để mà tiếc
+    // Danh sách cuộn bị giữ chỗ tính theo (loại, nhánh) → đổi nhánh là phải dốc,
+    // không thì mang danh sách của nhánh cũ đi giấu cuộn của nhánh mới.
+    // An toàn vì `srvCount = null` cũng ẩn luôn khối "Thêm dòng" cho tới khi nạp xong.
+    setHeldCoilIds([]);
+    setHeldPartial(false);
   }, []);
 
   const loadSlip = useCallback(async () => {
@@ -312,6 +330,9 @@ export default function WarehouseSlipView(
       setSlipNote(editing?.slip.note ?? '');
       setLines(editing?.lines ?? []);
       setEvents(d.events ?? []);
+      // Cuộn bị giữ chỗ bởi phiếu chưa khép (mọi ngày) — máy chủ tính sẵn.
+      setHeldCoilIds(Array.isArray(d.held_coil_ids) ? d.held_coil_ids : []);
+      setHeldPartial(d.held_partial === true);
       // Nạp THÀNH CÔNG → ghi mốc đối chiếu. Kể cả khi không có phiếu nào đang
       // soạn thì mốc vẫn là 0 (khác hẳn `null` = chưa biết gì).
       setSrvCount(editing?.lines.length ?? 0);
@@ -370,6 +391,8 @@ export default function WarehouseSlipView(
 
       // 🛑 VỀ MUỘN → bỏ. Không thì danh sách cuộn của nhánh cũ đè lên màn đang mở.
       if (boiCanhRef.current !== cua) return;
+      // Nhịp tim của agent — đi kèm chính gói mốc này (xem `nhipTimAgent`).
+      setAgentAt(typeof dm.agent_at === 'string' ? dm.agent_at : '');
       if (isNvl) {
         setCoils((cached[stockPart] ?? []) as StockCoil[]);
         setNvlMaster((cached.nvl_master ?? []) as MasterNvl[]);
@@ -487,15 +510,82 @@ export default function WarehouseSlipView(
   // (agent đẩy sau ~60s) nên cuộn vừa xuất vẫn còn trong danh sách — chặn tick lại.
   // Ngoại lệ: phiếu cũ bị XOÁ bên app chính (về `draft`) thì cuộn đã quay lại kho
   // Main thật → phải cho tick lại, không chặn.
+  //
+  // ⭐ NỚI 21/08/2026 — cuộn của phiếu CHƯA KHÉP thuộc NGÀY KHÁC cũng phải giữ
+  // chỗ. Trước đây chỉ soi phiếu cùng ngày nên phiếu chờ duyệt của hôm trước
+  // không giữ được cuộn nào ⇒ sáng hôm sau tick lại được (ca MAN-12 ngày 20/08).
+  // `heldPartial` = máy chủ đếm không chắc ⇒ KHÔNG GIẤU GÌ CẢ (luật 2 của anh Hữu).
   const usedCoilIds = useMemo(
     () => new Set([
       ...lines.map((l) => l.coil_id),
       ...past
         .filter((p) => p.slip.status === 'approved' || p.slip.status === 'pending')
         .flatMap((p) => p.lines.map((l) => l.coil_id)),
+      ...(heldPartial ? [] : heldCoilIds),
     ].filter(Boolean) as number[]),
-    [lines, past],
+    [lines, past, heldCoilIds, heldPartial],
   );
+  // Số cuộn bị giữ chỗ mà KHÔNG phải do phiếu đang xem — tức là do phiếu chưa
+  // khép của ngày khác. Chỉ đếm phần này để câu thông báo không cộng trùng.
+  const soCuonBiGiu = useMemo(() => {
+    if (heldPartial) return 0;
+    const trongTam = new Set([
+      ...lines.map((l) => l.coil_id),
+      ...past.flatMap((p) => p.lines.map((l) => l.coil_id)),
+    ].filter(Boolean) as number[]);
+    return heldCoilIds.filter((id) => !trongTam.has(id)).length;
+  }, [heldCoilIds, heldPartial, lines, past]);
+
+  /**
+   * ⭐ BẢN CHỤP TỒN CÓ ĐÁNG TIN KHÔNG — anh Hữu chốt 21/08/2026.
+   *
+   * Dòng "tồn lúc HH:MM" vốn ĐÃ CÓ (chữ xám 11px). Sáng 20/08 lúc 07:54 nó hiện
+   * đúng "tồn lúc 16:36" — tức bản chụp của CHIỀU HÔM TRƯỚC — nhưng không ai để
+   * ý: chữ quá nhỏ, KHÔNG có ngày nên "16:36" chẳng gợi ra là hôm qua, và không
+   * đổi màu.
+   *
+   * 🛑 KHÔNG được báo động theo TUỔI CỦA `pushed_at`. Agent chỉ đẩy khi tồn ĐỔI,
+   * nên sáng vắng việc thì mốc cũ hàng giờ là chuyện HỢP LỆ. Claude từng đề nghị
+   * ngưỡng "quá 30 phút thì vàng" — SAI, sẽ kêu mỗi buổi sáng yên ả và làm "đỏ
+   * mất thiêng". Anh Hữu đã bác đúng lập luận này ngày 20/08.
+   *
+   * Hai điều kiện DUY NHẤT làm màn hình đỏ — cả hai đều KHÔNG thể báo giả:
+   *   ① NHỊP TIM tắt: agent ghi đè catalog DCCD mỗi 10 phút VÔ ĐIỀU KIỆN. Quá
+   *      25 phút (2,5 nhịp) không thấy ⇒ agent chắc chắn có vấn đề.
+   *   ② Mốc tồn KHÁC NGÀY hôm nay: agent luôn đẩy một phát ngay khi khởi động
+   *      (`sweep='start'` → `pushNvlStock(true)`), nên mốc của hôm trước nghĩa là
+   *      hôm nay agent CHƯA hề chạy — đúng kịch bản sáng 20/08.
+   *
+   * `bayGio = 0` cho tới khi component gắn xong — cố ý, để bản dựng trên máy chủ
+   * và bản chạy trên máy khách khớp nhau (tránh cảnh báo hydrate).
+   */
+  const [bayGio, setBayGio] = useState(0);
+  useEffect(() => {
+    setBayGio(Date.now());
+    const t = setInterval(() => setBayGio(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+  const NGUONG_NHIP_PHUT = 25;      // 2,5 lần nhịp catalog 10 phút
+  const tonInfo = useMemo(() => {
+    if (!stockAt) return null;
+    const t = new Date(stockAt).getTime();
+    if (!Number.isFinite(t)) return null;
+    const vn = new Date(t + 7 * 3600e3).toISOString();
+    const ngay = vn.slice(0, 10);
+    const khacNgay = ngay !== todayVN();
+
+    // Nhịp tim: chỉ kết luận khi ĐỌC ĐƯỢC mốc và ĐÃ gắn xong (bayGio > 0).
+    const ta = agentAt ? new Date(agentAt).getTime() : NaN;
+    const nhipPhut = Number.isFinite(ta) && bayGio > 0
+      ? Math.floor((bayGio - ta) / 60_000)
+      : null;
+    const nhipTat = nhipPhut !== null && nhipPhut > NGUONG_NHIP_PHUT;
+
+    return {
+      ngay, gio: vn.slice(11, 16), khacNgay, nhipTat, nhipPhut,
+      do: khacNgay || nhipTat,
+    };
+  }, [stockAt, agentAt, bayGio]);
   // FIFO (user chốt lại 28/7): cuộn NHẬP TRƯỚC lên trước. **Trong cùng một đợt
   // nhập thì xếp Kg TỪ NHỎ ĐẾN LỚN** (user chốt 28/7 17:58) — đợt Daeho 46 cuộn
   // nặng xấp xỉ nhau, xếp theo Kg mới dò ra cuộn cần lấy nhanh. Kg bằng nhau thì
@@ -827,7 +917,13 @@ export default function WarehouseSlipView(
           ? `Đã gửi lên app chính — chờ duyệt (phiếu ${d.uid})`
           : `Đã lưu ${d.n_lines} dòng (chưa gửi)`,
       );
-      await loadSlip();
+      // Lưu xong nạp lại CẢ PHIẾU LẪN TỒN (thêm 21/08/2026). Trước đây tồn chỉ
+      // nạp lúc mở màn / đổi nhánh / đổi ngày, nên tick nhiều đợt trong ngày là
+      // đợt sau vẫn dùng bản chụp của đợt đầu.
+      // ⚠ Rẻ: `loadStock` hỏi MỐC trước (~100 B), mốc trùng thì không tải gói nào.
+      // ⚠ Thật thà về giới hạn: agent nằm im thì mốc không đổi ⇒ bước này không
+      //   cứu được gì — cái bắt được ca đó là băng cảnh báo "tồn của ngày ..." .
+      await Promise.all([loadSlip(), loadStock()]);
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Lỗi lưu phiếu');
     } finally {
@@ -981,6 +1077,29 @@ export default function WarehouseSlipView(
                       Muốn sửa phiếu này thì nhờ người duyệt bấm Từ chối
                     </span>
                   )}
+                  {/* ⭐ THÊM 21/08/2026 — LỖI APP CHÍNH TRẢ VỀ CHO PHIẾU ĐÃ GỬI.
+                      App chính soi tồn NGAY khi nhận phiếu (`build_preview`) và
+                      trả `line_errors` ngược về đây, nhưng trước bản này màn hình
+                      CHỈ vẽ lỗi cho phiếu ĐANG SOẠN. Phiếu đã gửi rơi xuống khối
+                      này ⇒ lỗi nằm im không ai thấy: phiếu 20/08 mang 1 lỗi
+                      (cuộn MAN-12 đã hết tồn) suốt từ hôm đó tới hôm sau. */}
+                  {s.line_errors?.length > 0 && (
+                    <span className="block mt-1 rounded-lg bg-red-50 border border-red-300 p-2">
+                      <span className="block text-xs font-bold text-red-700">
+                        ⚠ App chính báo {s.line_errors.length} dòng có vấn đề — phiếu
+                        này KHÔNG duyệt được cho tới khi sửa:
+                      </span>
+                      {s.line_errors.map((e, i) => (
+                        <span key={i} className="block text-xs text-red-700 mt-0.5">
+                          {e.seq > 0 ? `Dòng ${e.seq}` : 'Cả phiếu'}
+                          {e.code ? ` · ${e.code}` : ''}: {e.error}
+                        </span>
+                      ))}
+                      <span className="block text-xs text-red-700 mt-1">
+                        Nhờ người duyệt bấm <b>Từ chối</b> rồi tạo phiếu mới cho đúng.
+                      </span>
+                    </span>
+                  )}
                   <span className="block text-xs opacity-80 mt-0.5">Bấm để xem lại</span>
                 </summary>
                 {/* Cùng quy ước với danh sách phiếu đang nhập (user 30/7):
@@ -1129,13 +1248,50 @@ export default function WarehouseSlipView(
           <h3 className="font-bold text-brand-navy">
             ➕ {KIND_LABEL[kind]} {BRANCH_LABEL[branch].toLowerCase()}
           </h3>
-          {stockAt && (
+          {tonInfo && !tonInfo.do && (
             <span className="text-[11px] text-brand-navy-soft">
-              {isNvl && isReturn ? 'cuộn ở line lúc ' : 'tồn lúc '}
-              {new Date(new Date(stockAt).getTime() + 7 * 3600e3).toISOString().slice(11, 16)}
+              {isNvl && isReturn ? 'cuộn ở line lúc ' : 'tồn lúc '}{tonInfo.gio}
             </span>
           )}
         </div>
+
+        {/* ⭐ BẢN CHỤP TỒN KHÔNG ĐÁNG TIN — xem chú thích dài ở `tonInfo`.
+            Chỉ ĐỎ, KHÔNG có mức vàng: hai điều kiện ở đó đều không báo giả được. */}
+        {tonInfo?.do && (
+          <div className="rounded-lg border border-red-400 bg-red-50 p-2.5 text-red-700">
+            <div className="text-sm font-bold">
+              {tonInfo.khacNgay
+                ? `⚠ ĐANG XEM ${isNvl && isReturn ? 'CUỘN Ở LINE' : 'TỒN KHO'} CỦA NGÀY `
+                  + `${tonInfo.ngay.slice(8)}/${tonInfo.ngay.slice(5, 7)} LÚC ${tonInfo.gio}`
+                : `⚠ MÁY CHỦ ĐANG NGỪNG ĐẨY TỒN — ${tonInfo.nhipPhut} phút không có tín hiệu`}
+            </div>
+            <div className="text-xs mt-1">
+              {tonInfo.khacNgay
+                ? 'Số liệu này KHÔNG phải của hôm nay. Cuộn đã được duyệt xuất sáng '
+                  + 'nay vẫn có thể hiện ra ở đây.'
+                : `Số liệu đang xem là bản lúc ${tonInfo.gio}, có thể đã cũ.`}
+              {' '}Báo anh Hữu kiểm tra máy tính chủ (bật máy xong phải đăng nhập)
+              trước khi tích cuộn.
+            </div>
+          </div>
+        )}
+
+        {/* ⭐ CUỘN BỊ GIỮ CHỖ bởi phiếu chưa khép (luật 3 anh Hữu chốt 21/08). */}
+        {heldPartial ? (
+          <div className="rounded-lg border border-red-400 bg-red-50 p-2.5 text-red-700">
+            <div className="text-sm font-bold">
+              ⚠ Chưa đếm được cuộn đang nằm ở phiếu chờ duyệt
+            </div>
+            <div className="text-xs mt-1">
+              Đang hiện ĐẦY ĐỦ mọi cuộn — có thể có cuộn đã nằm trong phiếu chờ
+              duyệt. Kiểm lại danh sách phiếu chờ duyệt trước khi tích.
+            </div>
+          </div>
+        ) : soCuonBiGiu > 0 ? (
+          <div className="text-xs text-brand-navy-soft">
+            🔒 {soCuonBiGiu} cuộn đang nằm ở phiếu chờ duyệt — không chọn được
+          </div>
+        ) : null}
 
         <div>
           <label className="block text-sm font-semibold text-brand-navy mb-1">
