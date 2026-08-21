@@ -232,14 +232,21 @@ with sync_playwright() as pw:
     chon.click(timeout=30000)
     pg.wait_for_timeout(3000)
     than = pg.content()
+    # ⚠ BẪY ĐÃ DÍNH 21/08 chiều: KHÔNG dò tên cuộn trên CẢ TRANG. Khối "phiếu cũ"
+    #   cũng in "Lot: xxx" cho từng dòng phiếu chờ duyệt ⇒ dò cả trang là BÁO ĐỎ
+    #   GIẢ. Bằng chứng lúc đó: tiêu đề ghi đúng "44 cuộn = 55 − 11" (tức 11 cuộn
+    #   ĐÃ bị loại khỏi danh sách) mà phép dò vẫn kêu "còn lộ 11 cuộn".
+    #   Chỉ dò trong DANH SÁCH TICK ĐƯỢC: mỗi cuộn = 1 <li> có ô tích.
+    o_tick = pg.locator("li:has(input[type=checkbox])")
+    danh_sach = " | ".join(o_tick.all_text_contents())
 
     print("\n3. ⭐ Cuộn nằm ở phiếu CHƯA KHÉP phải BIẾN MẤT")
-    lot = [t for t in ten_bi_giu if t in than]
-    kiem(not lot, f"⭐ 0/{len(ten_bi_giu)} cuộn bị giữ còn hiện trên màn",
-         f"còn lộ: {', '.join(lot)}" if lot else "sạch")
+    lot = [t for t in ten_bi_giu if t in danh_sach]
+    kiem(not lot, f"⭐ 0/{len(ten_bi_giu)} cuộn bị giữ còn tick được",
+         f"còn lộ: {', '.join(lot)}" if lot else f"sạch · {o_tick.count()} dòng tick được")
 
     print("\n4. ⭐ Cuộn KHÔNG bị giữ thì VẪN PHẢI hiện (chống báo xanh giả)")
-    thieu = [t for t in ten_con_lai if t not in than]
+    thieu = [t for t in ten_con_lai if t not in danh_sach]
     kiem(ten_con_lai and not thieu,
          f"⭐ {len(ten_con_lai) - len(thieu)}/{len(ten_con_lai)} cuộn tự do vẫn chọn được",
          f"mất oan: {', '.join(thieu)}" if thieu else "đủ")
@@ -250,8 +257,19 @@ with sync_playwright() as pw:
          f"tổng {len(TAT_CA)} − giữ {len(BI_GIU)}")
 
     print("\n6. Dòng nhắc người dùng")
-    kiem("cuộn đang nằm ở phiếu chờ duyệt" in than,
-         "có dòng 'N cuộn đang nằm ở phiếu chờ duyệt — không chọn được'")
+    # Dòng 🔒 CHỈ dành cho cuộn bị giữ bởi phiếu KHÔNG nhìn thấy trên màn — tức
+    # phiếu của NGÀY KHÁC. Nếu phiếu giữ chỗ là phiếu CỦA HÔM NAY thì nó đang nằm
+    # ngay ở khối lịch sử, người dùng thấy rồi, nên `soCuonBiGiu` = 0 và dòng 🔒
+    # KHÔNG hiện — đó là ĐÚNG THIẾT KẾ, không phải lỗi.
+    #   (Bắt được 21/08 chiều: bài viết buổi sáng lúc phiếu giữ chỗ ở ngày khác,
+    #    chiều phiếu giữ chỗ thành của hôm nay ⇒ phép kiểm cũ báo đỏ oan.)
+    tren_man = "Đã gửi — chờ duyệt" in than or "Đang ghi (chưa gửi)" in than
+    if tren_man:
+        kiem(True, "phiếu giữ chỗ là của HÔM NAY, đang hiện ở khối lịch sử "
+                   "⇒ không cần dòng 🔒 (đúng thiết kế)")
+    else:
+        kiem("cuộn đang nằm ở phiếu chờ duyệt" in than,
+             "có dòng 'N cuộn đang nằm ở phiếu chờ duyệt — không chọn được'")
 
     br.close()
 

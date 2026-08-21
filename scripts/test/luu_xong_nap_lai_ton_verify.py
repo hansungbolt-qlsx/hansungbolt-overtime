@@ -123,6 +123,11 @@ with sync_playwright() as pw:
         route.abort()
 
     pg.route("**/api/**", chan)
+    # ⚠ BẮT ĐƯỢC 21/08 chiều: app bật `window.confirm` CẢNH BÁO AN TOÀN khi mã
+    #   không nằm trong KHSX hôm nay (và khi mã đang có dòng ở phiếu xuất tạm).
+    #   Playwright mặc định TỰ BẤM HUỶ ⇒ dòng không vào giỏ ⇒ bài kiểm báo đỏ oan.
+    #   Người thật sẽ bấm OK, nên bài kiểm phải bấm OK.
+    pg.on("dialog", lambda d: d.accept())
 
     print("\n1. Mở màn Xuất kho → Nguyên liệu")
     pg.goto(f"{GOC}/register", wait_until="load", timeout=90000)
@@ -149,8 +154,10 @@ with sync_playwright() as pw:
     pg.wait_for_timeout(800)
     pg.get_by_role("button", name="➕ Thêm vào phiếu").first.click(timeout=30000)
     pg.wait_for_timeout(2000)
-    co_dong = "— 1 dòng" in pg.content() or "1 dòng" in pg.content()
-    kiem(co_dong, "giỏ đã có dòng để Lưu")
+    # Đếm ĐÚNG giỏ đang soạn, không dò chữ "1 dòng" chung chung (khối phiếu cũ
+    #   cũng in "N dòng" ⇒ dò lỏng là xanh giả).
+    co_dong = pg.get_by_role("button", name="💾 Lưu phiếu").first.is_enabled()
+    kiem(co_dong, "giỏ đã có dòng để Lưu (nút Lưu đã bật)")
 
     print("\n3. Bấm Lưu (gói bị chặn trong trình duyệt, KHÔNG ra khỏi máy)")
     truoc_meta = n_meta
