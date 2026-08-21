@@ -208,15 +208,15 @@ with sync_playwright() as pw:
         pg.get_by_role("button", name="➕ Thêm vào phiếu").first.click(timeout=30000)
         pg.wait_for_timeout(1200)
         than = pg.content()
-        bi_chan = "Vượt tồn kho" in than
+        bi_chan = "Vượt tồn" in than
         kiem(bi_chan == phai_chan, ten, "bị chặn" if bi_chan else "cho qua")
         return than
 
     # B1 — số nằm GIỮA (còn dùng được) và (tồn): bản CHƯA vá cho qua, bản ĐÃ vá chặn
     giua = round(CON + (TON - CON) / 2, 3)
     than = thu(giua, f"B1. ⭐ xin {giua:g} > còn dùng được {CON:g} → PHẢI CHẶN", True)
-    kiem("Vượt tồn kho" in than and "phiếu chờ duyệt đang giữ" in than,
-         "B1b. câu báo lỗi nói RÕ vì sao: 'phiếu chờ duyệt đang giữ'")
+    kiem("chỉ xuất thêm được" in than and "phiếu chờ duyệt giữ" in than,
+         "B1b. câu báo lỗi nói NGAY con số xuất thêm được + phần bị giữ")
 
     # B2 — số NHỎ hơn phần còn lại: KHÔNG được chặn oan
     nho = max(1, round(CON * 0.3, 3))

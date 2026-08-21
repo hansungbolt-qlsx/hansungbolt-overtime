@@ -857,10 +857,18 @@ export default function WarehouseSlipView(
         const ngayKhac = heldPartial ? 0 : (heldAuxQty[pickedAux.code] ?? 0);
         const daGiu = choDuyetHomNay + ngayKhac;
         if (already + daGiu + qty > pickedAux.stock) {
+          // ⚠ Câu báo phải nói NGAY con số xuất thêm được là bao nhiêu. Bản đầu
+          // viết "…thêm 1.500.000 > tồn 2.000.000" — đọc lên thành một phép so
+          // sánh SAI (1,5 triệu đâu có lớn hơn 2 triệu); người đứng ở kho không
+          // đoán được là phải cộng dồn ba số.
+          const conDung = Math.max(0, pickedAux.stock - daGiu - already);
+          const dv = pickedAux.unit;
           setErr(
-            `Vượt tồn kho: phiếu này đã có ${fmtQty(already)}`
-            + (daGiu > 0 ? `, phiếu chờ duyệt đang giữ ${fmtQty(daGiu)}` : '')
-            + `, thêm ${fmtQty(qty)} > tồn ${fmtQty(pickedAux.stock)} ${pickedAux.unit}`,
+            `Vượt tồn — chỉ xuất thêm được ${fmtQty(conDung)} ${dv}, anh vừa xin `
+            + `${fmtQty(qty)}. (Tồn ${fmtQty(pickedAux.stock)}`
+            + (daGiu > 0 ? ` − phiếu chờ duyệt giữ ${fmtQty(daGiu)}` : '')
+            + (already > 0 ? ` − phiếu này đã có ${fmtQty(already)}` : '')
+            + ')',
           );
           return;
         }
