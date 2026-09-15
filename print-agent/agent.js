@@ -869,16 +869,28 @@ async function syncNvlOnce() {
   let sweep = null;
   if (!sweepOnStartDone) {
     sweep = 'start';
-    sweepOnStartDone = true;
   } else if (vnHHMM() >= SWEEP_AT && sweptToday !== today) {
     sweep = 'eod';
-    sweptToday = today;
   }
   if (sweep) {
     console.log(`[${new Date().toISOString()}] Vét phiếu chưa gửi (sweep=${sweep})`);
   }
-  await pushNvlStock(!!sweep);
+  // ⚠ SỰ CỐ 12/09 + 14/09/2026 — vòng vét CHẾT khi đẩy tồn lỗi, không thử lại:
+  //   (1) đẩy tồn ném lỗi (Supabase "Gateway Timeout" đúng 16:30) ⇒ hai bước dưới
+  //       không bao giờ chạy; (2) `sweptToday` đã ghi TRƯỚC khi vét ⇒ cả ngày không
+  //       vét lại. Phiếu nháp 14/9 nằm im tới sáng 15/9. Trước đó sống được 20 ngày
+  //       nhờ PC tắt mỗi tối (sáng bật = vét khởi động bù) — 14/9 PC không tắt.
+  //   Chốt (anh Hữu 15/09): đẩy tồn lỗi CHỈ ghi log, vẫn đi tiếp vét phiếu + kéo
+  //   trạng thái; dấu "đã vét" chỉ ghi SAU khi vét phiếu xong — hỏng thì vòng 60"
+  //   sau vét lại. An toàn gửi trùng: vét luôn chỉ lấy phiếu `synced_at IS NULL`.
+  try {
+    await pushNvlStock(!!sweep);
+  } catch (e) {
+    console.error(`[${new Date().toISOString()}] Đẩy tồn lỗi (vẫn vét phiếu tiếp): ${e.message}`);
+  }
   await pushNvlSlips(sweep);
+  if (sweep === 'start') sweepOnStartDone = true;
+  else if (sweep === 'eod') sweptToday = today;
   await pullNvlStatuses();
 }
 
