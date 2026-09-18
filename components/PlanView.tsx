@@ -412,7 +412,10 @@ export default function PlanView({
         )}
         {sheet && (
           <>
-            {tab === 'homnay' && canDccd && (
+            {/* Anh Hữu 18/09/2026: bấm Item code in DCCD ở CẢ 2 tab (trước chỉ tab hôm
+                nay). Tab tổng có dòng dự bị chưa gán máy → mc rỗng, app chính tự lấy
+                máy theo KHSX mới nhất — y hệt thẻ "In phiếu DCCD" gõ mã hàng. */}
+            {canDccd && (
               <p className="text-[11px] text-brand-navy-soft mb-2">
                 💡 Bấm vào <span className="underline decoration-dotted">Item code</span> để in
                 phiếu DCCD công đoạn 10 của chỉ thị đó.
@@ -421,7 +424,7 @@ export default function PlanView({
             <SheetTable
               sheet={sheet}
               onItemClick={
-                tab === 'homnay' && canDccd
+                canDccd
                   ? (info) => { setDccdMc(''); setDccd(info); }
                   : undefined
               }
