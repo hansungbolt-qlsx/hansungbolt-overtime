@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
+import { resolvePlanDate } from '@/lib/plan-date';
 
 export const runtime = 'nodejs';
 
@@ -37,13 +38,22 @@ export async function GET(req: Request) {
   };
 
   let machines: MachineWithItems[] = [];
+  // Ngày KHSX thực dùng — HD: ngày chọn, hoặc bản cũ sau cùng khi ngày đó chưa có
+  // (anh Hữu 25/09/2026). RL không dùng kế hoạch → null.
+  let planDateUsed: string | null = null;
 
   if (session.department === 'HD') {
-    // HD: chỉ hiện máy có trong kế hoạch của ngày đó + item_code auto từ plan
-    const { data: plans, error: planErr } = await supabaseAdmin
-      .from('daily_plans')
-      .select('equipment_code, item_code, item_name')
-      .eq('plan_date', date);
+    const resolved = await resolvePlanDate(date);
+    if (resolved.error) return NextResponse.json({ error: resolved.error }, { status: 500 });
+    planDateUsed = resolved.planDate;
+
+    // HD: chỉ hiện máy có trong kế hoạch ngày thực dùng + item_code auto từ plan
+    const { data: plans, error: planErr } = planDateUsed
+      ? await supabaseAdmin
+          .from('daily_plans')
+          .select('equipment_code, item_code, item_name')
+          .eq('plan_date', planDateUsed)
+      : { data: [], error: null };
     if (planErr) return NextResponse.json({ error: planErr.message }, { status: 500 });
 
     const planCodes = Array.from(new Set((plans ?? []).map((p) => p.equipment_code)));
@@ -80,7 +90,7 @@ export async function GET(req: Request) {
       .sort((a, b) => rlNaturalCompare(a.code, b.code));
   }
 
-  return NextResponse.json({ employees: emps ?? [], machines });
+  return NextResponse.json({ employees: emps ?? [], machines, plan_date_used: planDateUsed });
 }
 
 // Sort HD: HD-01, HD-1A, HD-02, ..., HD-M4 (6EA), HD-M3 (6EA)

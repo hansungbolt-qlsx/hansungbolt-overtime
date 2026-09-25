@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
+import { resolvePlanDate } from '@/lib/plan-date';
 
 export const runtime = 'nodejs';
 
@@ -17,10 +18,15 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Thiếu date hoặc equipment_code' }, { status: 400 });
   }
 
+  // Ngày chưa có KHSX → bản cũ sau cùng (anh Hữu 25/09/2026), cùng luật với /options
+  const resolved = await resolvePlanDate(date);
+  if (resolved.error) return NextResponse.json({ error: resolved.error }, { status: 500 });
+  if (!resolved.planDate) return NextResponse.json({ items: [], plan_date_used: null });
+
   const { data, error } = await supabaseAdmin
     .from('daily_plans')
     .select('item_code, item_name')
-    .eq('plan_date', date)
+    .eq('plan_date', resolved.planDate)
     .eq('equipment_code', equipmentCode);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -32,5 +38,5 @@ export async function GET(req: Request) {
     items.push({ item_code: row.item_code, item_name: row.item_name });
   }
 
-  return NextResponse.json({ items });
+  return NextResponse.json({ items, plan_date_used: resolved.planDate });
 }

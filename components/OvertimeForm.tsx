@@ -45,12 +45,17 @@ function machineCodeColor(code: string): string {
   }
 }
 
+// yyyy-mm-dd → dd/mm/yyyy cho dòng báo ngày KHSX đang dùng
+const fmtDateVN = (iso: string) => iso.split('-').reverse().join('/');
+
 export default function OvertimeForm({ department }: { department: string }) {
   const [date, setDate] = useState(todayISO());
   // Mặc định null — form chọn NV/máy ẩn; user phải click 1 nút loại ngày trước.
   const [dayType, setDayType] = useState<'weekday' | 'sunday' | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [machines, setMachines] = useState<Machine[]>([]);
+  // Ngày KHSX máy chủ thực dùng (khác `date` = đang dùng bản cũ sau cùng, anh Hữu 25/09)
+  const [planDateUsed, setPlanDateUsed] = useState<string | null>(null);
   const [rows, setRows] = useState<EmployeeRow[]>([emptyRow()]);
   const [loadingOpts, setLoadingOpts] = useState(false);
   const [error, setError] = useState('');
@@ -74,9 +79,10 @@ export default function OvertimeForm({ department }: { department: string }) {
       .then((r) => r.json())
       .then((d) => {
         if (cancelled) return;
-        if (d.error) { setError(d.error); setEmployees([]); setMachines([]); return; }
+        if (d.error) { setError(d.error); setEmployees([]); setMachines([]); setPlanDateUsed(null); return; }
         setEmployees(d.employees ?? []);
         setMachines(d.machines ?? []);
+        setPlanDateUsed(d.plan_date_used ?? null);
       })
       .catch(() => !cancelled && setError('Không tải được dữ liệu'))
       .finally(() => !cancelled && setLoadingOpts(false));
@@ -285,11 +291,19 @@ export default function OvertimeForm({ department }: { department: string }) {
         <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm p-3 rounded-md">
           {department === 'HD' ? (
             <>
-              Ngày <strong>{date}</strong> chưa có kế hoạch sản xuất. Liên hệ admin upload kế hoạch trước.
+              Chưa có kế hoạch sản xuất nào tính đến ngày <strong>{fmtDateVN(date)}</strong>.
+              Liên hệ admin upload kế hoạch trước.
             </>
           ) : (
             <>Chưa có máy nào khả dụng cho bộ phận {department}.</>
           )}
+        </div>
+      )}
+
+      {!loadingOpts && department === 'HD' && planDateUsed && planDateUsed !== date && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm p-3 rounded-md">
+          Ngày <strong>{fmtDateVN(date)}</strong> chưa có kế hoạch sản xuất mới — đang dùng
+          kế hoạch <strong>ngày {fmtDateVN(planDateUsed)}</strong> (bản sau cùng).
         </div>
       )}
 

@@ -102,6 +102,9 @@ function itemsToRows(
   return rows;
 }
 
+// yyyy-mm-dd → dd/mm/yyyy cho dòng báo ngày KHSX đang dùng
+const fmtDateVN = (iso: string) => iso.split('-').reverse().join('/');
+
 export default function LeaderEditForm({
   registrationId,
   department,
@@ -123,6 +126,8 @@ export default function LeaderEditForm({
   const [dayType, setDayType] = useState<'weekday' | 'sunday'>(initialDayType);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [machines, setMachines] = useState<Machine[]>([]);
+  // Ngày KHSX máy chủ thực dùng (khác initialDate = đang dùng bản cũ sau cùng, anh Hữu 25/09)
+  const [planDateUsed, setPlanDateUsed] = useState<string | null>(null);
   const [rows, setRows] = useState<EmployeeRow[]>([emptyRow()]);
   const [loadingOpts, setLoadingOpts] = useState(true);
   const [error, setError] = useState('');
@@ -158,6 +163,7 @@ export default function LeaderEditForm({
         }
         setEmployees(d.employees ?? []);
         setMachines(d.machines ?? []);
+        setPlanDateUsed(d.plan_date_used ?? null);
         if (!rowsInit) {
           const initRows = itemsToRows(initialItems, otherEquipmentIds);
           setRows(initRows.length > 0 ? initRows : [emptyRow()]);
@@ -395,12 +401,19 @@ export default function LeaderEditForm({
         <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm p-3 rounded-md">
           {department === 'HD' ? (
             <>
-              Ngày <strong>{initialDate}</strong> không có kế hoạch sản xuất.
+              Chưa có kế hoạch sản xuất nào tính đến ngày <strong>{fmtDateVN(initialDate)}</strong>.
               Liên hệ admin upload kế hoạch trước.
             </>
           ) : (
             <>Chưa có máy nào khả dụng cho bộ phận {department}.</>
           )}
+        </div>
+      )}
+
+      {!loadingOpts && department === 'HD' && planDateUsed && planDateUsed !== initialDate && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm p-3 rounded-md">
+          Ngày <strong>{fmtDateVN(initialDate)}</strong> chưa có kế hoạch sản xuất mới — đang dùng
+          kế hoạch <strong>ngày {fmtDateVN(planDateUsed)}</strong> (bản sau cùng).
         </div>
       )}
 
