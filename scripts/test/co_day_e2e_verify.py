@@ -63,14 +63,18 @@ def sb_slip():
 
 try:
     print("A. Catalog LOT: app chính → app tăng ca")
-    cat = requests.get(MB + "/api/ot/co-lots", headers=TOK, timeout=120).json()
-    ck(cat["ok"] and cat["count"] > 1000, f"app chính trả {cat['count']} LOT")
     adm, st = login(env["LOGIN_USERNAME"], env["LOGIN_PASSWORD"]); ck(st == 200, "đăng nhập admin (agent)")
+    codes = adm.get(OTB + "/api/co-items").json()["codes"]; ck(len(codes) == 15, "app tăng ca trả 15 mã Coating cho agent")
+    cat = requests.get(MB + "/api/ot/co-lots?codes=" + ",".join(codes), headers=TOK, timeout=120).json()
+    ck(cat["ok"] and cat["v"] == 2 and cat["count"] > 500, f"app chính trả catalog gọn {cat['count']} LOT (15 mã, 12 tháng)")
     r = adm.post(OTB + "/api/co-lots", json=cat); ck(r.status_code == 200, "agent đẩy catalog lên app tăng ca", r.text[:150])
     co, st = login("nguyenchihieu", "hd123"); ck(st == 200, "nhân viên CO nguyenchihieu đăng nhập")
-    g = co.get(OTB + "/api/co-lots").json()
-    ck(len(g.get("lots", [])) == cat["count"], "điện thoại tải đủ catalog")
-    l1, l2 = cat["lots"][0], cat["lots"][1]
+    g = co.get(OTB + "/api/co-lots"); gj = g.json()
+    ck(len(gj.get("lots", [])) == cat["count"] and len(g.content) < 200_000, f"điện thoại tải đủ catalog ({len(g.content)/1024:.0f} KB)")
+    def dec(x):
+        it = cat["items"][x[3]]; d6 = x[0][:6]
+        return {"lot": x[0], "label": f"{d6}-{x[0][6:]}-{x[1]}", "vendor": x[1], "saeji": x[2], "item": it[0], "name": it[1], "kg": x[4], "qty": x[5]}
+    l1, l2 = dec(cat["lots"][0]), dec(cat["lots"][1])
 
     print("B. Nhập phiếu (nhân viên CO)")
     old = sb_slip()

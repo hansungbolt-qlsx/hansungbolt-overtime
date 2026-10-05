@@ -8,7 +8,7 @@ import BarcodeScanButton from './BarcodeScanButton';
 import DateButton from './DateButton';
 import PrintJobButton from './PrintJobButton';
 import { toTitleCase } from '@/lib/format';
-import { CO_MACHINES, normalizeLot, type CoLine, type CoLot, type CoSlip } from '@/lib/co-day';
+import { CO_MACHINES, decodeCoLots, normalizeLot, type CoLine, type CoLot, type CoSlip } from '@/lib/co-day';
 
 type Emp = { id: string; full_name: string; order_no: number };
 
@@ -73,18 +73,23 @@ export default function CoDailyView({ currentUserFullName }: { currentUserFullNa
     return () => clearInterval(t);
   }, [slip?.status, date, load]);
 
-  // Catalog LOT tải 1 lần (≈4.500 lot)
-  useEffect(() => {
-    let cancel = false;
-    fetch('/api/co-lots').then((r) => r.json()).then((j) => {
-      if (cancel) return;
-      const m = new Map<string, CoLot>();
-      for (const l of (j.lots ?? []) as CoLot[]) m.set(l.lot, l);
+  // Catalog LOT xi mạ: CHỈ tải khi bấm Quét / bắt đầu gõ LOT (anh Hữu 05/10/2026: tiết kiệm gói Free),
+  // 1 lần mỗi lần mở app. File gọn ≈ 110 KB (15 mã Coating, 12 tháng).
+  const [catLoading, setCatLoading] = useState(false);
+  const ensureCatalog = useCallback(async (): Promise<Map<string, CoLot> | null> => {
+    if (catalog) return catalog;
+    if (catLoading) return null;
+    setCatLoading(true);
+    try {
+      const j = await (await fetch('/api/co-lots')).json();
+      const m = decodeCoLots(j);
       setCatalog(m); setCatAt(j.generated_at ?? null);
-      if (j.error) setCatErr(j.error);
-    }).catch(() => !cancel && setCatErr('Không tải được danh sách LOT'));
-    return () => { cancel = true; };
-  }, []);
+      setCatErr(j.error ? String(j.error) : '');
+      return m;
+    } catch {
+      setCatErr('Không tải được danh sách LOT'); return null;
+    } finally { setCatLoading(false); }
+  }, [catalog, catLoading]);
 
   // Mặc định nhân viên = chính người đăng nhập (nếu là 1 trong 4 người CO)
   const myEmpId = useMemo(() => {
@@ -94,9 +99,9 @@ export default function CoDailyView({ currentUserFullName }: { currentUserFullNa
   // Nhân viên đang chọn: chọn tay > mặc định là chính người đăng nhập
   const empSel = d.employeeId || myEmpId;
 
-  function applyLot(text: string) {
+  function applyLot(text: string, cat: Map<string, CoLot> | null = catalog) {
     const key = normalizeLot(text);
-    const lot = catalog?.get(key) ?? null;
+    const lot = cat?.get(key) ?? null;
     setD((x) => ({
       ...x, lotText: text, lot,
       manual: !lot && key.length >= 6,
@@ -213,12 +218,14 @@ export default function CoDailyView({ currentUserFullName }: { currentUserFullNa
         <div className="space-y-2.5 border-t border-brand-surface-alt pt-3">
           <div className="text-xs font-semibold text-brand-navy">{d.editId ? '✏️ Sửa dòng' : '➕ Thêm LOT'}</div>
           <div className="flex gap-2">
-            <input value={d.lotText} onChange={(e) => applyLot(e.target.value)} inputMode="numeric"
+            <input value={d.lotText} onFocus={() => { void ensureCatalog(); }}
+              onChange={(e) => { const v = e.target.value; void ensureCatalog().then((m) => applyLot(v, m ?? catalog)); applyLot(v); }} inputMode="numeric"
               placeholder="LOT NO xi mạ (quét hoặc gõ 10 số)" className={inp} />
-            <BarcodeScanButton label="📷 Quét" onScan={(t) => applyLot(t)} />
+            <BarcodeScanButton label="📷 Quét" onScan={(t) => { void ensureCatalog().then((m) => applyLot(t, m ?? catalog)); }} />
           </div>
           {catErr && <div className="text-[11px] text-amber-700">⚠ {catErr} — vẫn gõ tay được</div>}
-          {!catErr && catalog && <div className="text-[11px] text-brand-navy-soft">Danh sách LOT xi mạ: {catalog.size.toLocaleString('vi-VN')} lot{catAt ? ` · cập nhật ${new Date(catAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}` : ''}</div>}
+          {catLoading && <div className="text-[11px] text-brand-navy-soft">Đang tải danh sách LOT xi mạ…</div>}
+          {!catErr && catalog && <div className="text-[11px] text-brand-navy-soft">Danh sách LOT xi mạ (mã Coating, 12 tháng): {catalog.size.toLocaleString('vi-VN')} lot{catAt ? ` · cập nhật ${new Date(catAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}` : ''}</div>}
           {d.lot && (
             <div className="text-xs bg-brand-teal/10 border border-brand-teal/40 rounded-md px-3 py-2 text-brand-navy space-y-0.5">
               <div><b>{d.lot.label}</b> · nhập {d.lot.date.split('-').reverse().join('/')}</div>
@@ -228,7 +235,7 @@ export default function CoDailyView({ currentUserFullName }: { currentUserFullNa
           )}
           {d.manual && (
             <div className="space-y-2">
-              <div className="text-[11px] text-amber-700">⚠ LOT không có trong danh sách xi mạ ERP 120 ngày — nhập tay chỉ thị và mã hàng</div>
+              <div className="text-[11px] text-amber-700">⚠ LOT không có trong danh sách xi mạ (15 mã Coating, 12 tháng) — nhập tay chỉ thị và mã hàng</div>
               <div className="grid grid-cols-2 gap-2">
                 <input value={d.saeji} onChange={(e) => setD({ ...d, saeji: e.target.value })} placeholder="Chỉ thị thư" className={inp} />
                 <input value={d.item} onChange={(e) => setD({ ...d, item: e.target.value })} placeholder="Mã hàng" className={inp} />

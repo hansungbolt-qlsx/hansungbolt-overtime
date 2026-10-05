@@ -51,6 +51,30 @@ export type CoSlip = {
   last_error: string | null;
 };
 
+/** Catalog GỌN (v2, 05/10/2026) → Map lot → CoLot. items = [[mã, tên, quy cách]];
+ *  lots = [[lot, NCC, SaejiNo, chỉ_số_mã, kg, ea]]. Nhận cả bản cũ (lots là object). */
+export function decodeCoLots(j: unknown): Map<string, CoLot> {
+  const m = new Map<string, CoLot>();
+  const o = (j ?? {}) as { items?: [string, string, string][]; lots?: unknown[] };
+  const items = Array.isArray(o.items) ? o.items : [];
+  for (const raw of Array.isArray(o.lots) ? o.lots : []) {
+    if (Array.isArray(raw)) {
+      const [lot, vendor, saeji, ii, kg, qty] = raw as [string, string, string, number, number, number];
+      const it = items[ii] ?? ['', '', ''];
+      const d6 = lot.slice(0, 6);
+      m.set(lot, {
+        lot, label: `${d6}-${lot.slice(6)}-${vendor}`, vendor,
+        date: `20${d6.slice(0, 2)}-${d6.slice(2, 4)}-${d6.slice(4, 6)}`,
+        saeji, saeji_disp: saeji.length >= 6 ? `${saeji.slice(-6, -3)}-${saeji.slice(-3)}` : saeji,
+        item: it[0], name: it[1], spec: it[2], kg: Number(kg) || 0, qty: Number(qty) || 0,
+      });
+    } else if (raw && typeof raw === 'object' && 'lot' in raw) {
+      const l = raw as CoLot; m.set(l.lot, l);
+    }
+  }
+  return m;
+}
+
 /** Chuỗi quét/gõ → khoá LOT. Nhận '2610050048', '*2610050048*', '261005-0048', '261005-0048-NPT'. */
 export function normalizeLot(text: string): string {
   const t = (text ?? '').trim().replace(/^\*+|\*+$/g, '').toUpperCase().replace(/\s+/g, '');

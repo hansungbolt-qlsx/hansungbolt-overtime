@@ -878,10 +878,14 @@ async function syncOvertimeOnce() {
 // -----------------------------------------------------------
 async function pushCoLots() {
   if (!MAIN_APP_URL || !MAIN_APP_TOKEN) return;
-  const data = await mainGet('/api/ot/co-lots');
+  // Danh sách mã Coating lấy từ app tăng ca (lib/co-items.ts) — sửa 1 chỗ (05/10/2026)
+  const ci = await otFetch('/api/co-items');
+  const codes = ((ci && ci.codes) || []).join(',');
+  const data = await mainGet(`/api/ot/co-lots?codes=${encodeURIComponent(codes)}`);
   if (!data || !data.ok) throw new Error((data && data.detail) || 'app chính co-lots lỗi');
+  if (!data.lots.length && !codes) throw new Error('app tăng ca chưa có danh sách mã Coating');
   // Chỉ đẩy khi danh sách LOT ĐỔI (≈1 MB) — tiết kiệm hạn mức Supabase/Vercel Free
-  const fp = `${data.count}|${data.lots[0]?.lot ?? ''}|${data.lots.reduce((a, l) => a + l.kg, 0).toFixed(1)}`;
+  const fp = `${codes}|${data.count}|${JSON.stringify(data.lots[0] ?? '')}|${data.lots.reduce((a, l) => a + (Array.isArray(l) ? l[4] : l.kg), 0).toFixed(1)}`;
   if (fp === lastCoLotsFp) return;
   await otFetch('/api/co-lots', { method: 'POST', body: JSON.stringify(data) });
   lastCoLotsFp = fp;
