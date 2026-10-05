@@ -98,6 +98,12 @@ try:
     ck(pr.status_code == 200 and "KẾT QUẢ COATING NGÀY 02/01/2026" in ptxt and l1["label"] in ptxt and "13.3" in ptxt, "trang in bảng kết quả render (2 LOT, kg sửa)", ptxt[ptxt.find("KẾT"):ptxt.find("KẾT")+80])
     pj = co.post(OTB + "/api/print-jobs", json={"type": "co_day", "ref_id": "x"}); ck(pj.status_code == 400, "lệnh in co_day sai ngày → 400")
 
+    print("B2. Vét phiếu quên Gửi (07:00 / khởi động — anh Hữu 05/10)")
+    ck(all(x["work_date"] != DAY for x in adm.get(OTB + "/api/co-days/sync").json()["slips"]), "ngày cũ quên Gửi: vòng thường KHÔNG vét")
+    sw = [x for x in adm.get(OTB + "/api/co-days/sync?sweep=1").json()["slips"] if x["work_date"] == DAY]
+    ck(len(sw) == 1 and sw[0]["swept"] is True, "vòng vét (sweep=1) có phiếu ngày cũ quên Gửi")
+    ck(sb_slip()["status"] == "draft", "GET vét không đổi trạng thái phiếu")
+
     print("C. Gửi → agent → app chính")
     r = co.post(OTB + "/api/co-days/send", json={"date": DAY}); ck(r.status_code == 200 and r.json()["n_lines"] == 2, "bấm Gửi", r.text[:120])
     ck(sb_slip()["status"] == "pending", "Supabase: pending")
@@ -146,7 +152,7 @@ try:
     requests.post(MB + "/api/ot/co-day-deleted/ack", headers=TOK, json={"uid": mine[0]["uid"]})
     sl = sb_slip(); ck(sl["status"] == "draft" and "App chính đã xoá" in (sl["last_error"] or ""), "app tăng ca: phiếu về Đang ghi + ghi chú", sl)
     ck(all(x["work_date"] != DAY for x in requests.get(MB + "/api/ot/co-day-deleted", headers=TOK).json()["items"]), "ack xong không báo lại")
-    ck(all(x["work_date"] != DAY for x in adm.get(OTB + "/api/co-days/sync").json()["slips"]), "phiếu bị xoá trả về KHÔNG bị vét gửi lại")
+    ck(all(x["work_date"] != DAY for x in adm.get(OTB + "/api/co-days/sync?sweep=1").json()["slips"]), "phiếu bị xoá trả về KHÔNG bị vét gửi lại (kể cả lúc vét)")
     r = co.delete(OTB + f"/api/co-days?date={DAY}"); ck(r.status_code == 200, "app tăng ca xoá hẳn phiếu", r.text[:100])
     ck(sb_slip() is None, "Supabase sạch phiếu ngày thử")
 

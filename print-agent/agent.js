@@ -464,6 +464,9 @@ let lastCatalogAt = 0;
 let lastCoLotsAt = 0;   // Sản lượng CO (05/10/2026)
 let lastCoSyncAt = 0;
 let lastCoLotsFp = '';
+const CO_SWEEP_AT = '07:00';   // vét phiếu Sản lượng CO quên Gửi của ngày trước (anh Hữu 05/10/2026)
+let coSweepStartDone = false;  // vét 1 lần lúc agent khởi động (máy mở trễ)
+let coSweptDay = '';           // ngày đã vét mốc 07:00
 
 async function pushDccdCatalog() {
   if (!MAIN_APP_URL || !MAIN_APP_TOKEN) return;
@@ -912,7 +915,11 @@ async function syncCoOnce() {
     });
     console.log(`[${new Date().toISOString()}] Sản lượng CO ${it.work_date}: app chính đã xoá → trả về app tăng ca`);
   }
-  const { slips } = await otFetch('/api/co-days/sync');
+  // Vét phiếu NGÀY TRƯỚC quên Gửi (anh Hữu 05/10/2026): CHỈ lúc agent vừa khởi động (máy mở) hoặc từ 07:00,
+  // mỗi ngày 1 lần. Không vét 16:30 vì Coating tăng ca tới 19:30 mà máy tắt sau 16:30.
+  const coToday = vnDate();
+  const coSweep = !coSweepStartDone || (vnHHMM() >= CO_SWEEP_AT && coSweptDay !== coToday);
+  const { slips } = await otFetch(`/api/co-days/sync${coSweep ? '?sweep=1' : ''}`);
   for (const s of slips || []) {
     const payload = { uid: s.uid, work_date: s.work_date, sent_by_name: s.sent_by_name, note: s.note, lines: s.lines };
     let ok = false, detail = '', mainRef = null;
@@ -927,6 +934,12 @@ async function syncCoOnce() {
     } catch (e) { detail = e.message; }
     await otFetch('/api/co-days/sync', { method: 'POST', body: JSON.stringify({ uid: s.uid, ok, main_ref: mainRef, error: ok ? undefined : detail }) });
     console.log(`[${new Date().toISOString()}] Sản lượng CO ${s.work_date} (${s.lines.length} dòng${s.swept ? ', vét quên gửi' : ''}) → app chính: ${ok ? 'OK' : 'LỖI ' + detail}`);
+  }
+  // Chỉ đánh dấu đã vét SAU khi vòng chạy xong (lỗi giữa chừng → vòng 60" sau vét lại, như bài học kho NPL 15/09)
+  if (coSweep) {
+    coSweepStartDone = true;
+    if (vnHHMM() >= CO_SWEEP_AT) coSweptDay = coToday;
+    console.log(`[${new Date().toISOString()}] Vét phiếu Sản lượng CO quên Gửi (${coSweptDay === coToday ? '07:00' : 'khởi động'}) xong`);
   }
 }
 
