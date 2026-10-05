@@ -876,11 +876,47 @@ async function syncOvertimeOnce() {
 //                 → app chính /api/ot/co-day (lưu vĩnh viễn) → ghi kết quả ngược về app tăng ca
 // Lỗi chỉ ghi log, KHÔNG làm chết vòng in.
 // -----------------------------------------------------------
+// ── Cửa kiểm Sản lượng CO hỏi THẲNG Supabase (05/10/2026) — y bài học 07/08: Vercel chỉ là người đưa thư,
+//    mỗi chuyến tính vào hạn mức Free; không có việc thì KHÔNG gọi Vercel. HỎNG THÌ MỞ (coi như có việc).
+async function coCoPhieuCanDay(sweep) {
+  if (!SB_ON) return true;
+  try {
+    const q = sweep
+      ? `or=(and(status.eq.pending,synced_at.is.null),and(status.eq.draft,work_date.lt.${vnDate()}))`
+      : 'status=eq.pending&synced_at=is.null';
+    const res = await sb(`co_day_slips?${q}&select=uid&limit=1`);
+    return ((await res.json()) || []).length > 0;
+  } catch (e) {
+    console.error(`[${new Date().toISOString()}] Cửa kiểm Sản lượng CO lỗi (mở cửa): ${e.message}`);
+    return true;
+  }
+}
+
+async function coCoHangChoXoa() {
+  if (!SB_ON) return true;
+  try {
+    ghiNhanGoi('supabase');
+    const res = await fetch(`${SUPABASE_URL}/storage/v1/object/info/plan-files/co-deleted.json`, {
+      headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` },
+    });
+    if (res.status === 404 || res.status === 400) return false;   // chưa từng có hàng chờ
+    if (!res.ok) return true;
+    const j = await res.json().catch(() => null);
+    const size = Number(j?.size ?? j?.metadata?.size ?? 99);
+    return size > 2;                                                 // '[]' = 2 byte = rỗng
+  } catch { return true; }
+}
+
+let coCodesCache = null, coCodesAt = 0;   // danh sách mã Coating: hỏi app tăng ca tối đa 1 lần/giờ
+
 async function pushCoLots() {
   if (!MAIN_APP_URL || !MAIN_APP_TOKEN) return;
   // Danh sách mã Coating lấy từ app tăng ca (lib/co-items.ts) — sửa 1 chỗ (05/10/2026)
-  const ci = await otFetch('/api/co-items');
-  const codes = ((ci && ci.codes) || []).join(',');
+  if (!coCodesCache || Date.now() - coCodesAt > 3600_000) {
+    const ci = await otFetch('/api/co-items');
+    coCodesCache = ((ci && ci.codes) || []).join(','); coCodesAt = Date.now();
+  }
+  const codes = coCodesCache;
   const data = await mainGet(`/api/ot/co-lots?codes=${encodeURIComponent(codes)}`);
   if (!data || !data.ok) throw new Error((data && data.detail) || 'app chính co-lots lỗi');
   if (!data.lots.length && !codes) throw new Error('app tăng ca chưa có danh sách mã Coating');
@@ -895,7 +931,7 @@ async function pushCoLots() {
 async function syncCoOnce() {
   if (!MAIN_APP_URL || !MAIN_APP_TOKEN) return;
   // Xoá ở APP TĂNG CA → báo app chính xoá theo (anh Hữu 05/10/2026)
-  const q = await otFetch('/api/co-days/deleted');
+  const q = (await coCoHangChoXoa()) ? await otFetch('/api/co-days/deleted') : { items: [] };
   for (const it of (q && q.items) || []) {
     const res = await fetch(`${MAIN_APP_URL}/api/ot/co-day-delete`, {
       method: 'POST', headers: { 'X-Agent-Token': MAIN_APP_TOKEN, 'Content-Type': 'application/json' },
@@ -923,7 +959,9 @@ async function syncCoOnce() {
   // mỗi ngày 1 lần. Không vét 16:30 vì Coating tăng ca tới 19:30 mà máy tắt sau 16:30.
   const coToday = vnDate();
   const coSweep = !coSweepStartDone || (vnHHMM() >= CO_SWEEP_AT && coSweptDay !== coToday);
-  const { slips } = await otFetch(`/api/co-days/sync${coSweep ? '?sweep=1' : ''}`);
+  const { slips } = (await coCoPhieuCanDay(coSweep))
+    ? await otFetch(`/api/co-days/sync${coSweep ? '?sweep=1' : ''}`)
+    : { slips: [] };
   for (const s of slips || []) {
     const payload = { uid: s.uid, work_date: s.work_date, sent_by_name: s.sent_by_name, note: s.note, lines: s.lines };
     let ok = false, detail = '', mainRef = null;
