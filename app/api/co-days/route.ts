@@ -58,3 +58,23 @@ export async function POST(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true, line: data });
 }
+
+// DELETE /api/co-days?date=YYYY-MM-DD — xoá CẢ phiếu ngày (anh Hữu 05/10/2026).
+// Phiếu đang ở app chính ('received' hoặc đang chờ đẩy) thì CHẶN: xoá trên app chính trước (TV › Kết quả Coating),
+// phiếu tự trả về đây rồi mới xoá — để 2 bên không lệch nhau.
+export async function DELETE(req: Request) {
+  const session = await getSession();
+  if (!canEditCoDay(session)) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
+  const date = new URL(req.url).searchParams.get('date');
+  if (!isISODate(date)) return NextResponse.json({ error: 'Sai date (YYYY-MM-DD)' }, { status: 400 });
+  const { data: slip } = await supabaseAdmin.from('co_day_slips').select('id, status').eq('work_date', date).maybeSingle();
+  if (!slip) return NextResponse.json({ error: 'Ngày này không có phiếu' }, { status: 404 });
+  if (slip.status !== 'draft') {
+    return NextResponse.json({ error: slip.status === 'received'
+      ? 'Phiếu đang ở app chính — nhờ admin xoá trên app chính (TV › Kết quả Coating) trước, phiếu sẽ trả về đây'
+      : 'Phiếu đang chờ đẩy sang app chính — đợi khoảng 1 phút rồi thử lại' }, { status: 409 });
+  }
+  const { error } = await supabaseAdmin.from('co_day_slips').delete().eq('id', slip.id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}

@@ -125,6 +125,32 @@ try:
         ck(up.get("ok") and len(cd.lines) == 1 and cd.n_resend == 2, "gửi lại: app chính còn 1 dòng (ghi đè)")
     adm.post(OTB + "/api/co-days/sync", json={"uid": s["uid"], "ok": True, "main_ref": str(up["id"])})
 
+    print("F. Xoá: app chính xoá → trả về app tăng ca → app tăng ca xoá hẳn")
+    ck(sb_slip()["status"] == "received", "trước khi xoá: received")
+    r = co.delete(OTB + f"/api/co-days?date={DAY}"); ck(r.status_code == 409, "app tăng ca CHẶN xoá khi app chính còn giữ", r.text[:100])
+    from app.models import User as _U
+    from app.services.auth import hash_password as _hp
+    with SessionLocal() as db:
+        if not db.query(_U).filter_by(username="_t_co_adm").first():
+            db.add(_U(username="_t_co_adm", password_hash=_hp("test1234"), full_name="T", role="admin", is_admin=True, is_active=True)); db.commit()
+    ms = requests.Session(); ms.post(MB + "/login", data={"username": "_t_co_adm", "password": "test1234"}, allow_redirects=False)
+    ck("Xoá phiếu" in ms.get(MB + f"/tv/daily/co?date={DAY}").text, "trang TV có nút Xoá phiếu (admin)")
+    r = ms.post(MB + "/tv/daily/co/delete", data={"date": DAY}, allow_redirects=False)
+    ck(r.status_code == 303, "app chính xoá phiếu", r.status_code)
+    ck("Chưa có phiếu" in ms.get(MB + f"/tv/daily/co?date={DAY}").text, "TV ẩn phiếu đã xoá")
+    with SessionLocal() as db:
+        cd = db.query(CoDay).filter_by(uid=f"CO-{DAY.replace('-', '')}").one()
+        ck(cd.deleted_at is not None and len(cd.lines) == 1, "app chính xoá MỀM (giữ dòng để truy vết)")
+    dl = requests.get(MB + "/api/ot/co-day-deleted", headers=TOK).json()["items"]
+    mine = [x for x in dl if x["work_date"] == DAY]; ck(len(mine) == 1, "agent thấy phiếu đã xoá")
+    adm.post(OTB + "/api/co-days/sync", json={"uid": mine[0]["uid"], "returned": True, "returned_by": mine[0]["deleted_by"]})
+    requests.post(MB + "/api/ot/co-day-deleted/ack", headers=TOK, json={"uid": mine[0]["uid"]})
+    sl = sb_slip(); ck(sl["status"] == "draft" and "App chính đã xoá" in (sl["last_error"] or ""), "app tăng ca: phiếu về Đang ghi + ghi chú", sl)
+    ck(all(x["work_date"] != DAY for x in requests.get(MB + "/api/ot/co-day-deleted", headers=TOK).json()["items"]), "ack xong không báo lại")
+    ck(all(x["work_date"] != DAY for x in adm.get(OTB + "/api/co-days/sync").json()["slips"]), "phiếu bị xoá trả về KHÔNG bị vét gửi lại")
+    r = co.delete(OTB + f"/api/co-days?date={DAY}"); ck(r.status_code == 200, "app tăng ca xoá hẳn phiếu", r.text[:100])
+    ck(sb_slip() is None, "Supabase sạch phiếu ngày thử")
+
     print("E. Quyền")
     ld, _ = login("nguyenduchieu", "hd123")
     ck(ld.get(OTB + f"/api/co-days?date={DAY}").status_code == 200, "tổ trưởng CO xem được")

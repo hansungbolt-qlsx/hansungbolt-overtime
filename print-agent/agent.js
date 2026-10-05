@@ -887,6 +887,16 @@ async function pushCoLots() {
 
 async function syncCoOnce() {
   if (!MAIN_APP_URL || !MAIN_APP_TOKEN) return;
+  // App chính đã XOÁ phiếu → trả về app tăng ca ('Đang ghi'), rồi xác nhận với app chính (anh Hữu 05/10/2026)
+  const del = await mainGet('/api/ot/co-day-deleted');
+  for (const it of (del && del.items) || []) {
+    await otFetch('/api/co-days/sync', { method: 'POST', body: JSON.stringify({ uid: it.uid, returned: true, returned_by: it.deleted_by }) });
+    await fetch(`${MAIN_APP_URL}/api/ot/co-day-deleted/ack`, {
+      method: 'POST', headers: { 'X-Agent-Token': MAIN_APP_TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: it.uid }),
+    });
+    console.log(`[${new Date().toISOString()}] Sản lượng CO ${it.work_date}: app chính đã xoá → trả về app tăng ca`);
+  }
   const { slips } = await otFetch('/api/co-days/sync');
   for (const s of slips || []) {
     const payload = { uid: s.uid, work_date: s.work_date, sent_by_name: s.sent_by_name, note: s.note, lines: s.lines };

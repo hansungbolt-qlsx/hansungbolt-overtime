@@ -17,13 +17,15 @@ export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
   if (!agentAllowed(session.role)) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
-  const cols = 'id, uid, work_date, status, note, sent_by_name, created_by_name';
+  const cols = 'id, uid, work_date, status, note, sent_by_name, created_by_name, last_error';
   const [{ data: pend, error: e1 }, { data: old, error: e2 }] = await Promise.all([
     supabaseAdmin.from('co_day_slips').select(cols).eq('status', 'pending').is('synced_at', null).order('work_date'),
     supabaseAdmin.from('co_day_slips').select(cols).eq('status', 'draft').lt('work_date', vnToday()).order('work_date'),
   ]);
   if (e1 || e2) return NextResponse.json({ error: (e1 ?? e2)!.message }, { status: 500 });
-  const slips = [...(pend ?? []), ...(old ?? [])];
+  // Phiếu ngày cũ do APP CHÍNH XOÁ trả về thì KHÔNG tự vét gửi lại (anh Hữu 05/10/2026) — chỉ gửi khi người dùng bấm Gửi
+  const oldOk = (old ?? []).filter((s) => !String((s as { last_error?: string | null }).last_error ?? '').startsWith('App chính đã xoá'));
+  const slips = [...(pend ?? []), ...oldOk];
   const out = [];
   for (const s of slips) {
     const { data: lines, error } = await supabaseAdmin
@@ -41,9 +43,18 @@ export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
   if (!agentAllowed(session.role)) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
-  const b = (await req.json().catch(() => null)) as { uid?: string; ok?: boolean; main_ref?: string; error?: string } | null;
+  const b = (await req.json().catch(() => null)) as { uid?: string; ok?: boolean; main_ref?: string; error?: string; returned?: boolean; returned_by?: string } | null;
   if (!b?.uid) return NextResponse.json({ error: 'Thiếu uid' }, { status: 400 });
   const now = new Date().toISOString();
+  // App chính XOÁ phiếu (anh Hữu 05/10/2026) → trả về 'Đang ghi' + ghi chú; bên đây sửa rồi Gửi lại, hoặc Xoá phiếu cho sạch
+  if (b.returned) {
+    const { error } = await supabaseAdmin.from('co_day_slips').update({
+      status: 'draft', synced_at: null, received_at: null, main_ref: null, updated_at: now,
+      last_error: `App chính đã xoá phiếu${b.returned_by ? ` (${b.returned_by})` : ''} — sửa rồi Gửi lại, hoặc bấm Xoá phiếu ngày`,
+    }).eq('uid', b.uid);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  }
   const upd = b.ok
     ? { status: 'received', synced_at: now, received_at: now, main_ref: b.main_ref ?? null, last_error: null, updated_at: now }
     : { synced_at: null, last_error: (b.error ?? 'lỗi không rõ').slice(0, 500), updated_at: now };
