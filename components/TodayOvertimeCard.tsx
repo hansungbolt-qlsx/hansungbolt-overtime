@@ -290,6 +290,15 @@ export default function TodayOvertimeCard({
               totalMachines={rlMachines}
             />
           )}
+          {/* Coating (anh Hữu 05/10/2026: trước quên khối này nên ảnh chia sẻ của CO trống) */}
+          {showCO && co.length > 0 && (
+            <ShareDept
+              title="Coating"
+              color="#ea580c"
+              employees={co}
+              totalMachines={coMachines}
+            />
+          )}
         </div>
       </div>
     </>
