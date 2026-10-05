@@ -259,8 +259,8 @@ export default function CoDailyView({ currentUserFullName }: { currentUserFullNa
               {d.lot && Number(String(d.kg).replace(',', '.')) !== d.lot.kg && <span className="text-[10px] text-amber-700">LOT ERP: {fmtKg(d.lot.kg)} Kg</span>}
             </label>
             <label className="text-xs text-brand-navy">Nhân viên
-              {/* Cao bằng ô trọng lượng — Safari iOS bỏ qua padding của select nên đặt chiều cao cố định */}
-              <select value={empSel} onChange={(e) => setD({ ...d, employeeId: e.target.value })} className={`${inp} h-12`}>
+              {/* Tên đậm, chữ to 1 bậc; cao bằng ô trọng lượng — Safari iOS bỏ qua padding của select nên đặt chiều cao cố định */}
+              <select value={empSel} onChange={(e) => setD({ ...d, employeeId: e.target.value })} className={`${inp} h-12 font-bold text-base`}>
                 <option value="">— Chọn —</option>
                 {emps.map((e) => <option key={e.id} value={e.id}>{toTitleCase(e.full_name)}</option>)}
               </select>
