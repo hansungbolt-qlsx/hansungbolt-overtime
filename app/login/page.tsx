@@ -119,7 +119,7 @@ export default function LoginPage() {
                 )}
               </div>
             </div>
-            <span className="text-sm text-brand-navy">Ghi nhớ đăng nhập (90 ngày)</span>
+            <span className="text-sm text-brand-navy">Ghi nhớ đăng nhập (không cần đăng nhập lại)</span>
           </label>
 
           {error && (

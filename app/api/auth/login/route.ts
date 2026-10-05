@@ -55,6 +55,7 @@ export async function POST(req: Request) {
     fullName: user.full_name,
     role: user.role,
     department: user.department,
+    remember: remember === true,
   });
   await setSessionCookie(token, remember === true);
 
