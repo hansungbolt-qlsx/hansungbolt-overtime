@@ -66,6 +66,13 @@ export default function CoDailyView({ currentUserFullName }: { currentUserFullNa
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void load(date); }, [date, load]);
 
+  // Đã bấm Gửi → tự hỏi lại mỗi 10 giây tới khi app chính nhận (anh Hữu 05/10: trước phải tải lại trang mới thấy ✅)
+  useEffect(() => {
+    if (slip?.status !== 'pending') return;
+    const t = setInterval(() => { void load(date); }, 10_000);
+    return () => clearInterval(t);
+  }, [slip?.status, date, load]);
+
   // Catalog LOT tải 1 lần (≈4.500 lot)
   useEffect(() => {
     let cancel = false;
@@ -282,7 +289,7 @@ export default function CoDailyView({ currentUserFullName }: { currentUserFullNa
           <div className="p-4 border-t border-brand-surface-alt space-y-2">
             <button type="button" onClick={send} disabled={busy || slip?.status === 'pending'}
               className="w-full py-3 rounded-xl bg-[#ea580c] text-white font-bold disabled:opacity-50">
-              {slip?.status === 'received' ? '📤 Gửi lại phiếu (đã sửa sau khi gửi)' : slip?.status === 'pending' ? '📤 Đang chờ đẩy…' : '📤 Gửi phiếu cuối ngày'}
+              {slip?.status === 'received' ? '✅ Đã gửi app chính — bấm để gửi lại' : slip?.status === 'pending' ? '📤 Đang đẩy sang app chính (khoảng 1 phút)…' : '📤 Gửi phiếu cuối ngày'}
             </button>
             <PrintJobButton type="co_day" refId={date} label="🖨 In bảng kết quả" />
           </div>
