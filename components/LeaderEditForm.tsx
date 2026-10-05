@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { deptNeedsManualRpm } from '@/lib/departments';
+import { CO_ITEMS, CO_ITEMS_DATALIST_ID, findCoItem } from '@/lib/co-items';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toTitleCase } from '@/lib/format';
@@ -244,6 +245,10 @@ export default function LeaderEditForm({
       next[rowIdx] = {
         ...row,
         machineItemCodes: { ...row.machineItemCodes, [machineId]: value },
+        // CO (anh Hữu 05/10/2026): mã có trong danh sách Coating → RPM tự điền (sửa tay vẫn được)
+        ...(manualRpm && findCoItem(value)
+          ? { machineRpm: { ...row.machineRpm, [machineId]: String(findCoItem(value)!.rpm) } }
+          : {}),
       };
       return next;
     });
@@ -452,6 +457,13 @@ export default function LeaderEditForm({
         </div>
       )}
 
+      {manualRpm && (
+        <datalist id={CO_ITEMS_DATALIST_ID}>
+          {CO_ITEMS.map((it) => (
+            <option key={it.code} value={it.code}>{`RPM ${it.rpm} · ${it.coating} · ${it.name}`}</option>
+          ))}
+        </datalist>
+      )}
       {!loadingOpts && machines.length > 0 && (
         <>
           <div className="space-y-4">
@@ -591,7 +603,9 @@ export default function LeaderEditForm({
                                         e.target.value,
                                       )
                                     }
-                                    placeholder="Nhập mã hàng"
+                                    placeholder={manualRpm ? "Gõ mã hàng — chọn gợi ý để tự điền RPM" : "Nhập mã hàng"}
+                                  list={manualRpm ? CO_ITEMS_DATALIST_ID : undefined}
+                                  autoComplete="off"
                                     className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-brand-teal bg-white"
                                   />
                                 </div>

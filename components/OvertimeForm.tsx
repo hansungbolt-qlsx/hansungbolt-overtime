@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { toTitleCase } from '@/lib/format';
 import DateButton from './DateButton';
 import { deptNeedsManualRpm } from '@/lib/departments';
+import { CO_ITEMS, CO_ITEMS_DATALIST_ID, findCoItem } from '@/lib/co-items';
 
 type Employee = { id: string; full_name: string; order_no: number };
 type PlanItem = { item_code: string; item_name: string | null };
@@ -143,6 +144,10 @@ export default function OvertimeForm({ department }: { department: string }) {
       next[rowIdx] = {
         ...row,
         machineItemCodes: { ...row.machineItemCodes, [machineId]: value },
+        // CO (anh Hữu 05/10/2026): mã có trong danh sách Coating → RPM tự điền (sửa tay vẫn được)
+        ...(manualRpm && findCoItem(value)
+          ? { machineRpm: { ...row.machineRpm, [machineId]: String(findCoItem(value)!.rpm) } }
+          : {}),
       };
       return next;
     });
@@ -331,6 +336,13 @@ export default function OvertimeForm({ department }: { department: string }) {
         </div>
       )}
 
+      {manualRpm && (
+        <datalist id={CO_ITEMS_DATALIST_ID}>
+          {CO_ITEMS.map((it) => (
+            <option key={it.code} value={it.code}>{`RPM ${it.rpm} · ${it.coating} · ${it.name}`}</option>
+          ))}
+        </datalist>
+      )}
       {!loadingOpts && machines.length > 0 && dayType && (
         <>
           <div className="space-y-4">
@@ -461,7 +473,9 @@ export default function OvertimeForm({ department }: { department: string }) {
                                   onChange={(e) =>
                                     updateMachineItemCode(idx, machine.id, e.target.value)
                                   }
-                                  placeholder="Nhập mã hàng"
+                                  placeholder={manualRpm ? "Gõ mã hàng — chọn gợi ý để tự điền RPM" : "Nhập mã hàng"}
+                                  list={manualRpm ? CO_ITEMS_DATALIST_ID : undefined}
+                                  autoComplete="off"
                                   className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-brand-teal bg-white"
                                 />
                               </div>
