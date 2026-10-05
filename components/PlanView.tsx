@@ -165,7 +165,8 @@ function fmtSaeji(l: Lot): string {
 // chính; chọn chỉ thị → chọn công đoạn theo bộ phận → In. Gõ thẳng số chỉ thị
 // (6-9 số) vẫn nhận.
 // export: bộ phận CO dùng riêng thẻ này làm tab 'In phiếu DCCD' (anh Hữu 05/10/2026)
-export function DccdCard({ options }: { options: [string, string][] }) {
+// onlyCodes (CO, anh Hữu 05/10/2026): chỉ hiện chỉ thị đang mở của các mã này, hiện sẵn danh sách khi chưa gõ, gõ 1 ký tự là lọc
+export function DccdCard({ options, onlyCodes }: { options: [string, string][]; onlyCodes?: string[] }) {
   const [q, setQ] = useState('');
   const [catalog, setCatalog] = useState<Lot[] | null>(null);
   const [catAt, setCatAt] = useState<string | null>(null);
@@ -174,8 +175,9 @@ export function DccdCard({ options }: { options: [string, string][] }) {
   const [copies, setCopies] = useState('1');
 
   // Lazy tải catalog khi bắt đầu gõ (1 lần, ~50KB)
+  const only = onlyCodes && onlyCodes.length > 0 ? new Set(onlyCodes.map((c) => c.toUpperCase())) : null;
   useEffect(() => {
-    if (!q || catalog !== null) return;
+    if ((!q && !only) || catalog !== null) return;
     let cancelled = false;
     fetch('/api/dccd-lots')
       .then((r) => r.json())
@@ -186,13 +188,16 @@ export function DccdCard({ options }: { options: [string, string][] }) {
       })
       .catch(() => { if (!cancelled) setCatalog([]); });
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, catalog]);
 
   const qn = q.trim().toUpperCase();
   const qDigits = qn.replace(/[^0-9]/g, '');
+  const pool = catalog && only ? catalog.filter((l) => only.has(l.code.toUpperCase())) : catalog;
+  const minLen = only ? 0 : 3;
   const matches =
-    !sel && qn.length >= 3 && catalog
-      ? catalog.filter((l) => l.code.toUpperCase().includes(qn)).slice(0, 8)
+    !sel && qn.length >= minLen && pool
+      ? pool.filter((l) => l.code.toUpperCase().includes(qn)).slice(0, only ? 50 : 8)
       : [];
   // Gõ thẳng số chỉ thị (chỉ số/dấu gạch) → in trực tiếp, nhưng CHỈ khi không
   // khớp mã hàng nào — mã hàng nào cũng mở đầu bằng 6 chữ số (bug 13/7: gõ tới
@@ -224,7 +229,7 @@ export function DccdCard({ options }: { options: [string, string][] }) {
             value={sel ? `${sel.code} · ${fmtSaeji(sel)}` : q}
             onChange={(e) => { setSel(null); setQ(e.target.value); }}
             onFocus={() => { if (sel) { setSel(null); setQ(''); } }}
-            placeholder="vd 050200-FS2W hoặc 606-169"
+            placeholder={only ? 'Gõ vài ký tự mã hàng Coating, hoặc chọn bên dưới' : 'vd 050200-FS2W hoặc 606-169'}
             className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm font-mono text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal"
           />
         </div>
@@ -266,14 +271,14 @@ export function DccdCard({ options }: { options: [string, string][] }) {
       </div>
 
       {/* Gợi ý chỉ thị theo mã hàng */}
-      {!sel && qn.length >= 3 && (
+      {!sel && qn.length >= minLen && (
         <div className="mt-2">
           {catalog === null && (
             <p className="text-[11px] text-brand-navy-soft">Đang tải danh sách chỉ thị...</p>
           )}
           {catalog !== null && matches.length === 0 && !directSaeji && (
             <p className="text-[11px] text-brand-navy-soft">
-              Không có chỉ thị đang mở khớp &quot;{qn}&quot;
+              {only && !qn ? 'Các mã Coating hiện không có chỉ thị đang mở' : <>Không có chỉ thị đang mở khớp &quot;{qn}&quot;</>}
               {catAt ? ` (danh sách lúc ${catAt.slice(11, 16)})` : ''}
             </p>
           )}

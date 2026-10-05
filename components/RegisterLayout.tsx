@@ -8,6 +8,7 @@ import DepartmentRegistrationsList from './DepartmentRegistrationsList';
 import TodayOvertimeCard from './TodayOvertimeCard';
 import PlanView, { DccdCard } from './PlanView';
 import { DCCD_GJ_BY_DEPT } from '@/lib/departments';
+import { CO_ITEMS } from '@/lib/co-items';
 import StopReasonsView from './StopReasonsView';
 import WarehouseSlipView from './WarehouseSlipView';
 import CoDailyView from './CoDailyView';
@@ -211,7 +212,7 @@ export default function RegisterLayout({
         <PlanView department={department} isLeader={isLeader} isQlsx={isQlsx} />
       )}
 
-      {activeTab === 'dccd' && <DccdCard options={DCCD_GJ_BY_DEPT.CO} />}
+      {activeTab === 'dccd' && <DccdCard options={DCCD_GJ_BY_DEPT.CO} onlyCodes={CO_ITEMS.map((i) => i.code)} />}
 
       {activeTab === 'co_day' && <CoDailyView currentUserFullName={currentUserFullName} />}
 
