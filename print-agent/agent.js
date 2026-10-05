@@ -971,6 +971,23 @@ async function printOvertimeSheets(job) {
 // -----------------------------------------------------------
 // Print PDF via Windows
 // -----------------------------------------------------------
+// Bảng Kết quả Coating ngày (anh Hữu 05/10/2026): in ra ĐÚNG form file Excel tải xuống —
+// lấy dòng từ app tăng ca (kể cả phiếu đang ghi) → app chính dựng Excel → PDF (LibreOffice) → máy in.
+async function printCoDay(job) {
+  const d = await otFetch(`/api/co-days?date=${job.ref_id}`);
+  if (!d || !d.lines || d.lines.length === 0) throw new Error(`Ngày ${job.ref_id} chưa có dòng Sản lượng CO nào`);
+  const res = await fetch(`${MAIN_APP_URL}/api/ot/co-day.pdf`, {
+    method: 'POST',
+    headers: { 'X-Agent-Token': MAIN_APP_TOKEN, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ work_date: job.ref_id, sent_by_name: d.slip?.sent_by_name ?? '', lines: d.lines }),
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    throw new Error(`App chính dựng PDF lỗi HTTP ${res.status}: ${t.slice(0, 200)}`);
+  }
+  await printPDFFile(Buffer.from(await res.arrayBuffer()), job.id);
+}
+
 async function printPDFFile(pdfBuffer, jobId) {
   const filepath = join(TMP_DIR, `job-${jobId}.pdf`);
   writeFileSync(filepath, pdfBuffer);
@@ -998,6 +1015,8 @@ async function processJob(job) {
       await printDccd(job);
     } else if (job.type === 'overtime_sheets') {
       await printOvertimeSheets(job);
+    } else if (job.type === 'co_day') {
+      await printCoDay(job);
     } else {
       const pdf = await renderPDF(job);
       await printPDFFile(pdf, job.id);
