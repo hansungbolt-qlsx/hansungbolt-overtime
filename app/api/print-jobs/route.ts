@@ -28,7 +28,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
   }
   // qlsx (user 24/7): được in KHSX + DCCD (đủ 4 CĐ) — các type khác chặn per-type dưới
-  if (session.role !== 'admin' && session.role !== 'leader' && session.role !== 'qlsx') {
+  // worker (nhân viên) CHỈ được in bảng Kết quả Coating của bộ phận CO (anh Hữu 05/10/2026) — kiểm ở nhánh co_day
+  const isCoWorker = session.role === 'worker' && session.department === 'CO';
+  if (session.role !== 'admin' && session.role !== 'leader' && session.role !== 'qlsx' && !isCoWorker) {
     return NextResponse.json({ error: 'Không có quyền in' }, { status: 403 });
   }
 
@@ -48,12 +50,13 @@ export async function POST(req: Request) {
     type !== 'khsx_tong' &&
     type !== 'khsx_homnay' &&
     type !== 'dccd' &&
-    type !== 'overtime_sheets'
+    type !== 'overtime_sheets' &&
+    type !== 'co_day'
   ) {
     return NextResponse.json(
       {
         error:
-          'type phải là registration / labels_day / overtime_summary / khsx_tong / khsx_homnay / dccd / overtime_sheets',
+          'type phải là registration / labels_day / overtime_summary / khsx_tong / khsx_homnay / dccd / overtime_sheets / co_day',
       },
       { status: 400 },
     );
@@ -63,7 +66,18 @@ export async function POST(req: Request) {
   }
 
   // Validate ref_id + check quyền theo dept
-  if (type === 'registration') {
+  if (isCoWorker && type !== 'co_day') {
+    return NextResponse.json({ error: 'Không có quyền in' }, { status: 403 });
+  }
+  if (type === 'co_day') {
+    // Bảng Kết quả Coating ngày (anh Hữu 05/10/2026): ref_id = YYYY-MM-DD; 4 người CO + admin + qlsx
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ref_id)) {
+      return NextResponse.json({ error: 'ref_id phải là YYYY-MM-DD' }, { status: 400 });
+    }
+    if (session.role !== 'admin' && session.role !== 'qlsx' && session.department !== 'CO') {
+      return NextResponse.json({ error: 'Chỉ bộ phận Coating in được bảng này' }, { status: 403 });
+    }
+  } else if (type === 'registration') {
     const { data: reg } = await supabaseAdmin
       .from('overtime_registrations')
       .select('id, department')

@@ -164,7 +164,8 @@ function fmtSaeji(l: Lot): string {
 // đang mở (catalog agent đẩy từ app chính mỗi 10') như mục In phiếu lẻ app
 // chính; chọn chỉ thị → chọn công đoạn theo bộ phận → In. Gõ thẳng số chỉ thị
 // (6-9 số) vẫn nhận.
-function DccdCard({ options }: { options: [string, string][] }) {
+// export: bộ phận CO dùng riêng thẻ này làm tab 'In phiếu DCCD' (anh Hữu 05/10/2026)
+export function DccdCard({ options }: { options: [string, string][] }) {
   const [q, setQ] = useState('');
   const [catalog, setCatalog] = useState<Lot[] | null>(null);
   const [catAt, setCatAt] = useState<string | null>(null);

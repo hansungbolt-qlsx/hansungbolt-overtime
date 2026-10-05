@@ -301,6 +301,10 @@ function jobUrl(job) {
     if (dept) url += `&dept=${dept}`;
     return url;
   }
+  if (job.type === 'co_day') {
+    // Bảng Kết quả Coating ngày (anh Hữu 05/10/2026) — A4 ngang
+    return `${APP_URL}/print/co-day?date=${job.ref_id}`;
+  }
   throw new Error(`Unknown job type: ${job.type}`);
 }
 
@@ -376,7 +380,7 @@ async function renderPDF(job) {
     await new Promise((r) => setTimeout(r, 200));
 
     // Tổng hợp giờ tăng ca dùng A4 landscape (bảng nhiều cột)
-    const isLandscape = job.type === 'overtime_summary';
+    const isLandscape = job.type === 'overtime_summary' || job.type === 'co_day';
     // preferCSSPageSize: tôn trọng @page của từng trang
     // (tem: A4 dọc lề 0 · tổng hợp: A4 ngang lề 1cm · phiếu: A4 dọc lề 8mm)
     const pdfBuffer = await page.pdf({
@@ -457,6 +461,9 @@ async function printDccd(job) {
 // -----------------------------------------------------------
 const CATALOG_MS = 10 * 60_000;
 let lastCatalogAt = 0;
+let lastCoLotsAt = 0;   // Sản lượng CO (05/10/2026)
+let lastCoSyncAt = 0;
+let lastCoLotsFp = '';
 
 async function pushDccdCatalog() {
   if (!MAIN_APP_URL || !MAIN_APP_TOKEN) return;
@@ -859,6 +866,45 @@ async function syncOvertimeOnce() {
   );
 }
 
+// -----------------------------------------------------------
+// SẢN LƯỢNG COATING (anh Hữu 05/10/2026)
+//   pushCoLots  — mỗi 10': app chính /api/ot/co-lots (LOT xi mạ CĐ 80, 120 ngày) → app tăng ca /api/co-lots
+//   syncCoOnce  — mỗi 60": app tăng ca /api/co-days/sync (phiếu đã Gửi + phiếu ngày cũ quên Gửi)
+//                 → app chính /api/ot/co-day (lưu vĩnh viễn) → ghi kết quả ngược về app tăng ca
+// Lỗi chỉ ghi log, KHÔNG làm chết vòng in.
+// -----------------------------------------------------------
+async function pushCoLots() {
+  if (!MAIN_APP_URL || !MAIN_APP_TOKEN) return;
+  const data = await mainGet('/api/ot/co-lots');
+  if (!data || !data.ok) throw new Error((data && data.detail) || 'app chính co-lots lỗi');
+  // Chỉ đẩy khi danh sách LOT ĐỔI (≈1 MB) — tiết kiệm hạn mức Supabase/Vercel Free
+  const fp = `${data.count}|${data.lots[0]?.lot ?? ''}|${data.lots.reduce((a, l) => a + l.kg, 0).toFixed(1)}`;
+  if (fp === lastCoLotsFp) return;
+  await otFetch('/api/co-lots', { method: 'POST', body: JSON.stringify(data) });
+  lastCoLotsFp = fp;
+  console.log(`[${new Date().toISOString()}] Catalog LOT xi mạ → app tăng ca: ${data.count} lot`);
+}
+
+async function syncCoOnce() {
+  if (!MAIN_APP_URL || !MAIN_APP_TOKEN) return;
+  const { slips } = await otFetch('/api/co-days/sync');
+  for (const s of slips || []) {
+    const payload = { uid: s.uid, work_date: s.work_date, sent_by_name: s.sent_by_name, note: s.note, lines: s.lines };
+    let ok = false, detail = '', mainRef = null;
+    try {
+      const res = await fetch(`${MAIN_APP_URL}/api/ot/co-day`, {
+        method: 'POST',
+        headers: { 'X-Agent-Token': MAIN_APP_TOKEN, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const d = await res.json().catch(() => null);
+      ok = res.ok && !!d?.ok; detail = (d && d.detail) || `HTTP ${res.status}`; mainRef = d?.id ? String(d.id) : null;
+    } catch (e) { detail = e.message; }
+    await otFetch('/api/co-days/sync', { method: 'POST', body: JSON.stringify({ uid: s.uid, ok, main_ref: mainRef, error: ok ? undefined : detail }) });
+    console.log(`[${new Date().toISOString()}] Sản lượng CO ${s.work_date} (${s.lines.length} dòng${s.swept ? ', vét quên gửi' : ''}) → app chính: ${ok ? 'OK' : 'LỖI ' + detail}`);
+  }
+}
+
 async function syncNvlOnce() {
   if (!MAIN_APP_URL || !MAIN_APP_TOKEN) return;
   const today = vnDate();
@@ -985,6 +1031,15 @@ async function pollLoop() {
         console.error(`[${new Date().toISOString()}] Sync kho NPL lỗi: ${e.message}`);
       }
       lastNvlSyncAt = Date.now();
+    }
+    // Sản lượng Coating: catalog LOT mỗi 10', phiếu mỗi 60" (anh Hữu 05/10/2026)
+    if (Date.now() - lastCoLotsAt > CATALOG_MS) {
+      try { await pushCoLots(); lastCoLotsAt = Date.now(); }
+      catch (e) { console.error(`[${new Date().toISOString()}] Catalog LOT CO lỗi: ${e.message}`); lastCoLotsAt = Date.now() - CATALOG_MS + 60_000; }
+    }
+    if (Date.now() - lastCoSyncAt > NVL_SYNC_MS) {
+      try { await syncCoOnce(); } catch (e) { console.error(`[${new Date().toISOString()}] Sync Sản lượng CO lỗi: ${e.message}`); }
+      lastCoSyncAt = Date.now();
     }
     // Tăng ca → menu Overtime app chính mỗi 60" (dò vân tay, đổi mới kéo)
     if (Date.now() - lastOtSyncAt > OT_SYNC_MS) {

@@ -6,9 +6,11 @@ import MaterialLabelsUpload from './MaterialLabelsUpload';
 import OvertimeSummaryCard from './OvertimeSummaryCard';
 import DepartmentRegistrationsList from './DepartmentRegistrationsList';
 import TodayOvertimeCard from './TodayOvertimeCard';
-import PlanView from './PlanView';
+import PlanView, { DccdCard } from './PlanView';
+import { DCCD_GJ_BY_DEPT } from '@/lib/departments';
 import StopReasonsView from './StopReasonsView';
 import WarehouseSlipView from './WarehouseSlipView';
+import CoDailyView from './CoDailyView';
 import { chanNeuChuaLuu } from '@/lib/nvl-slips';
 
 const todayISO = () => {
@@ -19,7 +21,7 @@ const todayISO = () => {
   return `${y}-${m}-${day}`;
 };
 
-type Tab = 'overtime' | 'labels' | 'summary' | 'today' | 'plan' | 'stops' | 'wh_out' | 'wh_in';
+type Tab = 'overtime' | 'labels' | 'summary' | 'today' | 'plan' | 'dccd' | 'co_day' | 'stops' | 'wh_out' | 'wh_in';
 
 function OvertimeView({ department, isLeader }: { department: string; isLeader: boolean }) {
   return (
@@ -78,7 +80,12 @@ export default function RegisterLayout({
   const showSummaryTab = !isLeader;
   const showLabelsTab = isHD;
   const showTodayTab = true;
-  const showPlanTab = isLeader || isQlsx;   // KHSX: tổ trưởng xem + in (user 13/7)
+  // KHSX: tổ trưởng xem + in (user 13/7). CO (anh Hữu 05/10/2026): KHÔNG xem KHSX, chỉ tab 'In phiếu DCCD' công đoạn 86
+  const isCO = department === 'CO';
+  const showPlanTab = (isLeader && !isCO) || isQlsx;
+  const showDccdTab = isLeader && isCO;
+  // Sản lượng CO hàng ngày (anh Hữu 05/10/2026): cả 4 người CO (tổ trưởng + nhân viên) nhập được
+  const showCoDayTab = isCO;
   // Máy dừng: tổ trưởng HD/RL ghi; qlsx xem (24/7). CO (Coating, anh Hữu 05/10/2026) KHÔNG có tab này.
   const showStopsTab = (isLeader && department !== 'CO') || isQlsx;
   // Xuất/Trả kho NPL (user 28/7): nhân viên kho dùng role qlsx. App chính là chủ
@@ -110,6 +117,8 @@ export default function RegisterLayout({
   if (showLabelsTab) tabs.push({ key: 'labels', label: 'Tem NVL', color: 'navy' });
   if (showTodayTab) tabs.push({ key: 'today', label: 'Tăng ca hôm nay', color: 'green' });
   if (showPlanTab) tabs.push({ key: 'plan', label: 'Kế hoạch SX', color: 'navy' });
+  if (showDccdTab) tabs.push({ key: 'dccd', label: 'In phiếu DCCD', color: 'navy' });
+  if (showCoDayTab) tabs.push({ key: 'co_day', label: 'Sản lượng CO', color: 'red' });
   if (showStopsTab) tabs.push({ key: 'stops', label: 'Máy dừng hôm nay', color: 'red' });
   if (showWarehouseTabs) {
     tabs.push({ key: 'wh_out', label: '📤 Xuất kho', color: 'teal' });
@@ -201,6 +210,10 @@ export default function RegisterLayout({
       {activeTab === 'plan' && (
         <PlanView department={department} isLeader={isLeader} isQlsx={isQlsx} />
       )}
+
+      {activeTab === 'dccd' && <DccdCard options={DCCD_GJ_BY_DEPT.CO} />}
+
+      {activeTab === 'co_day' && <CoDailyView currentUserFullName={currentUserFullName} />}
 
       {activeTab === 'stops' && <StopReasonsView readOnly={isQlsx} />}
 

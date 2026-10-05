@@ -7,6 +7,10 @@
     {
       "path": "/api/registrations/cleanup",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/co-days/cleanup",
+      "schedule": "30 2 * * *"
     }
   ]
 }
