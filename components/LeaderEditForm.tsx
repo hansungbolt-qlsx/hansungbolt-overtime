@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { deptNeedsManualRpm } from '@/lib/departments';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toTitleCase } from '@/lib/format';
@@ -21,12 +22,15 @@ type InitialItem = {
   employee_id: string;
   equipment_id: string;
   item_code: string;
+  planned_quantity?: number | null;   // để suy RPM tay đã nhập (CO)
 };
 
 type EmployeeRow = {
   employeeId: string;
   checkedMachineIds: string[];
   machineItemCodes: Record<string, string>;
+  // RPM nhập tay theo máy — chỉ bộ phận CO (Coating, anh Hữu 05/10/2026)
+  machineRpm: Record<string, string>;
   // Map equipment_id -> overtime_items.id (existing). Khi submit lookup id.
   existingItemIds: Record<string, string>;
   useOther: boolean;
@@ -38,6 +42,7 @@ const emptyRow = (): EmployeeRow => ({
   employeeId: '',
   checkedMachineIds: [],
   machineItemCodes: {},
+  machineRpm: {},
   existingItemIds: {},
   useOther: false,
   otherTask: '',
@@ -60,6 +65,7 @@ function machineCodeColor(code: string): string {
 function itemsToRows(
   items: InitialItem[],
   otherEquipmentIds: Set<string>,
+  qtyHours: number,
 ): EmployeeRow[] {
   const byEmp = new Map<string, InitialItem[]>();
   for (const it of items) {
@@ -79,6 +85,12 @@ function itemsToRows(
         machineItemCodes: Object.fromEntries(
           machineItems.map((i) => [i.equipment_id, i.item_code]),
         ),
+        // RPM tay = SL dự kiến đã lưu / (60 × giờ tính) — chỉ có nghĩa với CO
+        machineRpm: Object.fromEntries(
+          machineItems
+            .filter((i) => (i.planned_quantity ?? 0) > 0 && qtyHours > 0)
+            .map((i) => [i.equipment_id, String(Math.round((i.planned_quantity ?? 0) / (60 * qtyHours)))]),
+        ),
         existingItemIds: Object.fromEntries(
           machineItems.map((i) => [i.equipment_id, i.id]),
         ),
@@ -92,6 +104,7 @@ function itemsToRows(
         employeeId: empId,
         checkedMachineIds: [],
         machineItemCodes: {},
+        machineRpm: {},
         existingItemIds: {},
         useOther: true,
         otherTask: otherItem.item_code,
@@ -139,6 +152,7 @@ export default function LeaderEditForm({
   );
 
   const calcHours = dayType === 'weekday' ? 2.5 : 7.5;
+  const manualRpm = deptNeedsManualRpm(department);
   const timeLabel =
     dayType === 'weekday' ? '16:30 – 19:30 (3 giờ)' : '06:00 – 14:00 (8 giờ)';
   const totalItems = rows.reduce(
@@ -165,7 +179,7 @@ export default function LeaderEditForm({
         setMachines(d.machines ?? []);
         setPlanDateUsed(d.plan_date_used ?? null);
         if (!rowsInit) {
-          const initRows = itemsToRows(initialItems, otherEquipmentIds);
+          const initRows = itemsToRows(initialItems, otherEquipmentIds, initialDayType === 'weekday' ? 2.5 : 7.5);
           setRows(initRows.length > 0 ? initRows : [emptyRow()]);
           setRowsInit(true);
         }
@@ -243,6 +257,22 @@ export default function LeaderEditForm({
     });
   }
 
+  function updateMachineRpm(rowIdx: number, machineId: string, value: string) {
+    setRows((prev) => {
+      const next = [...prev];
+      const row = next[rowIdx];
+      next[rowIdx] = { ...row, machineRpm: { ...row.machineRpm, [machineId]: value } };
+      return next;
+    });
+  }
+
+  // RPM dùng tính SL dự kiến: CO lấy số nhập tay, bộ phận khác lấy RPM master
+  function rpmOf(row: EmployeeRow, machine: Machine): number {
+    if (!manualRpm) return machine.rpm;
+    const v = parseInt(row.machineRpm[machine.id] ?? '', 10);
+    return Number.isFinite(v) && v > 0 ? v : 0;
+  }
+
   function addRow() {
     setRows((prev) => [...prev, emptyRow()]);
   }
@@ -279,6 +309,9 @@ export default function LeaderEditForm({
               `Nhân viên ${i + 1}: máy ${m.code} chưa nhập mã hàng`,
             );
           }
+          if (manualRpm && rpmOf(r, m) <= 0) {
+            return setError(`Nhân viên ${i + 1}: máy ${m.code} chưa nhập RPM`);
+          }
         }
       }
     }
@@ -290,6 +323,7 @@ export default function LeaderEditForm({
       equipment_id?: string;
       item_code?: string;
       item_name?: string | null;
+      rpm?: number;   // RPM tay (CO) — API tính SL dự kiến theo số này thay vì RPM master
       is_other?: boolean;
       other_description?: string;
     }> = [];
@@ -316,6 +350,7 @@ export default function LeaderEditForm({
           equipment_id: machineId,
           item_code: itemCode,
           item_name: planItem?.item_name ?? null,
+          rpm: manualRpm ? rpmOf(row, machine) : undefined,
         });
       }
     }
@@ -490,7 +525,7 @@ export default function LeaderEditForm({
                           const planItem = machine.items[0];
                           const needsManualCode = !planItem;
                           const itemCodeLabel = planItem?.item_code ?? '—';
-                          const qty = plannedQty(machine.rpm);
+                          const qty = plannedQty(rpmOf(row, machine));
                           return (
                             <div
                               key={machine.id}
@@ -558,6 +593,20 @@ export default function LeaderEditForm({
                                     }
                                     placeholder="Nhập mã hàng"
                                     className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-brand-teal bg-white"
+                                  />
+                                </div>
+                              )}
+                              {checked && manualRpm && (
+                                <div className="px-2 pb-1.5 flex items-center gap-1.5">
+                                  <span className="text-[10px] font-semibold text-brand-navy whitespace-nowrap">RPM</span>
+                                  <input
+                                    type="number"
+                                    inputMode="numeric"
+                                    min={1}
+                                    value={row.machineRpm[machine.id] ?? ''}
+                                    onChange={(e) => updateMachineRpm(idx, machine.id, e.target.value)}
+                                    placeholder="Nhập RPM"
+                                    className="w-full px-2 py-1 text-xs border border-amber-300 rounded focus:outline-none focus:ring-1 focus:ring-amber-500 bg-amber-50"
                                   />
                                 </div>
                               )}

@@ -12,8 +12,8 @@ type EmpRow = {
 };
 type Summary = {
   date: string;
-  restrictDept?: 'HD' | 'RL' | null;
-  departments: { HD: EmpRow[]; RL: EmpRow[] };
+  restrictDept?: 'HD' | 'RL' | 'CO' | null;
+  departments: { HD: EmpRow[]; RL: EmpRow[]; CO?: EmpRow[] };
 };
 
 function todayISO() {
@@ -73,11 +73,14 @@ export default function TodayOvertimeCard({
   const restrictDept = data?.restrictDept ?? null;
   const showHD = !restrictDept || restrictDept === 'HD';
   const showRL = !restrictDept || restrictDept === 'RL';
+  const showCO = !restrictDept || restrictDept === 'CO';   // Coating (anh Hữu 05/10/2026)
   const hd = data?.departments.HD ?? [];
   const rl = data?.departments.RL ?? [];
+  const co = data?.departments.CO ?? [];
   const hdMachines = hd.reduce((s, e) => s + e.machines.length, 0);
   const rlMachines = rl.reduce((s, e) => s + e.machines.length, 0);
-  const hasData = hd.length > 0 || rl.length > 0;
+  const coMachines = co.reduce((s, e) => s + e.machines.length, 0);
+  const hasData = hd.length > 0 || rl.length > 0 || co.length > 0;
 
   const [yy, mm, dd] = date.split('-');
   const dateLabel = `${dd}/${mm}/${yy}`;
@@ -201,6 +204,14 @@ export default function TodayOvertimeCard({
                 accent="#2db5a1"
                 employees={rl}
                 totalMachines={rlMachines}
+              />
+            )}
+            {showCO && (
+              <DeptSection
+                title="Coating"
+                accent="#ea580c"
+                employees={co}
+                totalMachines={coMachines}
               />
             )}
           </div>

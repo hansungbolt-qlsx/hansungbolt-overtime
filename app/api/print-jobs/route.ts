@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { DCCD_GJ_BY_DEPT } from '@/lib/departments';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
 import { expireStalePrintJobs } from '@/lib/print-jobs-expire';
@@ -142,11 +143,9 @@ export async function POST(req: Request) {
     // Phân quyền công đoạn theo bộ phận (13/7): HD → CĐ 10; RL → 30 R/L,
     // 45 S/R, 60 C/T; admin + qlsx (user chốt 24/7) đủ 4 công đoạn.
     if (session.role === 'leader') {
-      const allowed: Record<string, string[]> = {
-        HD: ['10'],
-        RL: ['30', '45', '60'],
-      };
-      const ok = (allowed[session.department ?? ''] ?? []).includes(gj);
+      // Bảng dùng chung với PlanView (lib/departments.ts): HD 10 · RL 30/45/60 · CO 86 (05/10/2026)
+      const allowed = (DCCD_GJ_BY_DEPT as Record<string, [string, string][]>)[session.department ?? ''] ?? [];
+      const ok = allowed.some(([code]) => code === gj);
       if (!ok) {
         return NextResponse.json(
           { error: 'Bộ phận của bạn không in được phiếu công đoạn này' },

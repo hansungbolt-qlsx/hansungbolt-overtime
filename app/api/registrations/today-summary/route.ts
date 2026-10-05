@@ -29,7 +29,7 @@ export async function GET(req: Request) {
   // Non-admin chỉ thấy phiếu bộ phận mình; admin + qlsx (user 24/7) thấy cả 2.
   const restrictDept =
     session.role !== 'admin' && session.role !== 'qlsx' && session.department
-      ? (session.department as 'HD' | 'RL')
+      ? (session.department as 'HD' | 'RL' | 'CO')
       : null;
 
   let regQuery = supabaseAdmin
@@ -44,7 +44,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       date,
       restrictDept,
-      departments: { HD: [], RL: [] },
+      departments: { HD: [], RL: [], CO: [] },
     });
   }
 
@@ -105,6 +105,7 @@ export async function GET(req: Request) {
 
   const hd: EmployeeRow[] = [];
   const rl: EmployeeRow[] = [];
+  const co: EmployeeRow[] = [];   // Coating (anh Hữu 05/10/2026)
   for (const row of groupMap.values()) {
     const { dept, ...rest } = row;
     // Dedup máy theo code (1 NV có thể chạy 1 máy với 2+ mã hàng → 2+ items
@@ -124,7 +125,10 @@ export async function GET(req: Request) {
     rest.machines = deduped;
 
     if (dept === 'HD') hd.push(rest);
+
     else if (dept === 'RL') rl.push(rest);
+
+    else if (dept === 'CO') co.push(rest);
   }
   hd.sort((a, b) => a.order_no - b.order_no);
   rl.sort((a, b) => a.order_no - b.order_no);
@@ -132,7 +136,7 @@ export async function GET(req: Request) {
   return NextResponse.json({
     date,
     restrictDept,
-    departments: { HD: hd, RL: rl },
+    departments: { HD: hd, RL: rl, CO: co },
   });
 }
 

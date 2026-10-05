@@ -14,6 +14,8 @@ type PatchItem = {
   equipment_id?: string;
   item_code?: string;
   item_name?: string | null;
+  // RPM nhập tay (bộ phận CO — máy CO rpm master = 0, anh Hữu 05/10/2026); >0 thì thay RPM master
+  rpm?: number;
   is_other?: boolean;
   other_description?: string;
   time_from?: string;
@@ -258,7 +260,9 @@ export async function PATCH(
       equipment_id: equipmentId,
       item_code: itemCode,
       item_name: isOther ? 'Công việc khác' : (it.item_name ?? null),
-      planned_quantity: isOther ? null : Math.round((eq?.rpm ?? 0) * 60 * qtyH),
+      planned_quantity: isOther
+        ? null
+        : Math.round((typeof it.rpm === 'number' && it.rpm > 0 ? it.rpm : (eq?.rpm ?? 0)) * 60 * qtyH),
       time_from: tFrom,
       time_to: tTo,
       duration_hours: d,

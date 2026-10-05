@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { toTitleCase } from '@/lib/format';
 import DateButton from './DateButton';
+import { deptNeedsManualRpm } from '@/lib/departments';
 
 type Employee = { id: string; full_name: string; order_no: number };
 type PlanItem = { item_code: string; item_name: string | null };
@@ -13,6 +14,8 @@ type EmployeeRow = {
   checkedMachineIds: string[];
   // Mã hàng nhập tay cho máy không có trong kế hoạch (RL luôn, HD chỉ khi không có plan item)
   machineItemCodes: Record<string, string>;
+  // RPM nhập tay theo máy — chỉ bộ phận CO (Coating, anh Hữu 05/10/2026: RPM theo mã hàng, master để 0)
+  machineRpm: Record<string, string>;
   useOther: boolean;
   otherTask: string;
 };
@@ -29,6 +32,7 @@ const emptyRow = (): EmployeeRow => ({
   employeeId: '',
   checkedMachineIds: [],
   machineItemCodes: {},
+  machineRpm: {},
   useOther: false,
   otherTask: '',
 });
@@ -65,6 +69,7 @@ export default function OvertimeForm({ department }: { department: string }) {
   // Giờ tính sản lượng (trừ break) — KHÁC giờ hiển thị. Khi dayType=null,
   // form NV/máy bị ẩn nên giá trị này không hiển thị; dùng 0 cho an toàn.
   const calcHours = dayType === 'sunday' ? 7.5 : dayType === 'weekday' ? 2.5 : 0;
+  const manualRpm = deptNeedsManualRpm(department);
   const totalItems = rows.reduce(
     (sum, row) => sum + row.checkedMachineIds.length + (row.useOther ? 1 : 0),
     0,
@@ -151,6 +156,22 @@ export default function OvertimeForm({ department }: { department: string }) {
     });
   }
 
+  function updateMachineRpm(rowIdx: number, machineId: string, value: string) {
+    setRows((prev) => {
+      const next = [...prev];
+      const row = next[rowIdx];
+      next[rowIdx] = { ...row, machineRpm: { ...row.machineRpm, [machineId]: value } };
+      return next;
+    });
+  }
+
+  // RPM dùng tính SL dự kiến: CO lấy số nhập tay, bộ phận khác lấy RPM master của máy
+  function rpmOf(row: EmployeeRow, machine: Machine): number {
+    if (!manualRpm) return machine.rpm;
+    const v = parseInt(row.machineRpm[machine.id] ?? '', 10);
+    return Number.isFinite(v) && v > 0 ? v : 0;
+  }
+
   function addRow() { setRows((prev) => [...prev, emptyRow()]); }
   function removeRow(idx: number) {
     setRows((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
@@ -177,6 +198,9 @@ export default function OvertimeForm({ department }: { department: string }) {
           if (!m) continue;
           if (!m.items[0] && !r.machineItemCodes[mId]?.trim()) {
             return setError(`Nhân viên ${i + 1}: máy ${m.code} chưa nhập mã hàng`);
+          }
+          if (manualRpm && rpmOf(r, m) <= 0) {
+            return setError(`Nhân viên ${i + 1}: máy ${m.code} chưa nhập RPM`);
           }
         }
       }
@@ -210,7 +234,7 @@ export default function OvertimeForm({ department }: { department: string }) {
           equipment_id: machineId,
           item_code: itemCode,
           item_name: planItem?.item_name ?? null,
-          planned_quantity: plannedQty(machine.rpm),
+          planned_quantity: plannedQty(rpmOf(row, machine)),
         });
       }
     }
@@ -379,7 +403,7 @@ export default function OvertimeForm({ department }: { department: string }) {
                         const planItem = machine.items[0];
                         const needsManualCode = !planItem;
                         const itemCodeLabel = planItem?.item_code ?? '—';
-                        const qty = plannedQty(machine.rpm);
+                        const qty = plannedQty(rpmOf(row, machine));
                         return (
                           <div
                             key={machine.id}
@@ -439,6 +463,20 @@ export default function OvertimeForm({ department }: { department: string }) {
                                   }
                                   placeholder="Nhập mã hàng"
                                   className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-brand-teal bg-white"
+                                />
+                              </div>
+                            )}
+                            {checked && manualRpm && (
+                              <div className="px-2 pb-1.5 flex items-center gap-1.5">
+                                <span className="text-[10px] font-semibold text-brand-navy whitespace-nowrap">RPM</span>
+                                <input
+                                  type="number"
+                                  inputMode="numeric"
+                                  min={1}
+                                  value={row.machineRpm[machine.id] ?? ''}
+                                  onChange={(e) => updateMachineRpm(idx, machine.id, e.target.value)}
+                                  placeholder="Nhập RPM"
+                                  className="w-full px-2 py-1 text-xs border border-amber-300 rounded focus:outline-none focus:ring-1 focus:ring-amber-500 bg-amber-50"
                                 />
                               </div>
                             )}

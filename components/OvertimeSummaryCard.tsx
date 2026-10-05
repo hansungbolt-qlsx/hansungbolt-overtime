@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { toTitleCase } from '@/lib/format';
 import PrintJobButton from './PrintJobButton';
 
-type Dept = 'HD' | 'RL' | 'QLSX';
+type Dept = 'HD' | 'RL' | 'CO' | 'QLSX';
 type ActiveTab = 'all' | Dept;
 
 type SummaryRow = {
@@ -16,11 +16,12 @@ type SummaryRow = {
   total_hours: number;
 };
 
-const DEPT_ORDER: Dept[] = ['HD', 'RL', 'QLSX'];
+const DEPT_ORDER: Dept[] = ['HD', 'RL', 'CO', 'QLSX'];
 
 const DEPT_BADGE: Record<Dept, string> = {
   HD: 'bg-[#063882] text-white',
   RL: 'bg-[#2db5a1] text-white',
+  CO: 'bg-[#ea580c] text-white',
   QLSX: 'bg-[#7c3aed] text-white',
 };
 

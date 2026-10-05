@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
+import { isProdDept } from '@/lib/departments';
 
 export const runtime = 'nodejs';
 
@@ -35,7 +36,7 @@ export async function GET() {
 }
 
 // POST /api/users — tạo user mới (admin only)
-// Body: { full_name, username, role: 'leader'|'worker', department: 'HD'|'RL' }
+// Body: { full_name, username, role: 'leader'|'worker', department: 'HD'|'RL'|'CO' }
 // Cùng lúc insert vào employees để user xuất hiện trong phiếu đăng ký tăng ca.
 export async function POST(req: Request) {
   const session = await getSession();
@@ -75,7 +76,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: 'Vai trò QLSX phải thuộc bộ phận QLSX' }, { status: 400 });
     }
-  } else if (department !== 'HD' && department !== 'RL') {
+  } else if (!isProdDept(department)) {
     return NextResponse.json({ error: 'Bộ phận không hợp lệ' }, { status: 400 });
   }
 

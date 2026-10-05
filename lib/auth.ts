@@ -7,7 +7,8 @@ export type Session = {
   // qlsx (user 24/7): nhân viên QLSX — xem KHSX + in phiếu (KHSX/DCCD đủ 4 CĐ),
   // xem Máy dừng + Tổng hợp tăng ca; KHÔNG in tem, KHÔNG đăng ký tăng ca
   role: 'admin' | 'leader' | 'worker' | 'qlsx';
-  department: 'HD' | 'RL' | 'QLSX' | null;
+  // CO = Coating (anh Hữu 05/10/2026) — danh mục ở lib/departments.ts
+  department: 'HD' | 'RL' | 'QLSX' | 'CO' | null;
 };
 
 export const SESSION_COOKIE = 'session';

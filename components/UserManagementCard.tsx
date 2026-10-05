@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { toTitleCase } from '@/lib/format';
+import { PROD_DEPTS, type ProdDept } from '@/lib/departments';
 
 type User = {
   id: string;
   username: string;
   full_name: string;
   role: 'admin' | 'leader' | 'worker' | 'qlsx';
-  department: 'HD' | 'RL' | 'QLSX' | null;
+  department: 'HD' | 'RL' | 'QLSX' | 'CO' | null;
   password_plain: string | null;
   // active/deactivated_at: optional vì có thể chưa chạy migration 08 trên DB.
   active?: boolean;
@@ -122,7 +123,7 @@ export default function UserManagementCard() {
       return a.full_name.localeCompare(b.full_name, 'vi');
     });
   }
-  const order = ['Admin', 'QLSX', 'HD', 'RL'];
+  const order = ['Admin', 'QLSX', 'HD', 'RL', 'CO'];
   const sortedKeys = Object.keys(grouped).sort(
     (a, b) => (order.indexOf(a) === -1 ? 99 : order.indexOf(a)) - (order.indexOf(b) === -1 ? 99 : order.indexOf(b)),
   );
@@ -279,7 +280,7 @@ function AddUserModal({
 }) {
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
-  const [department, setDepartment] = useState<'HD' | 'RL'>('HD');
+  const [department, setDepartment] = useState<ProdDept>('HD');
   // qlsx (user 24/7): bộ phận cố định 'QLSX', không vào danh sách tăng ca
   const [role, setRole] = useState<'worker' | 'leader' | 'qlsx'>('worker');
   const [saving, setSaving] = useState(false);
@@ -414,7 +415,7 @@ function AddUserModal({
             <div>
               <label className="block text-xs font-semibold text-brand-navy mb-1">Bộ phận</label>
               <div className="flex gap-2">
-                {(['HD', 'RL'] as const).map((d) => (
+                {PROD_DEPTS.map((d) => (
                   <button
                     key={d}
                     type="button"

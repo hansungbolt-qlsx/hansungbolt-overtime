@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { DCCD_GJ_ALL, DCCD_GJ_BY_DEPT } from '@/lib/departments';
 import PrintJobButton from './PrintJobButton';
 
 type SheetData = {
@@ -141,16 +142,9 @@ function SheetTable({
   );
 }
 
-// Công đoạn in được phiếu DCCD lẻ theo bộ phận (khớp phân quyền API print-jobs)
-const DCCD_GJ: Record<string, [string, string][]> = {
-  HD: [['10', 'CĐ 10 — H/D']],
-  RL: [
-    ['30', 'CĐ 30 — R/L'],
-    ['45', 'CĐ 45 — S/R'],
-    ['60', 'CĐ 60 — C/T'],
-  ],
-};
-const DCCD_GJ_ALL: [string, string][] = [...DCCD_GJ.HD, ...DCCD_GJ.RL];
+// Công đoạn in được phiếu DCCD lẻ theo bộ phận — bảng DÙNG CHUNG với API print-jobs
+// (lib/departments.ts): HD 10 · RL 30/45/60 · CO 86 (Coating, anh Hữu 05/10/2026).
+const DCCD_GJ: Record<string, [string, string][]> = DCCD_GJ_BY_DEPT;
 
 type Lot = {
   saeji: string;

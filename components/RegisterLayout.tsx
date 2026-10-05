@@ -79,7 +79,8 @@ export default function RegisterLayout({
   const showLabelsTab = isHD;
   const showTodayTab = true;
   const showPlanTab = isLeader || isQlsx;   // KHSX: tổ trưởng xem + in (user 13/7)
-  const showStopsTab = isLeader || isQlsx;  // Máy dừng: tổ trưởng ghi; qlsx xem (24/7)
+  // Máy dừng: tổ trưởng HD/RL ghi; qlsx xem (24/7). CO (Coating, anh Hữu 05/10/2026) KHÔNG có tab này.
+  const showStopsTab = (isLeader && department !== 'CO') || isQlsx;
   // Xuất/Trả kho NPL (user 28/7): nhân viên kho dùng role qlsx. App chính là chủ
   // kho — 2 tab này chỉ GỬI YÊU CẦU, duyệt bên app chính mới trừ/cộng tồn.
   const showWarehouseTabs = isQlsx;

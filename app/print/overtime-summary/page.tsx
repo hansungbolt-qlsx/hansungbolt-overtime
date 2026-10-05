@@ -31,7 +31,7 @@ export default async function PrintOvertimeSummaryPage({
   // Filter dept: admin có thể truyền ?dept=HD/RL/QLSX để xem riêng từng bộ phận;
   // non-admin luôn force theo dept của mình.
   const requestedDept =
-    sp.dept === 'HD' || sp.dept === 'RL' || sp.dept === 'QLSX' ? sp.dept : null;
+    sp.dept === 'HD' || sp.dept === 'RL' || sp.dept === 'CO' || sp.dept === 'QLSX' ? sp.dept : null;
   const filterDept =
     session.role !== 'admin' && session.department
       ? session.department

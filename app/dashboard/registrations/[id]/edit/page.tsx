@@ -77,6 +77,7 @@ export default async function EditRegistrationPage({
               employee_id: i.employee_id,
               equipment_id: i.equipment_id,
               item_code: i.item_code,
+              planned_quantity: i.planned_quantity,
             }))}
             equipments={(equipments ?? []).map((e) => ({
               id: e.id,

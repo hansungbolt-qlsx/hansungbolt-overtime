@@ -18,9 +18,11 @@ const TEMPLATE_PATH = path.join(
 const FOOTER_NOTE =
   '* Lưu ý: Đề nghị viết phiếu tăng ca và nộp cho phòng Nhân sự trước 14h30 trước khi tăng ca. Trường hợp tăng ca trước và nộp đơn sau thì sẽ không được tính tiền tăng ca của ngày đó.';
 
-const DATA_MERGES: Record<'HD' | 'RL', string[]> = {
+// CO (Coating, anh Hữu 05/10/2026): sheet 'CO' trong template chép y bố cục sheet RL.
+const DATA_MERGES: Record<'HD' | 'RL' | 'CO', string[]> = {
   HD: ['B9:B13', 'C9:C13', 'D9:D13', 'E9:E13', 'F9:F13', 'G9:G13', 'B17:M18', 'B19:M20'],
   RL: ['B9:M9', 'H10:H11', 'M10:M11', 'I10:I11', 'B13:M14', 'B15:M16'],
+  CO: ['B9:M9', 'H10:H11', 'M10:M11', 'I10:I11', 'B13:M14', 'B15:M16'],
 };
 
 function formatTime(t: string): string {
@@ -52,10 +54,10 @@ export async function GET(
   if (session.role !== 'admin' && session.department !== reg.department) {
     return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   }
-  if (reg.department !== 'HD' && reg.department !== 'RL') {
+  if (reg.department !== 'HD' && reg.department !== 'RL' && reg.department !== 'CO') {
     return NextResponse.json({ error: 'Department không hợp lệ' }, { status: 500 });
   }
-  const department: 'HD' | 'RL' = reg.department;
+  const department: 'HD' | 'RL' | 'CO' = reg.department;
 
   const { data: items, error: itemErr } = await supabaseAdmin
     .from('overtime_items')
