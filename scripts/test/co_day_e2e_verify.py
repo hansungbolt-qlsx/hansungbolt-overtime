@@ -127,7 +127,6 @@ try:
 
     print("F. Xoá: app chính xoá → trả về app tăng ca → app tăng ca xoá hẳn")
     ck(sb_slip()["status"] == "received", "trước khi xoá: received")
-    r = co.delete(OTB + f"/api/co-days?date={DAY}"); ck(r.status_code == 409, "app tăng ca CHẶN xoá khi app chính còn giữ", r.text[:100])
     from app.models import User as _U
     from app.services.auth import hash_password as _hp
     with SessionLocal() as db:
@@ -150,6 +149,27 @@ try:
     ck(all(x["work_date"] != DAY for x in adm.get(OTB + "/api/co-days/sync").json()["slips"]), "phiếu bị xoá trả về KHÔNG bị vét gửi lại")
     r = co.delete(OTB + f"/api/co-days?date={DAY}"); ck(r.status_code == 200, "app tăng ca xoá hẳn phiếu", r.text[:100])
     ck(sb_slip() is None, "Supabase sạch phiếu ngày thử")
+
+    print("G. Xoá ở APP TĂNG CA phiếu app chính đang giữ → app chính xoá theo")
+    r = add(l1, "CO-03", 7.5, emps[2]["id"]); co.post(OTB + "/api/co-days/send", json={"date": DAY})
+    s = [x for x in adm.get(OTB + "/api/co-days/sync").json()["slips"] if x["work_date"] == DAY][0]
+    up = requests.post(MB + "/api/ot/co-day", headers=TOK, json={"uid": s["uid"], "work_date": s["work_date"], "sent_by_name": s["sent_by_name"], "lines": s["lines"]}).json()
+    adm.post(OTB + "/api/co-days/sync", json={"uid": s["uid"], "ok": True, "main_ref": str(up["id"])})
+    with SessionLocal() as db:
+        ck(db.query(CoDay).filter_by(uid=s["uid"]).one().deleted_at is None, "gửi lại sau khi app chính xoá = KHÔI PHỤC phiếu")
+    r = co.delete(OTB + f"/api/co-days?date={DAY}")
+    ck(r.status_code == 200 and r.json().get("main_delete_queued") is True, "app tăng ca xoá phiếu đã nhận → vào hàng chờ xoá", r.text[:120])
+    ck(sb_slip() is None, "Supabase đã xoá phiếu")
+    q = [x for x in adm.get(OTB + "/api/co-days/deleted").json()["items"] if x["work_date"] == DAY]
+    ck(len(q) == 1, "agent thấy hàng chờ xoá")
+    d = requests.post(MB + "/api/ot/co-day-delete", headers=TOK, json={"uid": q[0]["uid"], "by": q[0]["by"]}).json()
+    adm.post(OTB + "/api/co-days/deleted", json={"uid": q[0]["uid"]})
+    with SessionLocal() as db:
+        cd = db.query(CoDay).filter_by(uid=q[0]["uid"]).one()
+        ck(d.get("ok") and cd.deleted_at is not None and (cd.deleted_by or "").startswith("app tăng ca"), "app chính xoá theo (mềm), ghi người xoá")
+    ck(all(x["work_date"] != DAY for x in requests.get(MB + "/api/ot/co-day-deleted", headers=TOK).json()["items"]), "không trả ngược về app tăng ca (đã ack)")
+    ck(all(x["work_date"] != DAY for x in adm.get(OTB + "/api/co-days/deleted").json()["items"]), "hàng chờ xoá sạch")
+    ck(requests.post(MB + "/api/ot/co-day-delete", headers=TOK, json={"uid": q[0]["uid"]}).json().get("noop"), "báo xoá lần 2 vô hại")
 
     print("E. Quyền")
     ld, _ = login("nguyenduchieu", "hd123")

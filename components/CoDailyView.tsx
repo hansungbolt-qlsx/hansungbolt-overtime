@@ -176,14 +176,16 @@ export default function CoDailyView({ currentUserFullName }: { currentUserFullNa
 
   async function deleteSlip() {
     const dd = date.split('-').reverse().join('/');
-    if (!confirm(`Xoá CẢ phiếu Sản lượng CO ngày ${dd} (${lines.length} dòng)?`)) return;
+    const onMain = slip?.status !== 'draft' || !!slip?.received_at;
+    const extra = onMain ? ' Phiếu đã ở app chính — app chính sẽ xoá theo trong khoảng 1 phút.' : '';
+    if (!confirm(`Xoá CẢ phiếu Sản lượng CO ngày ${dd} (${lines.length} dòng)?${extra}`)) return;
     if (!confirm('Xác nhận lần 2: xoá hẳn, không khôi phục được?')) return;
     setBusy(true); setErr(''); setMsg('');
     try {
       const r = await fetch(`/api/co-days?date=${date}`, { method: 'DELETE' });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) return setErr(j.error || 'Không xoá được');
-      setMsg(`Đã xoá phiếu ngày ${dd}`);
+      setMsg(j.main_delete_queued ? `Đã xoá phiếu ngày ${dd} — app chính xoá theo trong khoảng 1 phút` : `Đã xoá phiếu ngày ${dd}`);
       setSlip(null); setLines([]);
     } finally { setBusy(false); }
   }
@@ -306,7 +308,7 @@ export default function CoDailyView({ currentUserFullName }: { currentUserFullNa
               {slip?.status === 'received' ? '✅ Đã gửi app chính — bấm để gửi lại' : slip?.status === 'pending' ? '📤 Đang đẩy sang app chính (khoảng 1 phút)…' : '📤 Gửi phiếu cuối ngày'}
             </button>
             <PrintJobButton type="co_day" refId={date} label="🖨 In bảng kết quả" />
-            {slip?.status === 'draft' && (
+            {slip && (
               <button type="button" onClick={deleteSlip} disabled={busy}
                 className="w-full py-2 rounded-xl border border-red-300 text-red-700 text-sm font-semibold disabled:opacity-50">
                 🗑 Xoá phiếu ngày

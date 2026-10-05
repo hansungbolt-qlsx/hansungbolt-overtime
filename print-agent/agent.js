@@ -887,6 +887,21 @@ async function pushCoLots() {
 
 async function syncCoOnce() {
   if (!MAIN_APP_URL || !MAIN_APP_TOKEN) return;
+  // Xoá ở APP TĂNG CA → báo app chính xoá theo (anh Hữu 05/10/2026)
+  const q = await otFetch('/api/co-days/deleted');
+  for (const it of (q && q.items) || []) {
+    const res = await fetch(`${MAIN_APP_URL}/api/ot/co-day-delete`, {
+      method: 'POST', headers: { 'X-Agent-Token': MAIN_APP_TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uid: it.uid, by: it.by }),
+    });
+    const d = await res.json().catch(() => null);
+    if (res.ok && d && d.ok) {
+      await otFetch('/api/co-days/deleted', { method: 'POST', body: JSON.stringify({ uid: it.uid }) });
+      console.log(`[${new Date().toISOString()}] Sản lượng CO ${it.work_date}: app tăng ca xoá → app chính đã xoá theo`);
+    } else {
+      console.error(`[${new Date().toISOString()}] Xoá Sản lượng CO ${it.work_date} sang app chính lỗi: ${(d && d.detail) || res.status}`);
+    }
+  }
   // App chính đã XOÁ phiếu → trả về app tăng ca ('Đang ghi'), rồi xác nhận với app chính (anh Hữu 05/10/2026)
   const del = await mainGet('/api/ot/co-day-deleted');
   for (const it of (del && del.items) || []) {

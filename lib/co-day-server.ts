@@ -57,3 +57,21 @@ export async function ensureDraftSlip(date: string, byName: string): Promise<{ i
   return { id: ins.id };
 }
 
+
+// ── Hàng chờ XOÁ sang app chính (anh Hữu 05/10/2026: xoá ở app tăng ca hay app chính đều được) ──
+// Phiếu đã từng về app chính mà bị xoá ở đây → ghi uid vào Storage plan-files/co-deleted.json;
+// agent đọc, gọi app chính /api/ot/co-day-delete rồi gỡ uid. Không cần bảng mới (khỏi migration).
+const DEL_PATH = 'co-deleted.json';
+export type CoDeleted = { uid: string; work_date: string; by: string; at: string };
+
+export async function readCoDeleted(): Promise<CoDeleted[]> {
+  const { data } = await supabaseAdmin.storage.from('plan-files').download(DEL_PATH);
+  if (!data) return [];
+  try { const j = JSON.parse(await data.text()); return Array.isArray(j) ? j : []; } catch { return []; }
+}
+
+export async function writeCoDeleted(items: CoDeleted[]): Promise<string | null> {
+  const { error } = await supabaseAdmin.storage.from('plan-files')
+    .upload(DEL_PATH, Buffer.from(JSON.stringify(items), 'utf8'), { contentType: 'application/json', upsert: true });
+  return error ? error.message : null;
+}
