@@ -253,11 +253,14 @@ export default function CoDailyView({ currentUserFullName }: { currentUserFullNa
           </div>
           <div className="grid grid-cols-2 gap-2">
             <label className="text-xs text-brand-navy">Trọng lượng (Kg)
-              <input value={d.kg} onChange={(e) => setD({ ...d, kg: e.target.value })} inputMode="decimal" className={inp} />
+              {/* Viền vàng + số đậm cho dễ nhận biết (anh Hữu 06/10/2026) */}
+              <input value={d.kg} onChange={(e) => setD({ ...d, kg: e.target.value })} inputMode="decimal"
+                className="w-full h-12 px-3 border-2 border-amber-400 rounded-md text-brand-navy font-bold text-base bg-white focus:outline-none focus:ring-2 focus:ring-amber-300" />
               {d.lot && Number(String(d.kg).replace(',', '.')) !== d.lot.kg && <span className="text-[10px] text-amber-700">LOT ERP: {fmtKg(d.lot.kg)} Kg</span>}
             </label>
             <label className="text-xs text-brand-navy">Nhân viên
-              <select value={empSel} onChange={(e) => setD({ ...d, employeeId: e.target.value })} className={inp}>
+              {/* Cao bằng ô trọng lượng — Safari iOS bỏ qua padding của select nên đặt chiều cao cố định */}
+              <select value={empSel} onChange={(e) => setD({ ...d, employeeId: e.target.value })} className={`${inp} h-12`}>
                 <option value="">— Chọn —</option>
                 {emps.map((e) => <option key={e.id} value={e.id}>{toTitleCase(e.full_name)}</option>)}
               </select>
