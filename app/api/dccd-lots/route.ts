@@ -37,8 +37,10 @@ export async function POST(req: Request) {
 // GET — leader/admin lấy catalog cho ô gợi ý (client filter tại chỗ)
 export async function GET() {
   const session = await getSession();
+  // + nhân viên Coating (anh Hữu 06/10/2026): cả 4 người CO in phiếu DCCD công đoạn 86
+  const isCoWorker = session?.role === 'worker' && session.department === 'CO';
   if (!session || (session.role !== 'admin' && session.role !== 'leader'
-                   && session.role !== 'qlsx')) {
+                   && session.role !== 'qlsx' && !isCoWorker)) {
     return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   }
   const { data, error } = await supabaseAdmin.storage.from(BUCKET).download(PATH);

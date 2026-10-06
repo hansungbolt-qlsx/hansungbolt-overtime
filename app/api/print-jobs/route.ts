@@ -66,7 +66,8 @@ export async function POST(req: Request) {
   }
 
   // Validate ref_id + check quyền theo dept
-  if (isCoWorker && type !== 'co_day') {
+  // + phiếu DCCD công đoạn 86 (anh Hữu 06/10/2026) — kiểm công đoạn ở nhánh dccd
+  if (isCoWorker && type !== 'co_day' && type !== 'dccd') {
     return NextResponse.json({ error: 'Không có quyền in' }, { status: 403 });
   }
   if (type === 'co_day') {
@@ -156,7 +157,7 @@ export async function POST(req: Request) {
     const gj = m[2];
     // Phân quyền công đoạn theo bộ phận (13/7): HD → CĐ 10; RL → 30 R/L,
     // 45 S/R, 60 C/T; admin + qlsx (user chốt 24/7) đủ 4 công đoạn.
-    if (session.role === 'leader') {
+    if (session.role === 'leader' || isCoWorker) {
       // Bảng dùng chung với PlanView (lib/departments.ts): HD 10 · RL 30/45/60 · CO 86 (05/10/2026)
       const allowed = (DCCD_GJ_BY_DEPT as Record<string, [string, string][]>)[session.department ?? ''] ?? [];
       const ok = allowed.some(([code]) => code === gj);

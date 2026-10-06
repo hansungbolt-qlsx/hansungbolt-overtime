@@ -77,14 +77,16 @@ export default function RegisterLayout({
   // Tab "labels" cho HD (cả leader + worker)
   // Tab "today" — xem tổng hợp NV tăng ca cả HD+RL hôm nay (cả leader + worker)
   // qlsx (user 24/7): KHSX + Máy dừng (chỉ xem) + Tổng hợp; KHÔNG tem/đăng ký
+  const isCO = department === 'CO';
   const showOvertimeTab = isLeader;
-  const showSummaryTab = !isLeader;
+  // Tổ trưởng CO có thêm tab Tổng hợp tăng ca riêng (anh Hữu 06/10/2026) — trước chỉ nằm cuối tab Đăng ký
+  const showSummaryTab = !isLeader || isCO;
   const showLabelsTab = isHD;
   const showTodayTab = true;
   // KHSX: tổ trưởng xem + in (user 13/7). CO (anh Hữu 05/10/2026): KHÔNG xem KHSX, chỉ tab 'In phiếu DCCD' công đoạn 86
-  const isCO = department === 'CO';
   const showPlanTab = (isLeader && !isCO) || isQlsx;
-  const showDccdTab = isLeader && isCO;
+  // In phiếu DCCD: cả 4 người CO (anh Hữu 06/10/2026; trước chỉ tổ trưởng)
+  const showDccdTab = isCO;
   // Sản lượng CO hàng ngày (anh Hữu 05/10/2026): cả 4 người CO (tổ trưởng + nhân viên) nhập được
   const showCoDayTab = isCO;
   // Máy dừng: tổ trưởng HD/RL ghi; qlsx xem (24/7). CO (Coating, anh Hữu 05/10/2026) KHÔNG có tab này.
@@ -194,9 +196,12 @@ export default function RegisterLayout({
         })}
       </div>
 
-      {(activeTab === 'overtime' || activeTab === 'summary') && (
+      {(activeTab === 'overtime' || (activeTab === 'summary' && !isLeader)) && (
         <OvertimeView department={department} isLeader={isLeader} />
       )}
+
+      {/* Tổ trưởng (CO): tab Tổng hợp chỉ có bảng tổng hợp tháng của tổ */}
+      {activeTab === 'summary' && isLeader && <OvertimeSummaryCard />}
 
       {activeTab === 'labels' && (
         <LabelsView
