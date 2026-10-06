@@ -20,7 +20,7 @@ export async function GET(req: Request) {
   if (!session) return NextResponse.json({ error: 'Chưa đăng nhập' }, { status: 401 });
   if (!agentAllowed(session.role)) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   const sweep = new URL(req.url).searchParams.get('sweep') === '1';
-  const cols = 'id, uid, work_date, status, note, sent_by_name, created_by_name, last_error';
+  const cols = 'id, uid, work_date, stage, status, note, sent_by_name, created_by_name, last_error';
   const [{ data: pend, error: e1 }, { data: old, error: e2 }] = await Promise.all([
     supabaseAdmin.from('co_day_slips').select(cols).eq('status', 'pending').is('synced_at', null).order('work_date'),
     sweep

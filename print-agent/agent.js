@@ -302,8 +302,9 @@ function jobUrl(job) {
     return url;
   }
   if (job.type === 'co_day') {
-    // Bảng Kết quả Coating ngày (anh Hữu 05/10/2026) — A4 ngang
-    return `${APP_URL}/print/co-day?date=${job.ref_id}`;
+    // Bảng Kết quả Coating ngày (anh Hữu 05/10/2026) — A4 ngang; 'YYYY-MM-DD|84' = A/B (06/10/2026)
+    const [date, st] = String(job.ref_id).split('|');
+    return `${APP_URL}/print/co-day?date=${date}${st === '84' ? '&stage=84' : ''}`;
   }
   throw new Error(`Unknown job type: ${job.type}`);
 }
@@ -464,6 +465,7 @@ let lastCatalogAt = 0;
 let lastCoLotsAt = 0;   // Sản lượng CO (05/10/2026)
 let lastCoSyncAt = 0;
 let lastCoLotsFp = '';
+let lastAbLotsFp = '';   // catalog LOT A/B công đoạn 84 (06/10/2026)
 const CO_SWEEP_AT = '07:00';   // vét phiếu Sản lượng CO quên Gửi của ngày trước (anh Hữu 05/10/2026)
 let coSweepStartDone = false;  // vét 1 lần lúc agent khởi động (máy mở trễ)
 let coSweptDay = '';           // ngày đã vét mốc 07:00
@@ -872,6 +874,7 @@ async function syncOvertimeOnce() {
 // -----------------------------------------------------------
 // SẢN LƯỢNG COATING (anh Hữu 05/10/2026)
 //   pushCoLots  — mỗi 10': app chính /api/ot/co-lots (LOT xi mạ CĐ 80, 120 ngày) → app tăng ca /api/co-lots
+//                 + A/B công đoạn 84 (06/10/2026): /api/ot/co-lots?stage=84 → /api/co-lots?stage=84 (mã A/B app chính tự lấy ERP)
 //   syncCoOnce  — mỗi 60": app tăng ca /api/co-days/sync (phiếu đã Gửi + phiếu ngày cũ quên Gửi)
 //                 → app chính /api/ot/co-day (lưu vĩnh viễn) → ghi kết quả ngược về app tăng ca
 // Lỗi chỉ ghi log, KHÔNG làm chết vòng in.
@@ -922,10 +925,20 @@ async function pushCoLots() {
   if (!data.lots.length && !codes) throw new Error('app tăng ca chưa có danh sách mã Coating');
   // Chỉ đẩy khi danh sách LOT ĐỔI (≈1 MB) — tiết kiệm hạn mức Supabase/Vercel Free
   const fp = `${codes}|${data.count}|${JSON.stringify(data.lots[0] ?? '')}|${data.lots.reduce((a, l) => a + (Array.isArray(l) ? l[4] : l.kg), 0).toFixed(1)}`;
-  if (fp === lastCoLotsFp) return;
-  await otFetch('/api/co-lots', { method: 'POST', body: JSON.stringify(data) });
-  lastCoLotsFp = fp;
-  console.log(`[${new Date().toISOString()}] Catalog LOT xi mạ → app tăng ca: ${data.count} lot`);
+  if (fp !== lastCoLotsFp) {
+    await otFetch('/api/co-lots', { method: 'POST', body: JSON.stringify(data) });
+    lastCoLotsFp = fp;
+    console.log(`[${new Date().toISOString()}] Catalog LOT xi mạ → app tăng ca: ${data.count} lot`);
+  }
+  // A/B (CĐ 84): danh sách nhỏ, cũng chỉ đẩy khi đổi
+  const ab = await mainGet('/api/ot/co-lots?stage=84');
+  if (!ab || !ab.ok) throw new Error((ab && ab.detail) || 'app chính co-lots A/B lỗi');
+  const fpAb = `${ab.items.map((i) => i.join(':')).join(',')}|${ab.count}|${JSON.stringify(ab.lots[0] ?? '')}`;
+  if (fpAb !== lastAbLotsFp) {
+    await otFetch('/api/co-lots?stage=84', { method: 'POST', body: JSON.stringify(ab) });
+    lastAbLotsFp = fpAb;
+    console.log(`[${new Date().toISOString()}] Catalog LOT A/B → app tăng ca: ${ab.count} lot, ${ab.items.length} mã`);
+  }
 }
 
 async function syncCoOnce() {
@@ -963,7 +976,7 @@ async function syncCoOnce() {
     ? await otFetch(`/api/co-days/sync${coSweep ? '?sweep=1' : ''}`)
     : { slips: [] };
   for (const s of slips || []) {
-    const payload = { uid: s.uid, work_date: s.work_date, sent_by_name: s.sent_by_name, note: s.note, lines: s.lines };
+    const payload = { uid: s.uid, work_date: s.work_date, stage: s.stage || '86', sent_by_name: s.sent_by_name, note: s.note, lines: s.lines };
     let ok = false, detail = '', mainRef = null;
     try {
       const res = await fetch(`${MAIN_APP_URL}/api/ot/co-day`, {
@@ -975,7 +988,7 @@ async function syncCoOnce() {
       ok = res.ok && !!d?.ok; detail = (d && d.detail) || `HTTP ${res.status}`; mainRef = d?.id ? String(d.id) : null;
     } catch (e) { detail = e.message; }
     await otFetch('/api/co-days/sync', { method: 'POST', body: JSON.stringify({ uid: s.uid, ok, main_ref: mainRef, error: ok ? undefined : detail }) });
-    console.log(`[${new Date().toISOString()}] Sản lượng CO ${s.work_date} (${s.lines.length} dòng${s.swept ? ', vét quên gửi' : ''}) → app chính: ${ok ? 'OK' : 'LỖI ' + detail}`);
+    console.log(`[${new Date().toISOString()}] Sản lượng ${s.stage === '84' ? 'AB' : 'CO'} ${s.work_date} (${s.lines.length} dòng${s.swept ? ', vét quên gửi' : ''}) → app chính: ${ok ? 'OK' : 'LỖI ' + detail}`);
   }
   // Chỉ đánh dấu đã vét SAU khi vòng chạy xong (lỗi giữa chừng → vòng 60" sau vét lại, như bài học kho NPL 15/09)
   if (coSweep) {
@@ -1054,12 +1067,15 @@ async function printOvertimeSheets(job) {
 // Bảng Kết quả Coating ngày (anh Hữu 05/10/2026): in ra ĐÚNG form file Excel tải xuống —
 // lấy dòng từ app tăng ca (kể cả phiếu đang ghi) → app chính dựng Excel → PDF (LibreOffice) → máy in.
 async function printCoDay(job) {
-  const d = await otFetch(`/api/co-days?date=${job.ref_id}`);
-  if (!d || !d.lines || d.lines.length === 0) throw new Error(`Ngày ${job.ref_id} chưa có dòng Sản lượng CO nào`);
+  // ref_id = 'YYYY-MM-DD' (Coating) hoặc 'YYYY-MM-DD|84' (A/B, 06/10/2026)
+  const [date, st] = String(job.ref_id).split('|');
+  const stage = st === '84' ? '84' : '86';
+  const d = await otFetch(`/api/co-days?date=${date}&stage=${stage}`);
+  if (!d || !d.lines || d.lines.length === 0) throw new Error(`Ngày ${date} chưa có dòng Sản lượng ${stage === '84' ? 'AB' : 'CO'} nào`);
   const res = await fetch(`${MAIN_APP_URL}/api/ot/co-day.pdf`, {
     method: 'POST',
     headers: { 'X-Agent-Token': MAIN_APP_TOKEN, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ work_date: job.ref_id, sent_by_name: d.slip?.sent_by_name ?? '', lines: d.lines }),
+    body: JSON.stringify({ work_date: date, stage, sent_by_name: d.slip?.sent_by_name ?? '', lines: d.lines }),
   });
   if (!res.ok) {
     const t = await res.text().catch(() => '');

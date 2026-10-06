@@ -1,23 +1,27 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
-import { CO_MACHINES, canEditCoDay, canUseCoDay, isISODate } from '@/lib/co-day';
+import { CO_STAGES, canEditCoDay, canUseCoDay, isISODate, parseStage } from '@/lib/co-day';
 import { LINE_COLS, cleanLine, ensureDraftSlip, readCoDeleted, writeCoDeleted, type LineIn } from '@/lib/co-day-server';
 
 export const runtime = 'nodejs';
 
-// GET /api/co-days?date=YYYY-MM-DD → { slip, lines, employees } — Sản lượng CO hàng ngày (anh Hữu 05/10/2026)
+// GET /api/co-days?date=YYYY-MM-DD[&stage=84] → { slip, lines, employees } — Sản lượng CO hàng ngày (anh Hữu 05/10/2026)
+// stage (06/10/2026): '86' Coating (mặc định) · '84' A/B
 export async function GET(req: Request) {
   const session = await getSession();
   if (!canUseCoDay(session)) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
-  const date = new URL(req.url).searchParams.get('date');
+  const sp = new URL(req.url).searchParams;
+  const date = sp.get('date');
+  const stage = parseStage(sp.get('stage'));
   if (!isISODate(date)) return NextResponse.json({ error: 'Sai date (YYYY-MM-DD)' }, { status: 400 });
 
   const [{ data: slip, error: e1 }, { data: emps, error: e2 }] = await Promise.all([
     supabaseAdmin
       .from('co_day_slips')
-      .select('id, uid, work_date, status, sent_at, sent_by_name, received_at, last_error')
+      .select('id, uid, work_date, stage, status, sent_at, sent_by_name, received_at, last_error')
       .eq('work_date', date)
+      .eq('stage', stage)
       .maybeSingle(),
     supabaseAdmin
       .from('employees')
@@ -34,20 +38,21 @@ export async function GET(req: Request) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     lines = data ?? [];
   }
-  return NextResponse.json({ date, slip: slip ?? null, lines, employees: emps ?? [], machines: CO_MACHINES });
+  return NextResponse.json({ date, stage, slip: slip ?? null, lines, employees: emps ?? [], machines: CO_STAGES[stage].machines });
 }
 
-// POST /api/co-days  { date, line } → thêm 1 dòng
+// POST /api/co-days  { date, stage?, line } → thêm 1 dòng
 export async function POST(req: Request) {
   const session = await getSession();
   if (!canEditCoDay(session)) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
-  const body = (await req.json().catch(() => null)) as { date?: string; line?: LineIn } | null;
+  const body = (await req.json().catch(() => null)) as { date?: string; stage?: string; line?: LineIn } | null;
   if (!body || !isISODate(body.date) || !body.line) {
     return NextResponse.json({ error: 'Thiếu date hoặc line' }, { status: 400 });
   }
-  const c = await cleanLine(body.line);
+  const stage = parseStage(body.stage);
+  const c = await cleanLine(body.line, stage);
   if (c.error) return NextResponse.json({ error: c.error }, { status: 400 });
-  const s = await ensureDraftSlip(body.date, session!.fullName);
+  const s = await ensureDraftSlip(body.date, session!.fullName, stage);
   if (s.error) return NextResponse.json({ error: s.error }, { status: 500 });
   const { data: last } = await supabaseAdmin
     .from('co_day_lines').select('seq_no').eq('slip_id', s.id!).order('seq_no', { ascending: false }).limit(1);
@@ -65,10 +70,12 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   const session = await getSession();
   if (!canEditCoDay(session)) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
-  const date = new URL(req.url).searchParams.get('date');
+  const sp = new URL(req.url).searchParams;
+  const date = sp.get('date');
+  const stage = parseStage(sp.get('stage'));
   if (!isISODate(date)) return NextResponse.json({ error: 'Sai date (YYYY-MM-DD)' }, { status: 400 });
   const { data: slip } = await supabaseAdmin.from('co_day_slips')
-    .select('id, uid, status, main_ref, received_at').eq('work_date', date).maybeSingle();
+    .select('id, uid, status, main_ref, received_at').eq('work_date', date).eq('stage', stage).maybeSingle();
   if (!slip) return NextResponse.json({ error: 'Ngày này không có phiếu' }, { status: 404 });
   const onMain = slip.status !== 'draft' || !!slip.main_ref || !!slip.received_at;
   if (onMain) {

@@ -3,12 +3,13 @@
 // SẢN LƯỢNG CO HÀNG NGÀY (anh Hữu chốt 05/10/2026) — 4 người bộ phận Coating nhập.
 // Quét tem LOT xi mạ (mã vạch 10 số) → chỉ thị · mã hàng · kg tự hiện (catalog ERP agent đẩy lên)
 // → chọn máy, sửa kg nếu cần, chọn nhân viên, ghi chú → Thêm. Cuối ngày bấm "Gửi phiếu" → app chính lưu vĩnh viễn.
+// stage (06/10/2026): '86' Sản lượng CO (máy CO-01..03) · '84' Sản lượng AB công đoạn 84 (máy AB-01) — cùng 1 màn.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import BarcodeScanButton from './BarcodeScanButton';
 import DateButton from './DateButton';
 import PrintJobButton from './PrintJobButton';
 import { toTitleCase } from '@/lib/format';
-import { CO_MACHINES, decodeCoLots, normalizeLot, type CoLine, type CoLot, type CoSlip } from '@/lib/co-day';
+import { CO_STAGES, decodeCoLots, normalizeLot, type CoLine, type CoLot, type CoSlip, type CoStage } from '@/lib/co-day';
 
 type Emp = { id: string; full_name: string; order_no: number };
 
@@ -41,7 +42,10 @@ const STATUS: Record<CoSlip['status'], { t: string; c: string }> = {
   received: { t: '✅ App chính đã nhận', c: 'bg-emerald-50 border-emerald-300 text-emerald-800' },
 };
 
-export default function CoDailyView({ currentUserFullName }: { currentUserFullName?: string | null }) {
+export default function CoDailyView({ currentUserFullName, stage = '86' }: { currentUserFullName?: string | null; stage?: CoStage }) {
+  const cfg = CO_STAGES[stage];
+  // Chỉ 1 máy (AB-01) → chọn sẵn (anh Hữu 06/10/2026)
+  const defMachine = cfg.machines.length === 1 ? cfg.machines[0] : '';
   const [date, setDate] = useState(todayISO());
   const [slip, setSlip] = useState<CoSlip | null>(null);
   const [lines, setLines] = useState<CoLine[]>([]);
@@ -49,18 +53,18 @@ export default function CoDailyView({ currentUserFullName }: { currentUserFullNa
   const [catalog, setCatalog] = useState<Map<string, CoLot> | null>(null);
   const [catAt, setCatAt] = useState<string | null>(null);
   const [catErr, setCatErr] = useState('');
-  const [d, setD] = useState<Draft>(emptyDraft());
+  const [d, setD] = useState<Draft>(emptyDraft(defMachine));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
 
   const load = useCallback(async (dt: string) => {
-    const r = await fetch(`/api/co-days?date=${dt}`);
+    const r = await fetch(`/api/co-days?date=${dt}&stage=${stage}`);
     const j = await r.json().catch(() => ({}));
     if (!r.ok) { setErr(j.error || 'Không tải được phiếu'); return; }
     setErr('');
     setSlip(j.slip); setLines(j.lines ?? []); setEmps(j.employees ?? []);
-  }, []);
+  }, [stage]);
 
   // Tải phiếu khi đổi ngày — setState nằm sau await fetch (không đồng bộ), cùng mẫu các card khác của app
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -81,7 +85,7 @@ export default function CoDailyView({ currentUserFullName }: { currentUserFullNa
     if (catLoading) return null;
     setCatLoading(true);
     try {
-      const j = await (await fetch('/api/co-lots')).json();
+      const j = await (await fetch(`/api/co-lots?stage=${stage}`)).json();
       const m = decodeCoLots(j);
       setCatalog(m); setCatAt(j.generated_at ?? null);
       setCatErr(j.error ? String(j.error) : '');
@@ -89,7 +93,7 @@ export default function CoDailyView({ currentUserFullName }: { currentUserFullNa
     } catch {
       setCatErr('Không tải được danh sách LOT'); return null;
     } finally { setCatLoading(false); }
-  }, [catalog, catLoading]);
+  }, [catalog, catLoading, stage]);
 
   // Mặc định nhân viên = chính người đăng nhập (nếu là 1 trong 4 người CO)
   const myEmpId = useMemo(() => {
@@ -137,7 +141,7 @@ export default function CoDailyView({ currentUserFullName }: { currentUserFullNa
     try {
       const r = d.editId
         ? await fetch(`/api/co-days/lines/${d.editId}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ line }) })
-        : await fetch('/api/co-days', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ date, line }) });
+        : await fetch('/api/co-days', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ date, stage, line }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) return setErr(j.error || 'Không lưu được');
       setMsg(d.editId ? 'Đã sửa dòng' : `Đã thêm LOT ${d.lot?.label ?? key}`);
@@ -168,10 +172,10 @@ export default function CoDailyView({ currentUserFullName }: { currentUserFullNa
   }
 
   async function send() {
-    if (!confirm(`Gửi phiếu Sản lượng CO ngày ${date.split('-').reverse().join('/')} (${lines.length} dòng) sang app chính?`)) return;
+    if (!confirm(`Gửi phiếu ${cfg.title} ngày ${date.split('-').reverse().join('/')} (${lines.length} dòng) sang app chính?`)) return;
     setBusy(true); setErr(''); setMsg('');
     try {
-      const r = await fetch('/api/co-days/send', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ date }) });
+      const r = await fetch('/api/co-days/send', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ date, stage }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) return setErr(j.error || 'Không gửi được');
       setMsg(`Đã gửi ${j.n_lines} dòng — app chính nhận trong khoảng 1 phút`);
@@ -183,11 +187,11 @@ export default function CoDailyView({ currentUserFullName }: { currentUserFullNa
     const dd = date.split('-').reverse().join('/');
     const onMain = slip?.status !== 'draft' || !!slip?.received_at;
     const extra = onMain ? ' Phiếu đã ở app chính — app chính sẽ xoá theo trong khoảng 1 phút.' : '';
-    if (!confirm(`Xoá CẢ phiếu Sản lượng CO ngày ${dd} (${lines.length} dòng)?${extra}`)) return;
+    if (!confirm(`Xoá CẢ phiếu ${cfg.title} ngày ${dd} (${lines.length} dòng)?${extra}`)) return;
     if (!confirm('Xác nhận lần 2: xoá hẳn, không khôi phục được?')) return;
     setBusy(true); setErr(''); setMsg('');
     try {
-      const r = await fetch(`/api/co-days?date=${date}`, { method: 'DELETE' });
+      const r = await fetch(`/api/co-days?date=${date}&stage=${stage}`, { method: 'DELETE' });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) return setErr(j.error || 'Không xoá được');
       setMsg(j.main_delete_queued ? `Đã xoá phiếu ngày ${dd} — app chính xoá theo trong khoảng 1 phút` : `Đã xoá phiếu ngày ${dd}`);
@@ -203,7 +207,7 @@ export default function CoDailyView({ currentUserFullName }: { currentUserFullNa
     <div className="space-y-4">
       <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-4 space-y-3">
         <div className="flex items-center justify-between gap-2">
-          <div className="text-sm font-bold text-brand-navy">🎨 Sản lượng CO hàng ngày</div>
+          <div className="text-sm font-bold text-brand-navy">{stage === '84' ? '🔩' : '🎨'} {cfg.title} hàng ngày</div>
           <DateButton value={date} onChange={(v) => { setDate(v); setD(emptyDraft(d.machine, d.employeeId)); }} />
         </div>
         {slip && (
@@ -225,7 +229,7 @@ export default function CoDailyView({ currentUserFullName }: { currentUserFullNa
           </div>
           {catErr && <div className="text-[11px] text-amber-700">⚠ {catErr} — vẫn gõ tay được</div>}
           {catLoading && <div className="text-[11px] text-brand-navy-soft">Đang tải danh sách LOT xi mạ…</div>}
-          {!catErr && catalog && <div className="text-[11px] text-brand-navy-soft">Danh sách LOT xi mạ (mã Coating, 12 tháng): {catalog.size.toLocaleString('vi-VN')} lot{catAt ? ` · cập nhật ${new Date(catAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}` : ''}</div>}
+          {!catErr && catalog && <div className="text-[11px] text-brand-navy-soft">Danh sách LOT xi mạ ({cfg.itemsLabel}, 12 tháng): {catalog.size.toLocaleString('vi-VN')} lot{catAt ? ` · cập nhật ${new Date(catAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}` : ''}</div>}
           {d.lot && (
             <div className="text-xs bg-brand-teal/10 border border-brand-teal/40 rounded-md px-3 py-2 text-brand-navy space-y-0.5">
               <div><b>{d.lot.label}</b> · nhập {d.lot.date.split('-').reverse().join('/')}</div>
@@ -235,7 +239,7 @@ export default function CoDailyView({ currentUserFullName }: { currentUserFullNa
           )}
           {d.manual && (
             <div className="space-y-2">
-              <div className="text-[11px] text-amber-700">⚠ LOT không có trong danh sách xi mạ (15 mã Coating, 12 tháng) — nhập tay chỉ thị và mã hàng</div>
+              <div className="text-[11px] text-amber-700">⚠ LOT không có trong danh sách xi mạ ({cfg.itemsLabel}, 12 tháng) — nhập tay chỉ thị và mã hàng</div>
               <div className="grid grid-cols-2 gap-2">
                 <input value={d.saeji} onChange={(e) => setD({ ...d, saeji: e.target.value })} placeholder="Chỉ thị thư" className={inp} />
                 <input value={d.item} onChange={(e) => setD({ ...d, item: e.target.value })} placeholder="Mã hàng" className={inp} />
@@ -243,8 +247,8 @@ export default function CoDailyView({ currentUserFullName }: { currentUserFullNa
             </div>
           )}
           {dupLine && <div className="text-[11px] text-red-600 font-semibold">⚠ LOT này đã có ở dòng {dupLine.seq_no} ({dupLine.machine}) hôm nay</div>}
-          <div className="grid grid-cols-3 gap-2">
-            {CO_MACHINES.map((m) => (
+          <div className={`grid ${cfg.machines.length === 1 ? 'grid-cols-1' : 'grid-cols-3'} gap-2`}>
+            {cfg.machines.map((m) => (
               <button key={m} type="button" onClick={() => setD({ ...d, machine: m })}
                 className={`py-2 rounded-md border text-sm font-bold ${d.machine === m ? 'bg-[#ea580c] text-white border-[#ea580c]' : 'bg-white text-brand-navy border-gray-300'}`}>
                 {m}
@@ -317,7 +321,7 @@ export default function CoDailyView({ currentUserFullName }: { currentUserFullNa
               className="w-full py-3 rounded-xl bg-[#ea580c] text-white font-bold disabled:opacity-50">
               {slip?.status === 'received' ? '✅ Đã gửi app chính — bấm để gửi lại' : slip?.status === 'pending' ? '📤 Đang đẩy sang app chính (khoảng 1 phút)…' : '📤 Gửi phiếu cuối ngày'}
             </button>
-            <PrintJobButton type="co_day" refId={date} label="🖨 In bảng kết quả" />
+            <PrintJobButton type="co_day" refId={stage === '84' ? `${date}|84` : date} label="🖨 In bảng kết quả" />
             {slip && (
               <button type="button" onClick={deleteSlip} disabled={busy}
                 className="w-full py-2 rounded-xl border border-red-300 text-red-700 text-sm font-semibold disabled:opacity-50">

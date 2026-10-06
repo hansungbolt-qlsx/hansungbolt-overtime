@@ -1,6 +1,6 @@
 // Hàm phía server dùng chung cho các route /api/co-days/* (Next.js không cho route.ts xuất hàm phụ).
 import { supabaseAdmin } from '@/lib/supabase';
-import { CO_MACHINES, coUid, normalizeLot } from '@/lib/co-day';
+import { CO_STAGES, coUid, normalizeLot, type CoStage } from '@/lib/co-day';
 
 export const LINE_COLS =
   'id, seq_no, machine, lot_no, lot_label, vendor, saeji, item_code, item_name, lot_weight_kg, weight_kg, lot_qty, employee_id, employee_name, note, matched, created_by_name';
@@ -12,9 +12,10 @@ export type LineIn = {
 };
 
 /** Kiểm + chuẩn hoá 1 dòng (dùng chung POST và PATCH). */
-export async function cleanLine(b: LineIn): Promise<{ row?: Record<string, unknown>; error?: string }> {
+export async function cleanLine(b: LineIn, stage: CoStage = '86'): Promise<{ row?: Record<string, unknown>; error?: string }> {
   const machine = String(b.machine ?? '').trim();
-  if (!(CO_MACHINES as readonly string[]).includes(machine)) return { error: 'Chưa chọn máy CO-01 / CO-02 / CO-03' };
+  const mcs = CO_STAGES[stage].machines;
+  if (!mcs.includes(machine)) return { error: `Chưa chọn máy ${mcs.join(' / ')}` };
   const lot = normalizeLot(String(b.lot_no ?? ''));
   if (lot.length < 6) return { error: 'LOT NO không hợp lệ' };
   const kg = Number(b.weight_kg);
@@ -41,17 +42,17 @@ export async function cleanLine(b: LineIn): Promise<{ row?: Record<string, unkno
   };
 }
 
-/** Phiếu ngày: tạo nếu chưa có; có thay đổi dòng → về 'draft' + xoá synced_at (bắt buộc Gửi lại). */
-export async function ensureDraftSlip(date: string, byName: string): Promise<{ id?: string; error?: string }> {
+/** Phiếu ngày × công đoạn: tạo nếu chưa có; có thay đổi dòng → về 'draft' + xoá synced_at (bắt buộc Gửi lại). */
+export async function ensureDraftSlip(date: string, byName: string, stage: CoStage = '86'): Promise<{ id?: string; error?: string }> {
   const { data: slip } = await supabaseAdmin
-    .from('co_day_slips').select('id, status').eq('work_date', date).maybeSingle();
+    .from('co_day_slips').select('id, status').eq('work_date', date).eq('stage', stage).maybeSingle();
   if (slip) {
     const { error } = await supabaseAdmin.from('co_day_slips')
       .update({ status: 'draft', synced_at: null, updated_at: new Date().toISOString() }).eq('id', slip.id);
     return error ? { error: error.message } : { id: slip.id };
   }
   const { data: ins, error } = await supabaseAdmin.from('co_day_slips')
-    .insert({ uid: coUid(date), work_date: date, status: 'draft', created_by_name: byName })
+    .insert({ uid: coUid(date, stage), work_date: date, stage, status: 'draft', created_by_name: byName })
     .select('id').single();
   if (error || !ins) return { error: error?.message ?? 'Không tạo được phiếu' };
   return { id: ins.id };

@@ -72,8 +72,9 @@ export async function POST(req: Request) {
   }
   if (type === 'co_day') {
     // Bảng Kết quả Coating ngày (anh Hữu 05/10/2026): ref_id = YYYY-MM-DD; 4 người CO + admin + qlsx
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(ref_id)) {
-      return NextResponse.json({ error: 'ref_id phải là YYYY-MM-DD' }, { status: 400 });
+    // A/B công đoạn 84 (06/10/2026): ref_id = YYYY-MM-DD|84
+    if (!/^\d{4}-\d{2}-\d{2}(\|84)?$/.test(ref_id)) {
+      return NextResponse.json({ error: 'ref_id phải là YYYY-MM-DD hoặc YYYY-MM-DD|84' }, { status: 400 });
     }
     if (session.role !== 'admin' && session.role !== 'qlsx' && session.department !== 'CO') {
       return NextResponse.json({ error: 'Chỉ bộ phận Coating in được bảng này' }, { status: 403 });

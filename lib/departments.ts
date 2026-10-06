@@ -52,7 +52,8 @@ export const DCCD_GJ_BY_DEPT: Record<ProdDept, [string, string][]> = {
     ['45', 'CĐ 45 — S/R'],
     ['60', 'CĐ 60 — C/T'],
   ],
-  CO: [['86', 'CĐ 86 — CO/ST/PK']],
+  // CO làm thêm CĐ 84 A/B (anh Hữu 06/10/2026)
+  CO: [['86', 'CĐ 86 — CO/ST/PK'], ['84', 'CĐ 84 — A/B']],
 };
 export const DCCD_GJ_ALL: [string, string][] = PROD_DEPTS.flatMap((d) => DCCD_GJ_BY_DEPT[d]);
 

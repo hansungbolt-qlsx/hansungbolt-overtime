@@ -1,18 +1,18 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
-import { canEditCoDay, isISODate } from '@/lib/co-day';
+import { canEditCoDay, isISODate, parseStage } from '@/lib/co-day';
 
 export const runtime = 'nodejs';
 
-// POST /api/co-days/send { date } — "Gửi phiếu" cuối ngày: status → pending, agent đẩy sang app chính trong ≤ 60".
+// POST /api/co-days/send { date, stage? } — "Gửi phiếu" cuối ngày: status → pending, agent đẩy sang app chính trong ≤ 60".
 export async function POST(req: Request) {
   const session = await getSession();
   if (!canEditCoDay(session)) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
-  const body = (await req.json().catch(() => null)) as { date?: string } | null;
+  const body = (await req.json().catch(() => null)) as { date?: string; stage?: string } | null;
   if (!body || !isISODate(body.date)) return NextResponse.json({ error: 'Thiếu date' }, { status: 400 });
   const { data: slip } = await supabaseAdmin
-    .from('co_day_slips').select('id').eq('work_date', body.date).maybeSingle();
+    .from('co_day_slips').select('id').eq('work_date', body.date).eq('stage', parseStage(body.stage)).maybeSingle();
   if (!slip) return NextResponse.json({ error: 'Ngày này chưa có dòng nào' }, { status: 400 });
   const { count } = await supabaseAdmin
     .from('co_day_lines').select('id', { count: 'exact', head: true }).eq('slip_id', slip.id);

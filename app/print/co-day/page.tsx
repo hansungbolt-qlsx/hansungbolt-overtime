@@ -1,20 +1,22 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth-server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { canUseCoDay, isISODate } from '@/lib/co-day';
+import { canUseCoDay, isISODate, parseStage } from '@/lib/co-day';
 
 // Bảng KẾT QUẢ COATING NGÀY (anh Hữu 05/10/2026) — agent render trang này ra PDF khi có lệnh in 'co_day'.
 // A4 ngang, 7 cột anh chốt: Máy · Chỉ thị thư · Mã hàng · LOT NO · Trọng lượng · Nhân viên · Ghi chú.
-export default async function PrintCoDayPage({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
+// stage=84 (06/10/2026): bảng Kết quả A/B công đoạn 84
+export default async function PrintCoDayPage({ searchParams }: { searchParams: Promise<{ date?: string; stage?: string }> }) {
   const session = await getSession();
   if (!session) redirect('/login');
   if (!canUseCoDay(session)) redirect('/register');
   const sp = await searchParams;
   const date = sp.date ?? '';
   if (!isISODate(date)) redirect('/register');
+  const stage = parseStage(sp.stage);
 
   const { data: slip } = await supabaseAdmin
-    .from('co_day_slips').select('id, status, sent_by_name, sent_at').eq('work_date', date).maybeSingle();
+    .from('co_day_slips').select('id, status, sent_by_name, sent_at').eq('work_date', date).eq('stage', stage).maybeSingle();
   const { data: lines } = slip
     ? await supabaseAdmin
         .from('co_day_lines')
@@ -34,10 +36,10 @@ export default async function PrintCoDayPage({ searchParams }: { searchParams: P
     <main style={{ fontFamily: 'Arial, sans-serif', color: '#000', padding: '8mm' }}>
       <style>{`@page { size: A4 landscape; margin: 8mm; } body { margin: 0; }`}</style>
       <h1 style={{ textAlign: 'center', fontSize: 20, margin: '0 0 4px' }}>
-        KẾT QUẢ COATING NGÀY {d}/{m}/{y} · 코팅 일일 실적
+        {stage === '84' ? 'KẾT QUẢ A/B (CÔNG ĐOẠN 84)' : 'KẾT QUẢ COATING'} NGÀY {d}/{m}/{y} · {stage === '84' ? 'A/B 일일 실적' : '코팅 일일 실적'}
       </h1>
       <div style={{ fontSize: 11, marginBottom: 6 }}>
-        Bộ phận: Coating · Người gửi: {slip?.sent_by_name ?? '—'} · Số dòng: {rows.length} · Tổng: {fmt(total)} Kg
+        Bộ phận: Coating · Công đoạn: {stage === '84' ? 'A/B (84)' : 'Coating (86)'} · Người gửi: {slip?.sent_by_name ?? '—'} · Số dòng: {rows.length} · Tổng: {fmt(total)} Kg
         {slip?.status !== 'received' ? ' · (bản đang ghi, chưa gửi app chính)' : ''}
       </div>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>

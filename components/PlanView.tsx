@@ -166,7 +166,8 @@ function fmtSaeji(l: Lot): string {
 // (6-9 số) vẫn nhận.
 // export: bộ phận CO dùng riêng thẻ này làm tab 'In phiếu DCCD' (anh Hữu 05/10/2026)
 // onlyCodes (CO, anh Hữu 05/10/2026): chỉ hiện chỉ thị đang mở của các mã này, hiện sẵn danh sách khi chưa gõ, gõ 1 ký tự là lọc
-export function DccdCard({ options, onlyCodes }: { options: [string, string][]; onlyCodes?: string[] }) {
+// onlyCodes dạng { công đoạn: mã[] } (06/10/2026): CĐ 86 → 15 mã Coating, CĐ 84 → mã A/B (ERP) — đổi công đoạn là đổi danh sách
+export function DccdCard({ options, onlyCodes }: { options: [string, string][]; onlyCodes?: string[] | Record<string, string[]> }) {
   const [q, setQ] = useState('');
   const [catalog, setCatalog] = useState<Lot[] | null>(null);
   const [catAt, setCatAt] = useState<string | null>(null);
@@ -175,7 +176,10 @@ export function DccdCard({ options, onlyCodes }: { options: [string, string][]; 
   const [copies, setCopies] = useState('1');
 
   // Lazy tải catalog khi bắt đầu gõ (1 lần, ~50KB)
-  const only = onlyCodes && onlyCodes.length > 0 ? new Set(onlyCodes.map((c) => c.toUpperCase())) : null;
+  const byGj = onlyCodes && !Array.isArray(onlyCodes);
+  const codeList = byGj ? (onlyCodes as Record<string, string[]>)[gj] ?? [] : (onlyCodes as string[] | undefined) ?? [];
+  const only = byGj || codeList.length > 0 ? new Set(codeList.map((c) => c.toUpperCase())) : null;
+  const groupName = gj === '84' ? 'A/B' : 'Coating';
   useEffect(() => {
     if ((!q && !only) || catalog !== null) return;
     let cancelled = false;
@@ -229,7 +233,7 @@ export function DccdCard({ options, onlyCodes }: { options: [string, string][]; 
             value={sel ? `${sel.code} · ${fmtSaeji(sel)}` : q}
             onChange={(e) => { setSel(null); setQ(e.target.value); }}
             onFocus={() => { if (sel) { setSel(null); setQ(''); } }}
-            placeholder={only ? 'Gõ vài ký tự mã hàng Coating, hoặc chọn bên dưới' : 'vd 050200-FS2W hoặc 606-169'}
+            placeholder={only ? `Gõ vài ký tự mã hàng ${groupName}, hoặc chọn bên dưới` : 'vd 050200-FS2W hoặc 606-169'}
             className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm font-mono text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal"
           />
         </div>
@@ -237,7 +241,7 @@ export function DccdCard({ options, onlyCodes }: { options: [string, string][]; 
           <label className="block text-[11px] text-brand-navy-soft mb-0.5">Công đoạn</label>
           <select
             value={gj}
-            onChange={(e) => setGj(e.target.value)}
+            onChange={(e) => { setGj(e.target.value); if (byGj) setSel(null); }}
             className="px-2 py-1.5 border border-gray-300 rounded-md text-sm text-brand-navy"
           >
             {options.map(([v, label]) => (
@@ -278,7 +282,7 @@ export function DccdCard({ options, onlyCodes }: { options: [string, string][]; 
           )}
           {catalog !== null && matches.length === 0 && !directSaeji && (
             <p className="text-[11px] text-brand-navy-soft">
-              {only && !qn ? 'Các mã Coating hiện không có chỉ thị đang mở' : <>Không có chỉ thị đang mở khớp &quot;{qn}&quot;</>}
+              {only && !qn ? `Các mã ${groupName} hiện không có chỉ thị đang mở` : <>Không có chỉ thị đang mở khớp &quot;{qn}&quot;</>}
               {catAt ? ` (danh sách lúc ${catAt.slice(11, 16)})` : ''}
             </p>
           )}
