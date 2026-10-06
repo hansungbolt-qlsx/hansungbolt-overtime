@@ -122,6 +122,12 @@ export function canEditCoDay(s: { role: string; department: string | null } | nu
   if (!s) return false;
   return s.role === 'admin' || (s.department === 'CO' && (s.role === 'leader' || s.role === 'worker'));
 }
+/** Gửi phiếu cuối ngày sang app chính: CHỈ tổ trưởng CO (+ admin) — anh Hữu 06/10/2026: tổ viên chỉ quét nhập,
+ *  tổ trưởng kiểm tra rồi gửi. Quên gửi thì agent vẫn tự đẩy 07:00 sáng hôm sau. */
+export function canSendCoDay(s: { role: string; department: string | null } | null): boolean {
+  if (!s) return false;
+  return s.role === 'admin' || (s.department === 'CO' && s.role === 'leader');
+}
 
 export function isISODate(v: unknown): v is string {
   return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);

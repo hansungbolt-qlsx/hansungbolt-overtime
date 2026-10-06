@@ -225,8 +225,8 @@ export default function RegisterLayout({
       {activeTab === 'dccd' && <CoDccdCard />}
 
       {/* key theo công đoạn: đổi tab CO ↔ AB là dựng lại màn (không dùng lẫn danh sách LOT / phiếu) */}
-      {activeTab === 'co_day' && <CoDailyView key="86" stage="86" currentUserFullName={currentUserFullName} />}
-      {activeTab === 'ab_day' && <CoDailyView key="84" stage="84" currentUserFullName={currentUserFullName} />}
+      {activeTab === 'co_day' && <CoDailyView key="86" stage="86" canSend={isLeader} currentUserFullName={currentUserFullName} />}
+      {activeTab === 'ab_day' && <CoDailyView key="84" stage="84" canSend={isLeader} currentUserFullName={currentUserFullName} />}
       {activeTab === 'prod_sum' && <CoProdSummaryView />}
 
       {activeTab === 'stops' && <StopReasonsView readOnly={isQlsx} />}

@@ -42,7 +42,10 @@ const STATUS: Record<CoSlip['status'], { t: string; c: string }> = {
   received: { t: '✅ App chính đã nhận', c: 'bg-emerald-50 border-emerald-300 text-emerald-800' },
 };
 
-export default function CoDailyView({ currentUserFullName, stage = '86' }: { currentUserFullName?: string | null; stage?: CoStage }) {
+// canSend (06/10/2026): chỉ tổ trưởng thấy nút Gửi phiếu cuối ngày — tổ viên chỉ quét nhập
+export default function CoDailyView({ currentUserFullName, stage = '86', canSend = false }: {
+  currentUserFullName?: string | null; stage?: CoStage; canSend?: boolean;
+}) {
   const cfg = CO_STAGES[stage];
   // Chỉ 1 máy (AB-01) → chọn sẵn (anh Hữu 06/10/2026)
   const defMachine = cfg.machines.length === 1 ? cfg.machines[0] : '';
@@ -317,10 +320,14 @@ export default function CoDailyView({ currentUserFullName, stage = '86' }: { cur
         )}
         {lines.length > 0 && (
           <div className="p-4 border-t border-brand-surface-alt space-y-2">
-            <button type="button" onClick={send} disabled={busy || slip?.status === 'pending'}
-              className="w-full py-3 rounded-xl bg-[#ea580c] text-white font-bold disabled:opacity-50">
-              {slip?.status === 'received' ? '✅ Đã gửi app chính — bấm để gửi lại' : slip?.status === 'pending' ? '📤 Đang đẩy sang app chính (khoảng 1 phút)…' : '📤 Gửi phiếu cuối ngày'}
-            </button>
+            {canSend ? (
+              <button type="button" onClick={send} disabled={busy || slip?.status === 'pending'}
+                className="w-full py-3 rounded-xl bg-[#ea580c] text-white font-bold disabled:opacity-50">
+                {slip?.status === 'received' ? '✅ Đã gửi app chính — bấm để gửi lại' : slip?.status === 'pending' ? '📤 Đang đẩy sang app chính (khoảng 1 phút)…' : '📤 Gửi phiếu cuối ngày'}
+              </button>
+            ) : (
+              <p className="text-xs text-brand-navy-soft text-center">Tổ trưởng kiểm tra và gửi phiếu cuối ngày.</p>
+            )}
             <PrintJobButton type="co_day" refId={stage === '84' ? `${date}|84` : date} label="🖨 In bảng kết quả" />
             {slip && (
               <button type="button" onClick={deleteSlip} disabled={busy}

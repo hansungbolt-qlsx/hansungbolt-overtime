@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
-import { canEditCoDay, isISODate, parseStage } from '@/lib/co-day';
+import { canSendCoDay, isISODate, parseStage } from '@/lib/co-day';
 
 export const runtime = 'nodejs';
 
 // POST /api/co-days/send { date, stage? } — "Gửi phiếu" cuối ngày: status → pending, agent đẩy sang app chính trong ≤ 60".
 export async function POST(req: Request) {
   const session = await getSession();
-  if (!canEditCoDay(session)) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
+  if (!canSendCoDay(session)) return NextResponse.json({ error: 'Chỉ tổ trưởng gửi phiếu cuối ngày' }, { status: 403 });
   const body = (await req.json().catch(() => null)) as { date?: string; stage?: string } | null;
   if (!body || !isISODate(body.date)) return NextResponse.json({ error: 'Thiếu date' }, { status: 400 });
   const { data: slip } = await supabaseAdmin
