@@ -42,7 +42,7 @@ const STATUS: Record<CoSlip['status'], { t: string; c: string }> = {
   received: { t: '✅ App chính đã nhận', c: 'bg-emerald-50 border-emerald-300 text-emerald-800' },
 };
 
-// canSend (06/10/2026): chỉ tổ trưởng thấy nút Gửi phiếu cuối ngày — tổ viên chỉ quét nhập
+// canSend (06/10/2026): chỉ tổ trưởng thấy nút Gửi phiếu cuối ngày và nút Xoá phiếu ngày — tổ viên chỉ quét nhập, xoá từng dòng
 export default function CoDailyView({ currentUserFullName, stage = '86', canSend = false }: {
   currentUserFullName?: string | null; stage?: CoStage; canSend?: boolean;
 }) {
@@ -329,7 +329,7 @@ export default function CoDailyView({ currentUserFullName, stage = '86', canSend
               <p className="text-xs text-brand-navy-soft text-center">Tổ trưởng kiểm tra và gửi phiếu cuối ngày.</p>
             )}
             <PrintJobButton type="co_day" refId={stage === '84' ? `${date}|84` : date} label="🖨 In bảng kết quả" />
-            {slip && (
+            {slip && canSend && (
               <button type="button" onClick={deleteSlip} disabled={busy}
                 className="w-full py-2 rounded-xl border border-red-300 text-red-700 text-sm font-semibold disabled:opacity-50">
                 🗑 Xoá phiếu ngày

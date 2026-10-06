@@ -128,6 +128,8 @@ export function canSendCoDay(s: { role: string; department: string | null } | nu
   if (!s) return false;
   return s.role === 'admin' || (s.department === 'CO' && s.role === 'leader');
 }
+/** Xoá CẢ phiếu ngày: cũng CHỈ tổ trưởng CO (+ admin) — anh Hữu 06/10/2026. Tổ viên vẫn xoá được từng dòng. */
+export const canDeleteCoDaySlip = canSendCoDay;
 
 export function isISODate(v: unknown): v is string {
   return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
-import { CO_STAGES, canEditCoDay, canUseCoDay, isISODate, parseStage } from '@/lib/co-day';
+import { CO_STAGES, canDeleteCoDaySlip, canEditCoDay, canUseCoDay, isISODate, parseStage } from '@/lib/co-day';
 import { LINE_COLS, cleanLine, ensureDraftSlip, readCoDeleted, writeCoDeleted, type LineIn } from '@/lib/co-day-server';
 
 export const runtime = 'nodejs';
@@ -67,9 +67,10 @@ export async function POST(req: Request) {
 // DELETE /api/co-days?date=YYYY-MM-DD — xoá CẢ phiếu ngày (anh Hữu 05/10/2026: xoá ở app tăng ca hay app chính đều được).
 // Phiếu app chính đang giữ (đã nhận / đang đẩy / sửa sau khi gửi) → ghi hàng chờ xoá, agent báo app chính xoá theo (~1 phút).
 // Phiếu chưa từng về app chính, hoặc app chính đã xoá trả về → chỉ xoá ở đây.
+// CHỈ tổ trưởng CO + admin (anh Hữu 06/10/2026) — tổ viên chỉ xoá từng dòng.
 export async function DELETE(req: Request) {
   const session = await getSession();
-  if (!canEditCoDay(session)) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
+  if (!canDeleteCoDaySlip(session)) return NextResponse.json({ error: 'Chỉ tổ trưởng xoá được cả phiếu ngày' }, { status: 403 });
   const sp = new URL(req.url).searchParams;
   const date = sp.get('date');
   const stage = parseStage(sp.get('stage'));
