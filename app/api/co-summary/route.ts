@@ -72,8 +72,9 @@ export async function GET(req: Request) {
       .map((g) => {
         const gEa = gmap.get(g.item_code.toUpperCase()) ?? 0;
         const kg = Math.round(g.kg * 1000) / 1000;
+        // Làm tròn EA TỪNG LOT rồi cộng → EA của mã = Σ EA các LOT, khớp tuyệt đối với bảng chi tiết (anh Hữu 07/10/2026)
         const lots: LotRow[] = g.lots.map((x) => ({ ...x, ea: gEa > 0 ? Math.round((x.kg * 1000) / gEa) : null }));
-        return { ...g, lots, kg, g_ea: gEa || null, ea: gEa > 0 ? Math.round((kg * 1000) / gEa) : null };
+        return { ...g, lots, kg, g_ea: gEa || null, ea: gEa > 0 ? lots.reduce((s, x) => s + (x.ea ?? 0), 0) : null };
       })
       .sort((a, b) => a.item_code.localeCompare(b.item_code));
     return {

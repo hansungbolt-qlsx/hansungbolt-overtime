@@ -44,7 +44,8 @@ for it in b86["items"]:
     ck(all("-" in x["lot"] for x in lots), "  LOT đúng định dạng xi mạ (có gạch)", [x["lot"] for x in lots])
     if it["g_ea"]:
         ck(all(x["ea"] == round(x["kg"] * 1000 / it["g_ea"]) for x in lots), f"  EA từng LOT = kg×1000÷{it['g_ea']}")
-        print(f"      Σ EA từng LOT {sum(x['ea'] for x in lots):,} · EA dòng mã {it['ea']:,}")
+        ck(sum(x["ea"] for x in lots) == it["ea"], f"  Σ EA từng LOT {sum(x['ea'] for x in lots):,} = EA dòng mã {it['ea']:,} (khớp tuyệt đối)")
+ck(b86["total_ea"] == sum(i["ea"] or 0 for i in b86["items"]), f"Tổng EA khối CO {b86['total_ea']:,} = Σ EA các mã")
 mine = {l["lot_no"]: l for l in lines}
 for raw in ("2610030154", "2609240006", "2609240001"):
     if raw in mine:

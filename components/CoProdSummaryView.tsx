@@ -64,7 +64,7 @@ export default function CoProdSummaryView() {
           <button type="button" className={nav} onClick={() => setDate(shift(date, 1))} aria-label="Ngày sau">→</button>
         </div>
         <p className="text-[11px] text-brand-navy-soft">
-          Số lượng (EA) = Trọng lượng (Kg) × 1000 ÷ trọng lượng thành phẩm 1 EA của mã hàng trên ERP. Tính cả các dòng chưa bấm Gửi.
+          Số lượng (EA) = Trọng lượng (Kg) × 1000 ÷ trọng lượng thành phẩm 1 EA của mã hàng trên ERP, làm tròn từng LOT rồi cộng. Tính cả các dòng chưa bấm Gửi.
         </p>
         {err && <div className="text-sm text-red-600">{err}</div>}
       </div>
