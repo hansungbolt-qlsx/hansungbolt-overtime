@@ -166,7 +166,9 @@ function fmtSaeji(l: Lot): string {
 // (6-9 số) vẫn nhận.
 // export: bộ phận CO dùng riêng thẻ này làm tab 'In phiếu DCCD' (anh Hữu 05/10/2026)
 // onlyCodes (CO, anh Hữu 05/10/2026): chỉ hiện chỉ thị đang mở của các mã này, hiện sẵn danh sách khi chưa gõ, gõ 1 ký tự là lọc
-// onlyCodes dạng { công đoạn: mã[] } (06/10/2026): CĐ 86 → 15 mã Coating, CĐ 84 → mã A/B (ERP) — đổi công đoạn là đổi danh sách
+// onlyCodes dạng { công đoạn: mã[] } (06/10/2026): CĐ 86 → 15 mã Coating, CĐ 84 → mã A/B (ERP)
+// 07/10/2026 (anh Hữu): BỎ ô chọn công đoạn — gộp chung danh sách, công đoạn tự suy ra từ mã của chỉ thị
+// (ERP: 0 mã có cả 84 và 86); gõ thẳng số chỉ thị chỉ nhận khi chỉ thị nằm trong danh sách này
 export function DccdCard({ options, onlyCodes }: { options: [string, string][]; onlyCodes?: string[] | Record<string, string[]> }) {
   const [q, setQ] = useState('');
   const [catalog, setCatalog] = useState<Lot[] | null>(null);
@@ -176,10 +178,17 @@ export function DccdCard({ options, onlyCodes }: { options: [string, string][]; 
   const [copies, setCopies] = useState('1');
 
   // Lazy tải catalog khi bắt đầu gõ (1 lần, ~50KB)
-  const byGj = onlyCodes && !Array.isArray(onlyCodes);
-  const codeList = byGj ? (onlyCodes as Record<string, string[]>)[gj] ?? [] : (onlyCodes as string[] | undefined) ?? [];
+  const byGj = !!onlyCodes && !Array.isArray(onlyCodes);
+  const gjMap = new Map<string, string>();   // mã hàng (HOA) → công đoạn
+  if (byGj) {
+    for (const [g, codes] of Object.entries(onlyCodes as Record<string, string[]>)) {
+      for (const c of codes) gjMap.set(c.toUpperCase(), g);
+    }
+  }
+  const codeList = byGj ? [...gjMap.keys()] : (onlyCodes as string[] | undefined) ?? [];
   const only = byGj || codeList.length > 0 ? new Set(codeList.map((c) => c.toUpperCase())) : null;
-  const groupName = gj === '84' ? 'A/B' : 'Coating';
+  const groupName = byGj ? 'Coating hoặc A/B' : 'Coating';
+  const gjLabel = (g: string | null | undefined) => options.find(([v]) => v === g)?.[1] ?? '';
   useEffect(() => {
     if ((!q && !only) || catalog !== null) return;
     let cancelled = false;
@@ -201,7 +210,7 @@ export function DccdCard({ options, onlyCodes }: { options: [string, string][]; 
   const minLen = only ? 0 : 3;
   const matches =
     !sel && qn.length >= minLen && pool
-      ? pool.filter((l) => l.code.toUpperCase().includes(qn)).slice(0, only ? 50 : 8)
+      ? pool.filter((l) => l.code.toUpperCase().includes(qn)).slice(0, only ? 100 : 8)
       : [];
   // Gõ thẳng số chỉ thị (chỉ số/dấu gạch) → in trực tiếp, nhưng CHỈ khi không
   // khớp mã hàng nào — mã hàng nào cũng mở đầu bằng 6 chữ số (bug 13/7: gõ tới
@@ -214,11 +223,23 @@ export function DccdCard({ options, onlyCodes }: { options: [string, string][]; 
       ? qDigits
       : null;
 
-  const target = sel
-    ? { saeji: sel.saeji.replace(/\D/g, ''), label: `${fmtSaeji(sel)} — ${sel.code}` }
-    : directSaeji
-      ? { saeji: directSaeji, label: `chỉ thị ${qn}` }
-      : null;
+  // Bộ phận CO: số chỉ thị gõ thẳng phải nằm trong danh sách Coating/A/B đang mở
+  const fullSaeji = (d: string) => (d.length === 6 ? '202' + d : d.length === 7 ? '20' + d : d);
+  const directLot = byGj && directSaeji && pool
+    ? pool.find((l) => l.saeji.replace(/\D/g, '') === fullSaeji(directSaeji)) ?? null
+    : null;
+  const pickedLot = sel ?? directLot;
+  const effGj = byGj ? (pickedLot ? gjMap.get(pickedLot.code.toUpperCase()) ?? null : null) : gj;
+
+  const target = byGj
+    ? pickedLot && effGj
+      ? { saeji: pickedLot.saeji.replace(/\D/g, ''), label: `${fmtSaeji(pickedLot)} — ${pickedLot.code}` }
+      : null
+    : sel
+      ? { saeji: sel.saeji.replace(/\D/g, ''), label: `${fmtSaeji(sel)} — ${sel.code}` }
+      : directSaeji
+        ? { saeji: directSaeji, label: `chỉ thị ${qn}` }
+        : null;
 
   return (
     <div className="bg-white rounded-lg border border-brand-surface-alt p-3 mb-3">
@@ -237,18 +258,27 @@ export function DccdCard({ options, onlyCodes }: { options: [string, string][]; 
             className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm font-mono text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal"
           />
         </div>
-        <div>
-          <label className="block text-[11px] text-brand-navy-soft mb-0.5">Công đoạn</label>
-          <select
-            value={gj}
-            onChange={(e) => { setGj(e.target.value); if (byGj) setSel(null); }}
-            className="px-2 py-1.5 border border-gray-300 rounded-md text-sm text-brand-navy"
-          >
-            {options.map(([v, label]) => (
-              <option key={v} value={v}>{label}</option>
-            ))}
-          </select>
-        </div>
+        {byGj ? (
+          <div>
+            <label className="block text-[11px] text-brand-navy-soft mb-0.5">Công đoạn</label>
+            <div className="px-2 py-1.5 border border-gray-200 bg-slate-50 rounded-md text-sm text-brand-navy min-w-[120px]">
+              {effGj ? gjLabel(effGj) : <span className="text-brand-navy-soft">tự theo mã hàng</span>}
+            </div>
+          </div>
+        ) : (
+          <div>
+            <label className="block text-[11px] text-brand-navy-soft mb-0.5">Công đoạn</label>
+            <select
+              value={gj}
+              onChange={(e) => setGj(e.target.value)}
+              className="px-2 py-1.5 border border-gray-300 rounded-md text-sm text-brand-navy"
+            >
+              {options.map(([v, label]) => (
+                <option key={v} value={v}>{label}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
           <label className="block text-[11px] text-brand-navy-soft mb-0.5">Số bản</label>
           <select
@@ -264,7 +294,7 @@ export function DccdCard({ options, onlyCodes }: { options: [string, string][]; 
         {target ? (
           <PrintJobButton
             type="dccd"
-            refId={`${target.saeji}|${gj}|${copies}`}
+            refId={`${target.saeji}|${effGj}|${copies}`}
             label="In phiếu"
           />
         ) : (
@@ -286,9 +316,15 @@ export function DccdCard({ options, onlyCodes }: { options: [string, string][]; 
               {catAt ? ` (danh sách lúc ${catAt.slice(11, 16)})` : ''}
             </p>
           )}
-          {catalog !== null && matches.length === 0 && directSaeji && (
+          {catalog !== null && matches.length === 0 && directSaeji && (!byGj || directLot) && (
             <p className="text-[11px] text-brand-navy-soft">
-              Sẽ in thẳng chỉ thị <b className="font-mono">{qn}</b> — bấm In phiếu
+              Sẽ in thẳng chỉ thị <b className="font-mono">{qn}</b>
+              {directLot ? <> — {directLot.code}</> : null} — bấm In phiếu
+            </p>
+          )}
+          {catalog !== null && matches.length === 0 && directSaeji && byGj && !directLot && (
+            <p className="text-[11px] text-red-600">
+              Chỉ thị <b className="font-mono">{qn}</b> không thuộc mã Coating hoặc A/B đang mở — không in được ở đây
             </p>
           )}
           {matches.length > 0 && (
@@ -302,6 +338,9 @@ export function DccdCard({ options, onlyCodes }: { options: [string, string][]; 
                   className="w-full flex items-center gap-4 px-3 py-2 text-left hover:bg-sky-50 transition"
                 >
                   <span className="font-mono text-sm text-brand-navy flex-1">{l.code}</span>
+                  {byGj && (
+                    <span className="text-[11px] text-brand-navy-soft">{gjLabel(gjMap.get(l.code.toUpperCase()))}</span>
+                  )}
                   <span className="font-mono font-bold text-[#063882] text-sm">{fmtSaeji(l)}</span>
                 </button>
               ))}
