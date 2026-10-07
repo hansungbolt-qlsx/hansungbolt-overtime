@@ -80,6 +80,26 @@ with sync_playwright() as pw:
     ck(it0["lots"][0]["lot"] in sub.inner_text(), f"có LOT {it0['lots'][0]['lot']}")
     shot = Path(tempfile.gettempdir()) / "co_summary_lot.png"
     page.screenshot(path=str(shot), full_page=True); print("   ảnh:", shot)
+    # Vừa chiều ngang (anh Hữu 07/10/2026): không phần tử nào tràn ngang, cả khi mở chi tiết, ở 3 cỡ điện thoại
+    for w in (320, 360, 375, 390):
+        page.set_viewport_size({"width": w, "height": 900})
+        page.wait_for_timeout(200)
+        over = page.evaluate("""() => {
+          const doc = document.documentElement.scrollWidth > window.innerWidth;
+          const bad = [...document.querySelectorAll('table')].filter(t => t.scrollWidth > t.parentElement.clientWidth + 1).length;
+          return {doc, bad};
+        }""")
+        ck(not over["doc"] and over["bad"] == 0, f"rộng {w}px (đang mở chi tiết): không tràn ngang", over)
+        if w >= 360:
+            # mã hàng nằm 1 dòng (chiều cao ô mã ≈ 1 dòng chữ) ở cỡ điện thoại thường
+            # đếm số dòng chữ thật trong ô mã (số mức 'top' khác nhau của các mảnh chữ)
+            hs = page.evaluate("""() => [...document.querySelectorAll('tbody > tr > td:first-child.font-bold')].map(td => {
+                                     const r = document.createRange(); r.selectNodeContents(td);
+                                     const tops = new Set([...r.getClientRects()].map(x => Math.round(x.top)));
+                                     return [td.innerText, tops.size]; })""")
+            ck(all(n == 1 for _, n in hs), f"  rộng {w}px: mã hàng không xuống dòng", hs)
+    page.set_viewport_size({"width": 375, "height": 900})
+    page.screenshot(path=str(Path(tempfile.gettempdir()) / "co_summary_375.png"), full_page=True)
     blk.get_by_role("button", name=f"{it0['n_lot']} ▴").first.click()
     ck(blk.locator("table table").count() == 0, "bấm lại → đóng chi tiết")
     br.close()
