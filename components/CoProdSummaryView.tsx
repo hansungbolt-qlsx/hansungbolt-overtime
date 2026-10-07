@@ -3,10 +3,11 @@
 // TỔNG HỢP SẢN LƯỢNG theo ngày — bộ phận Coating (anh Hữu chốt 06/10/2026).
 // 2 khối: Công đoạn CO (86) · Công đoạn AB (84). Mỗi khối: từng mã hàng làm trong ngày → Σ Kg + Σ EA
 // (EA = Kg × 1000 ÷ trọng lượng thành phẩm 1 EA trên ERP). Tính cả dòng chưa bấm Gửi. Chọn ngày = xem lại ngày cũ.
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import DateButton from './DateButton';
 
-type Item = { item_code: string; item_name: string; n_lot: number; kg: number; g_ea: number | null; ea: number | null };
+type Item = { item_code: string; item_name: string; n_lot: number; kg: number; g_ea: number | null; ea: number | null;
+  lots?: { lot: string; kg: number; ea: number | null }[] };
 type Block = {
   stage: '86' | '84'; short: string; status: 'draft' | 'pending' | 'received' | null;
   n_lot: number; total_kg: number; total_ea: number; n_no_g: number; items: Item[];
@@ -34,6 +35,8 @@ export default function CoProdSummaryView() {
   const [date, setDate] = useState(todayISO());
   const [blocks, setBlocks] = useState<Block[] | null>(null);
   const [err, setErr] = useState('');
+  // Mã đang mở chi tiết LOT ('86|080290-FM6R-D') — bấm số LOT để mở/đóng (anh Hữu 07/10/2026)
+  const [open, setOpen] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -88,20 +91,53 @@ export default function CoProdSummaryView() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-brand-surface-alt">
-                  {b.items.map((it) => (
-                    <tr key={it.item_code}>
-                      <td className="px-3 py-2">
-                        <div className="font-bold text-brand-navy">{it.item_code}</div>
-                        {it.item_name && <div className="text-[11px] text-brand-navy-soft">{it.item_name}</div>}
+                  {b.items.map((it) => {
+                    const key = `${b.stage}|${it.item_code}`;
+                    const isOpen = open === key;
+                    return (
+                    <Fragment key={it.item_code}>
+                    <tr className={isOpen ? 'bg-sky-50' : ''}>
+                      {/* Chỉ mã hàng, không tên (anh Hữu 07/10/2026) */}
+                      <td className="px-3 py-2 font-bold text-brand-navy whitespace-nowrap">{it.item_code}</td>
+                      <td className="px-2 py-2 text-right tabular-nums">
+                        <button type="button" onClick={() => setOpen(isOpen ? null : key)}
+                          className="min-w-[2.5rem] px-2 py-1 rounded-md border border-brand-teal text-brand-teal font-bold whitespace-nowrap active:scale-95">
+                          {it.n_lot} {isOpen ? '▴' : '▾'}
+                        </button>
                       </td>
-                      <td className="px-2 py-2 text-right tabular-nums">{it.n_lot}</td>
                       <td className="px-2 py-2 text-right tabular-nums font-semibold">{fmtKg(it.kg)}</td>
                       <td className="px-3 py-2 text-right tabular-nums font-bold text-brand-navy">
                         {it.ea !== null ? fmtEa(it.ea) : <span className="text-amber-700 text-xs font-semibold">chưa có trọng lượng 1 EA</span>}
                         {it.g_ea !== null && <div className="text-[10px] text-brand-navy-soft font-normal">{it.g_ea} g/EA</div>}
                       </td>
                     </tr>
-                  ))}
+                    {isOpen && (
+                      <tr className="bg-sky-50">
+                        <td colSpan={4} className="px-3 pb-3 pt-0">
+                          <table className="w-full text-sm bg-white rounded-md border border-sky-200">
+                            <thead>
+                              <tr className="text-xs text-brand-navy-soft">
+                                <th className="px-2 py-1.5 text-left">LOT NO</th>
+                                <th className="px-2 py-1.5 text-right">Trọng lượng (Kg)</th>
+                                <th className="px-2 py-1.5 text-right">Số lượng (EA)</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-sky-100">
+                              {(it.lots ?? []).map((l, i) => (
+                                <tr key={i}>
+                                  <td className="px-2 py-1.5 tabular-nums">{l.lot}</td>
+                                  <td className="px-2 py-1.5 text-right tabular-nums">{fmtKg(l.kg)}</td>
+                                  <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{l.ea !== null ? fmtEa(l.ea) : '—'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
+                    );
+                  })}
                   <tr className="bg-slate-100 font-bold text-brand-navy">
                     <td className="px-3 py-2">Tổng</td>
                     <td className="px-2 py-2 text-right tabular-nums">{b.n_lot}</td>

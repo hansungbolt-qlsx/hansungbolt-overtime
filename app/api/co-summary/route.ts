@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
-import { CO_LOTS_BUCKET, CO_STAGES, canUseCoDay, isISODate, unitWeights, type CoStage } from '@/lib/co-day';
+import { CO_LOTS_BUCKET, CO_STAGES, canUseCoDay, decodeCoLots, isISODate, unitWeights, type CoStage } from '@/lib/co-day';
 
 export const runtime = 'nodejs';
 
@@ -11,23 +11,30 @@ export const runtime = 'nodejs';
 // GET /api/co-summary?date=YYYY-MM-DD
 
 const STAGE_ORDER: CoStage[] = ['86', '84'];
-let gCache: { at: number; map: Map<string, number> } | null = null;   // bảng g/EA, giữ 10' mỗi phiên máy chủ
+// bảng g/EA + nhãn LOT ('2610030154' → '261003-0154-NPT', cho dòng gõ tay cũ chưa có nhãn), giữ 10' mỗi phiên máy chủ
+let gCache: { at: number; map: Map<string, number>; labels: Map<string, string> } | null = null;
 
-async function loadUnitWeights(): Promise<Map<string, number>> {
-  if (gCache && Date.now() - gCache.at < 600_000) return gCache.map;
+async function loadUnitWeights(): Promise<{ map: Map<string, number>; labels: Map<string, string> }> {
+  if (gCache && Date.now() - gCache.at < 600_000) return gCache;
   const map = new Map<string, number>();
+  const labels = new Map<string, string>();
   for (const st of STAGE_ORDER) {
     const { data } = await supabaseAdmin.storage.from(CO_LOTS_BUCKET).download(CO_STAGES[st].lotsPath);
     if (!data) continue;
     try {
-      for (const [k, v] of unitWeights(JSON.parse(await data.text()))) map.set(k, v);
+      const j = JSON.parse(await data.text());
+      for (const [k, v] of unitWeights(j)) map.set(k, v);
+      for (const [k, l] of decodeCoLots(j)) labels.set(k, l.label);
     } catch { /* catalog hỏng → mã đó không quy đổi được EA */ }
   }
-  gCache = { at: Date.now(), map };
-  return map;
+  gCache = { at: Date.now(), map, labels };
+  return gCache;
 }
 
-type Line = { slip_id: string; item_code: string | null; item_name: string | null; weight_kg: number };
+type Line = { slip_id: string; seq_no: number; machine: string | null; lot_no: string; lot_label: string | null;
+  item_code: string | null; item_name: string | null; weight_kg: number };
+// Chi tiết từng LOT khi bấm số LOT (anh Hữu 07/10/2026): chỉ LOT NO · Trọng lượng · Số lượng
+type LotRow = { lot: string; kg: number; ea: number | null };
 
 export async function GET(req: Request) {
   const session = await getSession();
@@ -42,20 +49,22 @@ export async function GET(req: Request) {
   let lines: Line[] = [];
   if (ids.length) {
     const { data, error } = await supabaseAdmin
-      .from('co_day_lines').select('slip_id, item_code, item_name, weight_kg').in('slip_id', ids);
+      .from('co_day_lines').select('slip_id, seq_no, machine, lot_no, lot_label, item_code, item_name, weight_kg').in('slip_id', ids);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     lines = (data ?? []) as Line[];
   }
-  const gmap = lines.length ? await loadUnitWeights() : new Map<string, number>();
+  const { map: gmap, labels } = lines.length ? await loadUnitWeights() : { map: new Map<string, number>(), labels: new Map<string, string>() };
+  lines.sort((a, b) => (a.machine ?? '~').localeCompare(b.machine ?? '~') || a.seq_no - b.seq_no);
 
   const stages = STAGE_ORDER.map((st) => {
     const slip = (slips ?? []).find((s) => (s.stage ?? '86') === st) ?? null;
-    const by = new Map<string, { item_code: string; item_name: string; n_lot: number; kg: number }>();
+    const by = new Map<string, { item_code: string; item_name: string; n_lot: number; kg: number; lots: { lot: string; kg: number }[] }>();
     for (const l of lines.filter((x) => slip && x.slip_id === slip.id)) {
       const code = (l.item_code ?? '').trim() || '(chưa có mã)';
-      const g = by.get(code) ?? { item_code: code, item_name: l.item_name ?? '', n_lot: 0, kg: 0 };
+      const g = by.get(code) ?? { item_code: code, item_name: l.item_name ?? '', n_lot: 0, kg: 0, lots: [] };
       g.n_lot += 1;
       g.kg += Number(l.weight_kg) || 0;
+      g.lots.push({ lot: l.lot_label || labels.get(l.lot_no) || l.lot_no, kg: Number(l.weight_kg) || 0 });
       if (!g.item_name && l.item_name) g.item_name = l.item_name;
       by.set(code, g);
     }
@@ -63,7 +72,8 @@ export async function GET(req: Request) {
       .map((g) => {
         const gEa = gmap.get(g.item_code.toUpperCase()) ?? 0;
         const kg = Math.round(g.kg * 1000) / 1000;
-        return { ...g, kg, g_ea: gEa || null, ea: gEa > 0 ? Math.round((kg * 1000) / gEa) : null };
+        const lots: LotRow[] = g.lots.map((x) => ({ ...x, ea: gEa > 0 ? Math.round((x.kg * 1000) / gEa) : null }));
+        return { ...g, lots, kg, g_ea: gEa || null, ea: gEa > 0 ? Math.round((kg * 1000) / gEa) : null };
       })
       .sort((a, b) => a.item_code.localeCompare(b.item_code));
     return {
