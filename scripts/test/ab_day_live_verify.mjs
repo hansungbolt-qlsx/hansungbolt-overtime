@@ -45,8 +45,15 @@ ck(r.s === 400, 'AB với máy CO-01 → chặn', r);
 r = await j('/api/co-days', { method: 'POST', body: JSON.stringify({ date: D, stage: '84', line: L({ employee_id: emp }) }) });
 ck(r.s === 200 && r.b.line?.machine === 'AB-01', 'thêm dòng AB', r);
 const abLine = r.b.line?.id;
+// CO bắt buộc LOT có trong danh sách (07/10/2026) → dùng 1 LOT thật của 080300-FM5L-DS; LOT giả phải bị chặn
+const cat86 = (await j('/api/co-lots?stage=86')).b;
+const iFM5L = cat86.items.findIndex((x) => x[0] === '080300-FM5L-DS');
+const lotFM5L = cat86.lots.find((x) => x[3] === iFM5L)?.[0];
+ck(!!lotFM5L, 'danh sách CO có LOT 080300-FM5L-DS', iFM5L);
 r = await j('/api/co-days', { method: 'POST', body: JSON.stringify({ date: D, line: L({ employee_id: emp, machine: 'CO-03', item_code: '080300-FM5L-DS', weight_kg: 30, lot_no: '2001010002' }) }) });
-ck(r.s === 200, 'thêm dòng CO cùng ngày (không gửi stage = 86)', r);
+ck(r.s === 400 && /Không có LOT này/.test(r.b.error || ''), 'dòng CO LOT giả → 400 Không có LOT này', r);
+r = await j('/api/co-days', { method: 'POST', body: JSON.stringify({ date: D, line: L({ employee_id: emp, machine: 'CO-03', item_code: 'X', weight_kg: 30, lot_no: lotFM5L }) }) });
+ck(r.s === 200 && r.b.line?.item_code === '080300-FM5L-DS', 'thêm dòng CO cùng ngày (không gửi stage = 86), mã hàng lấy theo LOT', r);
 r = await j('/api/co-days', { method: 'POST', body: JSON.stringify({ date: D, line: L({ employee_id: emp, machine: 'AB-01' }) }) });
 ck(r.s === 400, 'CO với máy AB-01 → chặn', r);
 const g84 = await j(`/api/co-days?date=${D}&stage=84`), g86 = await j(`/api/co-days?date=${D}`);

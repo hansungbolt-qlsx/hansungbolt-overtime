@@ -1,6 +1,29 @@
 // Hàm phía server dùng chung cho các route /api/co-days/* (Next.js không cho route.ts xuất hàm phụ).
 import { supabaseAdmin } from '@/lib/supabase';
-import { CO_STAGES, coUid, normalizeLot, type CoStage } from '@/lib/co-day';
+import { CO_LOTS_BUCKET, CO_STAGES, NO_LOT_MSG, coUid, decodeCoLots, normalizeLot, type CoLot, type CoStage } from '@/lib/co-day';
+
+// Catalog LOT xi mạ phía server (anh Hữu 07/10/2026: CO bắt buộc LOT có trong danh sách). Giữ trong bộ nhớ 60 giây
+// cho đỡ tải Storage (gói Free); LOT không thấy → tải lại 1 lần (catalog agent đẩy mỗi 10') rồi mới kết luận.
+const catCache = new Map<string, { at: number; m: Map<string, CoLot> }>();
+async function serverCatalog(stage: CoStage, fresh = false): Promise<Map<string, CoLot> | null> {
+  const path = CO_STAGES[stage].lotsPath;
+  const c = catCache.get(path);
+  if (!fresh && c && Date.now() - c.at < 60_000) return c.m;
+  const { data } = await supabaseAdmin.storage.from(CO_LOTS_BUCKET).download(path);
+  if (!data) return null;
+  try {
+    const m = decodeCoLots(JSON.parse(await data.text()));
+    catCache.set(path, { at: Date.now(), m });
+    return m;
+  } catch { return null; }
+}
+async function findLot(stage: CoStage, key: string): Promise<{ lot?: CoLot; error?: string }> {
+  let m = await serverCatalog(stage);
+  let lot = m?.get(key);
+  if (!lot) { m = await serverCatalog(stage, true); lot = m?.get(key); }
+  if (!m || m.size === 0) return { error: 'Chưa có danh sách LOT xi mạ — thử lại sau ít phút' };
+  return lot ? { lot } : { error: `${NO_LOT_MSG} (${key}) trong danh sách LOT xi mạ ${CO_STAGES[stage].itemsLabel}, 12 tháng` };
+}
 
 export const LINE_COLS =
   'id, seq_no, machine, lot_no, lot_label, vendor, saeji, item_code, item_name, lot_weight_kg, weight_kg, lot_qty, employee_id, employee_name, note, matched, created_by_name';
@@ -30,6 +53,19 @@ export async function cleanLine(b: LineIn, stage: CoStage = '86'): Promise<{ row
     return { error: 'Chưa chọn nhân viên' };
   }
   const num = (v: unknown) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+  if (CO_STAGES[stage].requireLot) {
+    // Thông tin LOT lấy từ danh sách ERP, không lấy theo điện thoại gửi lên
+    const f = await findLot(stage, lot);
+    if (!f.lot) return { error: f.error };
+    const l = f.lot;
+    return {
+      row: {
+        machine, lot_no: lot, lot_label: l.label, vendor: l.vendor, saeji: l.saeji,
+        item_code: l.item, item_name: l.name || null, lot_weight_kg: l.kg, weight_kg: Math.round(kg * 1000) / 1000, lot_qty: l.qty,
+        employee_id: b.employee_id, employee_name, note: (b.note ?? '').toString().trim() || null, matched: true,
+      },
+    };
+  }
   return {
     row: {
       machine, lot_no: lot,

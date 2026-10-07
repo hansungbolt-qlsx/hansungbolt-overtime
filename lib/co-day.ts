@@ -9,12 +9,15 @@ export const CO_LOTS_PATH = 'co-lots.json';
 // Công đoạn dùng chung bảng co_day_* (anh Hữu 06/10/2026): '86' Coating · '84' A/B (máy mặc định AB-01).
 // Mã A/B app chính tự lấy từ ERP (mã có CĐ 84 + xi mạ 80) → catalog riêng ab-lots.json.
 export type CoStage = '86' | '84';
+// requireLot (anh Hữu 07/10/2026): CO BẮT BUỘC quét được LOT xi mạ có trong danh sách mới nhập tiếp; LOT không có → chặn,
+// báo "Không có LOT này" (client + server). AB vẫn cho gõ tay (12 tháng chỉ ~14 LOT xi mạ, nhiều tem phải gõ tay).
 export const CO_STAGES: Record<CoStage, {
-  short: string; title: string; uidPrefix: string; machines: readonly string[]; lotsPath: string; itemsLabel: string;
+  short: string; title: string; uidPrefix: string; machines: readonly string[]; lotsPath: string; itemsLabel: string; requireLot: boolean;
 }> = {
-  '86': { short: 'CO', title: 'Sản lượng CO', uidPrefix: 'CO', machines: CO_MACHINES, lotsPath: CO_LOTS_PATH, itemsLabel: 'mã Coating' },
-  '84': { short: 'AB', title: 'Sản lượng AB', uidPrefix: 'AB', machines: ['AB-01'], lotsPath: 'ab-lots.json', itemsLabel: 'mã A/B công đoạn 84' },
+  '86': { short: 'CO', title: 'Sản lượng CO', uidPrefix: 'CO', machines: CO_MACHINES, lotsPath: CO_LOTS_PATH, itemsLabel: 'mã Coating', requireLot: true },
+  '84': { short: 'AB', title: 'Sản lượng AB', uidPrefix: 'AB', machines: ['AB-01'], lotsPath: 'ab-lots.json', itemsLabel: 'mã A/B công đoạn 84', requireLot: false },
 };
+export const NO_LOT_MSG = 'Không có LOT này';
 /** Giá trị lạ / thiếu → '86' (phiếu trước 06/10 là Coating). */
 export function parseStage(v: unknown): CoStage {
   return String(v ?? '').trim() === '84' ? '84' : '86';

@@ -4,12 +4,12 @@
 // Quét tem LOT xi mạ (mã vạch 10 số) → chỉ thị · mã hàng · kg tự hiện (catalog ERP agent đẩy lên)
 // → chọn máy, sửa kg nếu cần, chọn nhân viên, ghi chú → Thêm. Cuối ngày bấm "Gửi phiếu" → app chính lưu vĩnh viễn.
 // stage (06/10/2026): '86' Sản lượng CO (máy CO-01..03) · '84' Sản lượng AB công đoạn 84 (máy AB-01) — cùng 1 màn.
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import BarcodeScanButton from './BarcodeScanButton';
 import DateButton from './DateButton';
 import PrintJobButton from './PrintJobButton';
 import { toTitleCase } from '@/lib/format';
-import { CO_STAGES, decodeCoLots, normalizeLot, type CoLine, type CoLot, type CoSlip, type CoStage } from '@/lib/co-day';
+import { CO_STAGES, NO_LOT_MSG, decodeCoLots, normalizeLot, type CoLine, type CoLot, type CoSlip, type CoStage } from '@/lib/co-day';
 
 type Emp = { id: string; full_name: string; order_no: number };
 
@@ -82,21 +82,35 @@ export default function CoDailyView({ currentUserFullName, stage = '86', canSend
 
   // Catalog LOT xi mạ: CHỈ tải khi bấm Quét / bắt đầu gõ LOT (anh Hữu 05/10/2026: tiết kiệm gói Free),
   // 1 lần mỗi lần mở app. File gọn ≈ 110 KB (15 mã Coating, 12 tháng).
+  // 07/10/2026: quét/gõ trong lúc ĐANG tải thì CHỜ cùng lần tải đó (trước trả rỗng → LOT có trên ERP bị coi là gõ tay,
+  // vụ 3 dòng CO 06/10). fresh = tải lại bỏ cache khi không thấy LOT (agent đẩy catalog mỗi 10'), tối đa 1 lần/phút.
   const [catLoading, setCatLoading] = useState(false);
-  const ensureCatalog = useCallback(async (): Promise<Map<string, CoLot> | null> => {
-    if (catalog) return catalog;
-    if (catLoading) return null;
+  const catRef = useRef<Map<string, CoLot> | null>(null);
+  const catPending = useRef<Promise<Map<string, CoLot> | null> | null>(null);
+  const lastFresh = useRef(0);
+  const ensureCatalog = useCallback(async (fresh = false): Promise<Map<string, CoLot> | null> => {
+    if (catRef.current && !fresh) return catRef.current;
+    if (catPending.current) return catPending.current;
+    if (fresh) {
+      if (Date.now() - lastFresh.current < 60_000) return catRef.current;
+      lastFresh.current = Date.now();
+    }
     setCatLoading(true);
-    try {
-      const j = await (await fetch(`/api/co-lots?stage=${stage}`)).json();
-      const m = decodeCoLots(j);
-      setCatalog(m); setCatAt(j.generated_at ?? null);
-      setCatErr(j.error ? String(j.error) : '');
-      return m;
-    } catch {
-      setCatErr('Không tải được danh sách LOT'); return null;
-    } finally { setCatLoading(false); }
-  }, [catalog, catLoading, stage]);
+    catPending.current = (async () => {
+      try {
+        const r = await fetch(`/api/co-lots?stage=${stage}${fresh ? `&t=${Date.now()}` : ''}`, fresh ? { cache: 'no-store' } : undefined);
+        const j = await r.json();
+        const m = decodeCoLots(j);
+        catRef.current = m;
+        setCatalog(m); setCatAt(j.generated_at ?? null);
+        setCatErr(j.error ? String(j.error) : '');
+        return m;
+      } catch {
+        setCatErr('Không tải được danh sách LOT'); return catRef.current;
+      } finally { setCatLoading(false); catPending.current = null; }
+    })();
+    return catPending.current;
+  }, [stage]);
 
   // Mặc định nhân viên = chính người đăng nhập (nếu là 1 trong 4 người CO)
   const myEmpId = useMemo(() => {
@@ -106,17 +120,38 @@ export default function CoDailyView({ currentUserFullName, stage = '86', canSend
   // Nhân viên đang chọn: chọn tay > mặc định là chính người đăng nhập
   const empSel = d.employeeId || myEmpId;
 
-  function applyLot(text: string, cat: Map<string, CoLot> | null = catalog) {
+  // Ô LOT đổi / quét xong → hiện chữ ngay, rồi CHỜ catalog mới tra; chỉ áp kết quả nếu ô vẫn là chuỗi đó.
+  // keepKg: mở Sửa dòng cũ thì giữ kg đã nhập, không thay bằng kg LOT ERP.
+  const lotTextRef = useRef('');
+  const [lotChecking, setLotChecking] = useState(false);
+  async function applyLot(text: string, keepKg = false) {
+    lotTextRef.current = text;
     const key = normalizeLot(text);
-    const lot = cat?.get(key) ?? null;
+    setD((x) => {
+      const same = x.lot?.lot === key;
+      // CO: bỏ LOT cũ thì bỏ luôn kg của LOT đó (đang Sửa dòng thì giữ kg đã nhập)
+      const dropKg = cfg.requireLot && !same && !!x.lot && !x.editId && !keepKg;
+      return { ...x, lotText: text, lot: same ? x.lot : null, ...(dropKg ? { kg: '' } : {}), ...(key.length < 6 ? { manual: false } : {}) };
+    });
+    if (key.length < 6) { setLotChecking(false); return; }
+    setLotChecking(true);
+    let m = await ensureCatalog();
+    let lot = m?.get(key) ?? null;
+    if (!lot && key.length >= 10) { m = await ensureCatalog(true); lot = m?.get(key) ?? null; }
+    if (lotTextRef.current !== text) return;           // đã gõ/quét chuỗi khác trong lúc chờ
+    setLotChecking(false);
     setD((x) => ({
       ...x, lotText: text, lot,
-      manual: !lot && key.length >= 6,
+      manual: !cfg.requireLot && !lot,
       saeji: lot ? lot.saeji : x.manual ? x.saeji : '',
       item: lot ? lot.item : x.manual ? x.item : '',
-      kg: lot ? String(lot.kg) : x.kg,
+      kg: lot && !keepKg ? String(lot.kg) : x.kg,
     }));
   }
+  // CO: chưa có LOT xi mạ hợp lệ thì khoá các ô còn lại (anh Hữu 07/10/2026)
+  const lotKey = normalizeLot(d.lotText);
+  const locked = cfg.requireLot && !d.lot;
+  const noLot = cfg.requireLot && !d.lot && !lotChecking && !catLoading && catalog !== null && lotKey.length >= 10;
 
   const dupLine = useMemo(() => {
     const key = normalizeLot(d.lotText);
@@ -127,6 +162,7 @@ export default function CoDailyView({ currentUserFullName, stage = '86', canSend
     setErr(''); setMsg('');
     const key = normalizeLot(d.lotText);
     if (key.length < 6) return setErr('Chưa quét / nhập LOT NO');
+    if (cfg.requireLot && !d.lot) return setErr(lotChecking || catLoading ? 'Đang tìm LOT — chờ một chút' : `${NO_LOT_MSG} — quét tem LOT xi mạ`);
     if (!d.machine) return setErr('Chưa chọn máy');
     const kg = Number(String(d.kg).replace(',', '.'));
     if (!Number.isFinite(kg) || kg <= 0) return setErr('Trọng lượng phải lớn hơn 0');
@@ -166,11 +202,14 @@ export default function CoDailyView({ currentUserFullName, stage = '86', canSend
 
   function edit(l: CoLine) {
     const lot = catalog?.get(l.lot_no) ?? null;
+    const text = l.lot_label ?? l.lot_no;
     setD({
-      editId: l.id, lotText: l.lot_label ?? l.lot_no, lot, manual: !lot,
+      editId: l.id, lotText: text, lot, manual: !cfg.requireLot && !lot,
       saeji: l.saeji ?? '', item: l.item_code ?? '', machine: l.machine, kg: String(l.weight_kg),
       employeeId: l.employee_id ?? '', note: l.note ?? '',
     });
+    // Catalog chưa tải → tải rồi tra lại (dòng cũ gõ tay 06/10 mà LOT có trong danh sách thì tự khớp khi Lưu sửa)
+    if (!lot) void applyLot(text, true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -226,12 +265,23 @@ export default function CoDailyView({ currentUserFullName, stage = '86', canSend
           <div className="text-xs font-semibold text-brand-navy">{d.editId ? '✏️ Sửa dòng' : '➕ Thêm LOT'}</div>
           <div className="flex gap-2">
             <input value={d.lotText} onFocus={() => { void ensureCatalog(); }}
-              onChange={(e) => { const v = e.target.value; void ensureCatalog().then((m) => applyLot(v, m ?? catalog)); applyLot(v); }} inputMode="numeric"
-              placeholder="LOT NO xi mạ (quét hoặc gõ 10 số)" className={inp} />
-            <BarcodeScanButton label="📷 Quét" onScan={(t) => { void ensureCatalog().then((m) => applyLot(t, m ?? catalog)); }} />
+              onChange={(e) => { void applyLot(e.target.value); }} inputMode="numeric"
+              placeholder="LOT NO xi mạ (quét hoặc gõ 10 số)" className={`${inp} ${noLot ? 'border-red-500 ring-2 ring-red-300' : ''}`} />
+            <BarcodeScanButton label="📷 Quét" onScan={(t) => { void applyLot(t); }} />
           </div>
-          {catErr && <div className="text-[11px] text-amber-700">⚠ {catErr} — vẫn gõ tay được</div>}
-          {catLoading && <div className="text-[11px] text-brand-navy-soft">Đang tải danh sách LOT xi mạ…</div>}
+          {catErr && (
+            <div className="text-[11px] text-amber-700">
+              ⚠ {catErr} — {cfg.requireLot ? 'chưa nhập được, ' : 'vẫn gõ tay được, '}
+              <button type="button" className="underline font-semibold" onClick={() => { lastFresh.current = 0; void ensureCatalog(true); }}>Tải lại</button>
+            </div>
+          )}
+          {(catLoading || lotChecking) && <div className="text-[11px] text-brand-navy-soft">Đang tải danh sách LOT xi mạ…</div>}
+          {noLot && (
+            <div className="text-sm font-bold text-red-700 bg-red-50 border border-red-300 rounded-md px-3 py-2">
+              ❌ {NO_LOT_MSG} ({lotKey}) — không có trong danh sách LOT xi mạ {cfg.itemsLabel}, 12 tháng. Kiểm tra lại tem rồi quét lại.
+            </div>
+          )}
+          {cfg.requireLot && !d.lot && !noLot && <div className="text-[11px] text-brand-navy-soft">Quét được LOT xi mạ thì mới nhập máy, trọng lượng, nhân viên.</div>}
           {!catErr && catalog && <div className="text-[11px] text-brand-navy-soft">Danh sách LOT xi mạ ({cfg.itemsLabel}, 12 tháng): {catalog.size.toLocaleString('vi-VN')} lot{catAt ? ` · cập nhật ${new Date(catAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}` : ''}</div>}
           {d.lot && (
             <div className="text-xs bg-brand-teal/10 border border-brand-teal/40 rounded-md px-3 py-2 text-brand-navy space-y-0.5">
@@ -250,6 +300,7 @@ export default function CoDailyView({ currentUserFullName, stage = '86', canSend
             </div>
           )}
           {dupLine && <div className="text-[11px] text-red-600 font-semibold">⚠ LOT này đã có ở dòng {dupLine.seq_no} ({dupLine.machine}) hôm nay</div>}
+          <fieldset disabled={locked} className={`space-y-2.5 min-w-0 ${locked ? 'opacity-40' : ''}`}>
           <div className={`grid ${cfg.machines.length === 1 ? 'grid-cols-1' : 'grid-cols-3'} gap-2`}>
             {cfg.machines.map((m) => (
               <button key={m} type="button" onClick={() => setD({ ...d, machine: m })}
@@ -274,10 +325,11 @@ export default function CoDailyView({ currentUserFullName, stage = '86', canSend
             </label>
           </div>
           <input value={d.note} onChange={(e) => setD({ ...d, note: e.target.value })} placeholder="Ghi chú" className={inp} />
+          </fieldset>
           {err && <div className="text-sm text-red-600">{err}</div>}
           {msg && <div className="text-sm text-emerald-700">{msg}</div>}
           <div className="flex gap-2">
-            <button type="button" onClick={save} disabled={busy}
+            <button type="button" onClick={save} disabled={busy || locked}
               className="flex-1 py-2.5 rounded-xl bg-brand-teal text-white font-semibold disabled:opacity-50">
               {d.editId ? 'Lưu sửa' : 'Thêm dòng'}
             </button>
