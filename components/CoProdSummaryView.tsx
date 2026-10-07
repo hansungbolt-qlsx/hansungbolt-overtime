@@ -7,7 +7,7 @@ import { Fragment, useEffect, useState } from 'react';
 import DateButton from './DateButton';
 
 type Item = { item_code: string; item_name: string; n_lot: number; kg: number; g_ea: number | null; ea: number | null;
-  lots?: { lot: string; kg: number; ea: number | null }[]; saejis?: string[] };
+  lots?: { time: string; lot: string; kg: number; ea: number | null }[]; saejis?: string[] };
 type Block = {
   stage: '86' | '84'; short: string; status: 'draft' | 'pending' | 'received' | null;
   n_lot: number; total_kg: number; total_ea: number; n_no_g: number; items: Item[];
@@ -129,10 +129,12 @@ export default function CoProdSummaryView() {
                       <tr className="bg-sky-50">
                         <td colSpan={4} className="px-2 pb-3 pt-0">
                           <table className="w-full table-fixed text-[13px] bg-white rounded-md border border-sky-200">
-                            <colgroup><col className="w-[46%]" /><col className="w-[27%]" /><col className="w-[27%]" /></colgroup>
+                            <colgroup><col className="w-[15%]" /><col className="w-[39%]" /><col className="w-[22%]" /><col className="w-[24%]" /></colgroup>
                             <thead>
                               <tr className="text-[11px] leading-tight text-brand-navy-soft">
-                                <th className="px-2 py-1.5 text-left">LOT NO</th>
+                                {/* Giờ nhập LOT (lúc bấm lưu vào phiếu) — anh Hữu 07/10/2026 */}
+                                <th className="pl-2 pr-1 py-1.5 text-left">Giờ</th>
+                                <th className="px-1 py-1.5 text-left">LOT NO</th>
                                 <th className="px-1 py-1.5 text-right">Trọng lượng (Kg)</th>
                                 <th className="px-2 py-1.5 text-right">Số lượng (EA)</th>
                               </tr>
@@ -140,7 +142,8 @@ export default function CoProdSummaryView() {
                             <tbody className="divide-y divide-sky-100">
                               {(it.lots ?? []).map((l, i) => (
                                 <tr key={i}>
-                                  <td className="px-2 py-1.5 tabular-nums leading-tight">{withBreaks(l.lot)}</td>
+                                  <td className="pl-2 pr-1 py-1.5 tabular-nums text-brand-navy-soft">{l.time}</td>
+                                  <td className="px-1 py-1.5 tabular-nums leading-tight">{withBreaks(l.lot)}</td>
                                   <td className="px-1 py-1.5 text-right tabular-nums">{fmtKg(l.kg)}</td>
                                   <td className="px-2 py-1.5 text-right tabular-nums font-semibold">{l.ea !== null ? fmtEa(l.ea) : '—'}</td>
                                 </tr>

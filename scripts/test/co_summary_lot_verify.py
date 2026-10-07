@@ -40,7 +40,9 @@ for it in b86["items"]:
     lots = it.get("lots") or []
     ck(len(lots) == it["n_lot"], f"{it['item_code']}: {len(lots)} dòng chi tiết = {it['n_lot']} LOT")
     ck(abs(sum(x["kg"] for x in lots) - it["kg"]) < 1e-6, f"  Σ kg chi tiết = {it['kg']}")
-    ck(all(set(x) == {"lot", "kg", "ea"} for x in lots), "  mỗi LOT đúng 3 thông tin lot · kg · ea")
+    ck(all(set(x) == {"time", "lot", "kg", "ea"} for x in lots), "  mỗi LOT đúng 4 thông tin giờ · lot · kg · ea")
+    import re as _re
+    ck(all(_re.fullmatch(r"\d\d:\d\d", x["time"]) for x in lots), "  giờ dạng HH:MM", [x["time"] for x in lots])
     ck(all("-" in x["lot"] for x in lots), "  LOT đúng định dạng xi mạ (có gạch)", [x["lot"] for x in lots])
     if it["g_ea"]:
         ck(all(x["ea"] == round(x["kg"] * 1000 / it["g_ea"]) for x in lots), f"  EA từng LOT = kg×1000÷{it['g_ea']}")
@@ -53,6 +55,21 @@ for it in b86["items"]:
             sd = f"{l['saeji'][-6:-3]}-{l['saeji'][-3:]}"
             if sd not in want: want.append(sd)
     ck(it.get("saejis") == want, f"{it['item_code']}: chỉ thị thư {it.get('saejis')} = phiếu {want}")
+# Giờ từng LOT = co_day_lines.created_at (giờ VN) — đối chiếu thẳng Supabase (chỉ đọc)
+from datetime import datetime, timedelta  # noqa: E402
+env = {}
+for ln_ in (Path(__file__).resolve().parents[2] / "print-agent/.env").read_text(encoding="utf-8").splitlines():
+    if "=" in ln_ and not ln_.strip().startswith("#"):
+        k_, v_ = ln_.split("=", 1); env[k_.strip()] = v_.strip()
+SBH = {"apikey": env["SUPABASE_SERVICE_KEY"], "Authorization": f"Bearer {env['SUPABASE_SERVICE_KEY']}"}
+slip = requests.get(f"{env['SUPABASE_URL']}/rest/v1/co_day_slips?work_date=eq.{DAY}&stage=eq.86&select=id", headers=SBH).json()[0]
+sb = requests.get(f"{env['SUPABASE_URL']}/rest/v1/co_day_lines?slip_id=eq.{slip['id']}&select=lot_no,created_at", headers=SBH).json()
+want_t = {x["lot_no"]: (datetime.fromisoformat(x["created_at"].replace("Z", "+00:00")) + timedelta(hours=7)).strftime("%H:%M") for x in sb}
+got_t = {x["lot"][:11].replace("-", ""): x["time"] for it in b86["items"] for x in it["lots"]}
+ck(got_t == want_t, f"giờ {len(got_t)} LOT = created_at Supabase (giờ VN)",
+   {k: (got_t.get(k), want_t.get(k)) for k in set(want_t) | set(got_t) if got_t.get(k) != want_t.get(k)})
+print("      ví dụ:", sorted(got_t.items(), key=lambda kv: kv[1])[:4])
+ck(all([x["time"] for x in it["lots"]] == sorted(x["time"] for x in it["lots"]) for it in b86["items"]), "chi tiết LOT mỗi mã xếp theo giờ nhập")
 mine = {l["lot_no"]: l for l in lines}
 for raw in ("2610030154", "2609240006", "2609240001"):
     if raw in mine:
@@ -85,7 +102,7 @@ with sync_playwright() as pw:
     sub = blk.locator("table table").first
     sub.wait_for()
     heads = [h.inner_text().strip() for h in sub.locator("th").all()]
-    ck(heads == ["LOT NO", "Trọng lượng (Kg)", "Số lượng (EA)"], "bảng chi tiết đúng 3 cột", heads)
+    ck(heads == ["Giờ", "LOT NO", "Trọng lượng (Kg)", "Số lượng (EA)"], "bảng chi tiết: Giờ đứng trước LOT NO", heads)
     ck(sub.locator("tbody tr").count() == it0["n_lot"], f"{it0['n_lot']} dòng LOT")
     ck(it0["lots"][0]["lot"] in sub.inner_text(), f"có LOT {it0['lots'][0]['lot']}")
     shot = Path(tempfile.gettempdir()) / "co_summary_lot.png"
