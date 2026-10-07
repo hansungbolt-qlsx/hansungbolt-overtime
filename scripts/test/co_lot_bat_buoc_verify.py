@@ -79,12 +79,41 @@ try:
     ck(r.status_code == 200 and after and after[0]["machine"] == "CO-02" and after[0]["lot_label"] == label, "CO: Sửa dòng LOT có → 200, đã đổi máy", r.text[:160])
     r = add("2001010001", stage="84", matched=False, lot_label=None, item_code="040120-T12W-6D", saeji="202001001")
     ck(r.status_code == 200 and r.json()["line"]["matched"] is False, "AB: LOT gõ tay vẫn cho lưu (không đổi)", r.text[:160])
+    ab_lid = r.json().get("line", {}).get("id")
+    # Xoá dòng: chỉ tổ trưởng (anh Hữu 07/10/2026) — tổ viên 403 cả CO lẫn AB, dòng còn nguyên; tổ trưởng 200
+    for l_id, nm in ((lid, "CO"), (ab_lid, "AB")):
+        r = worker.delete(BASE + f"/api/co-days/lines/{l_id}")
+        ck(r.status_code == 403 and "tổ trưởng" in r.text, f"{nm}: tổ viên xoá dòng → 403", f"{r.status_code} {r.text[:120]}")
+    still = [x["id"] for x in worker.get(BASE + f"/api/co-days?date={DAY}").json()["lines"]]
+    ck(lid in still, "dòng CO vẫn còn sau lệnh xoá của tổ viên")
+    r = leader.delete(BASE + f"/api/co-days/lines/{ab_lid}")
+    ck(r.status_code == 200, "tổ trưởng xoá dòng → 200", r.text[:120])
 finally:
     for stg in ("86", "84"):
         r = leader.delete(BASE + f"/api/co-days?date={DAY}&stage={stg}")
         print(f"   dọn ngày giả stage {stg}: {r.status_code}")
     for stg in ("86", "84"):
         ck(worker.get(BASE + f"/api/co-days?date={DAY}&stage={stg}").json().get("slip") is None, f"đã xoá sạch phiếu giả stage {stg}")
+
+print("B0. Nút Xoá dòng theo vai trò (ngày có phiếu thật, CHỈ XEM — không bấm)")
+REAL = "2026-10-07"
+with sync_playwright() as pw:
+    br = pw.chromium.launch()
+    for user, role, want in (("nguyenchitrung", "tổ viên", 0), ("nguyenduchieu", "tổ trưởng", None)):
+        ctx = br.new_context(viewport={"width": 420, "height": 900})
+        ctx.request.post(BASE + "/api/auth/login", data={"username": user, "password": "hd123"})
+        pg = ctx.new_page(); pg.goto(BASE + "/register")
+        pg.get_by_role("button", name="Sản lượng CO").first.click()
+        pg.get_by_text("Kết quả ngày").first.wait_for()
+        pg.wait_for_timeout(1500)
+        n_sua = pg.get_by_role("button", name="Sửa", exact=True).count()
+        n_xoa = pg.get_by_role("button", name="Xoá", exact=True).count()
+        if want == 0:
+            ck(n_xoa == 0, f"{role}: không có nút Xoá dòng (Sửa: {n_sua})", n_xoa)
+        else:
+            ck(n_xoa == n_sua, f"{role}: có Xoá ở mọi dòng ({n_xoa}/{n_sua})", (n_xoa, n_sua))
+        ctx.close()
+    br.close()
 
 print("B. Trình duyệt (chỉ gõ, không bấm Thêm)")
 with sync_playwright() as pw:

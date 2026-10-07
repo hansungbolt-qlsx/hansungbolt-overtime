@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
-import { canEditCoDay, parseStage, type CoStage } from '@/lib/co-day';
+import { canDeleteCoDayLine, canEditCoDay, parseStage, type CoStage } from '@/lib/co-day';
 import { cleanLine, ensureDraftSlip, type LineIn } from '@/lib/co-day-server';
 
 export const runtime = 'nodejs';
@@ -38,7 +38,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 // DELETE /api/co-days/lines/{id}
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
-  if (!canEditCoDay(session)) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
+  // Tổ viên chỉ Sửa, không Xoá dòng (anh Hữu 07/10/2026)
+  if (!canDeleteCoDayLine(session)) return NextResponse.json({ error: 'Chỉ tổ trưởng xoá được dòng — tổ viên dùng Sửa' }, { status: 403 });
   const { id } = await params;
   const slip = await slipOf(id);
   if (!slip) return NextResponse.json({ error: 'Không tìm thấy dòng' }, { status: 404 });

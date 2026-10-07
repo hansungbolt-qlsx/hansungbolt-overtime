@@ -42,7 +42,7 @@ const STATUS: Record<CoSlip['status'], { t: string; c: string }> = {
   received: { t: '✅ App chính đã nhận', c: 'bg-emerald-50 border-emerald-300 text-emerald-800' },
 };
 
-// canSend (06/10/2026): chỉ tổ trưởng thấy nút Gửi phiếu cuối ngày và nút Xoá phiếu ngày — tổ viên chỉ quét nhập, xoá từng dòng
+// canSend (06/10/2026): chỉ tổ trưởng thấy nút Gửi phiếu cuối ngày và nút Xoá phiếu ngày; 07/10: Xoá từng dòng cũng chỉ tổ trưởng — tổ viên quét nhập + Sửa
 export default function CoDailyView({ currentUserFullName, stage = '86', canSend = false }: {
   currentUserFullName?: string | null; stage?: CoStage; canSend?: boolean;
 }) {
@@ -364,7 +364,8 @@ export default function CoDailyView({ currentUserFullName, stage = '86', canSend
                 {l.note && <div className="text-xs text-brand-navy">📝 {l.note}</div>}
                 <div className="flex gap-3 mt-1">
                   <button type="button" onClick={() => edit(l)} className="text-xs text-brand-teal font-semibold">Sửa</button>
-                  <button type="button" onClick={() => remove(l)} className="text-xs text-red-600 font-semibold">Xoá</button>
+                  {/* Xoá dòng: chỉ tổ trưởng (+ admin) — tổ viên chỉ Sửa (anh Hữu 07/10/2026) */}
+                  {canSend && <button type="button" onClick={() => remove(l)} className="text-xs text-red-600 font-semibold">Xoá</button>}
                 </div>
               </div>
             ))}
