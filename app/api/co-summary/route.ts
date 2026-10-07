@@ -34,7 +34,7 @@ async function loadUnitWeights(): Promise<{ map: Map<string, number>; labels: Ma
 type Line = { slip_id: string; seq_no: number; machine: string | null; lot_no: string; lot_label: string | null; saeji: string | null; created_at: string;
   item_code: string | null; item_name: string | null; weight_kg: number };
 // Chi tiết từng LOT khi bấm số LOT (anh Hữu 07/10/2026): chỉ LOT NO · Trọng lượng · Số lượng
-type LotRow = { time: string; lot: string; kg: number; ea: number | null };
+type LotRow = { time: string; lot: string; kg: number; ea: number | null; saeji: string };
 // Giờ nhập LOT = lúc bấm lưu dòng vào phiếu (co_day_lines.created_at, Sửa dòng không đổi) → 'HH:MM' giờ Việt Nam (Vercel chạy UTC)
 const vnHHMM = (iso: string) => { const d = new Date(Date.parse(iso) + 7 * 3600_000); return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(11, 16); };
 
@@ -60,7 +60,7 @@ export async function GET(req: Request) {
 
   const stages = STAGE_ORDER.map((st) => {
     const slip = (slips ?? []).find((s) => (s.stage ?? '86') === st) ?? null;
-    const by = new Map<string, { item_code: string; item_name: string; n_lot: number; kg: number; lots: { at: string; time: string; lot: string; kg: number }[]; saejis: string[] }>();
+    const by = new Map<string, { item_code: string; item_name: string; n_lot: number; kg: number; lots: { at: string; time: string; lot: string; kg: number; saeji: string }[]; saejis: string[] }>();
     for (const l of lines.filter((x) => slip && x.slip_id === slip.id)) {
       const code = (l.item_code ?? '').trim() || '(chưa có mã)';
       const g = by.get(code) ?? { item_code: code, item_name: l.item_name ?? '', n_lot: 0, kg: 0, lots: [], saejis: [] };
@@ -70,7 +70,7 @@ export async function GET(req: Request) {
       if (sjDisp && !g.saejis.includes(sjDisp)) g.saejis.push(sjDisp);
       g.n_lot += 1;
       g.kg += Number(l.weight_kg) || 0;
-      g.lots.push({ at: l.created_at, time: vnHHMM(l.created_at), lot: l.lot_label || labels.get(l.lot_no) || l.lot_no, kg: Number(l.weight_kg) || 0 });
+      g.lots.push({ at: l.created_at, time: vnHHMM(l.created_at), lot: l.lot_label || labels.get(l.lot_no) || l.lot_no, kg: Number(l.weight_kg) || 0, saeji: sjDisp });
       if (!g.item_name && l.item_name) g.item_name = l.item_name;
       by.set(code, g);
     }
@@ -81,8 +81,15 @@ export async function GET(req: Request) {
         // Làm tròn EA TỪNG LOT rồi cộng → EA của mã = Σ EA các LOT, khớp tuyệt đối với bảng chi tiết (anh Hữu 07/10/2026)
         // Chi tiết LOT xếp theo giờ nhập (mã chạy nhiều máy vẫn đúng trình tự thời gian)
         const lots: LotRow[] = [...g.lots].sort((a, b) => a.at.localeCompare(b.at))
-          .map((x) => ({ time: x.time, lot: x.lot, kg: x.kg, ea: gEa > 0 ? Math.round((x.kg * 1000) / gEa) : null }));
-        return { ...g, lots, kg, g_ea: gEa || null, ea: gEa > 0 ? lots.reduce((s, x) => s + (x.ea ?? 0), 0) : null };
+          .map((x) => ({ time: x.time, lot: x.lot, kg: x.kg, ea: gEa > 0 ? Math.round((x.kg * 1000) / gEa) : null, saeji: x.saeji }));
+        // Số lượng riêng từng chỉ thị khi 1 mã làm nhiều chỉ thị trong ngày (anh Hữu 08/10/2026): Σ LOT của chỉ thị đó,
+        // EA = Σ EA từng LOT nên cộng các chỉ thị = đúng số của mã. Thứ tự = thứ tự chỉ thị dưới mã.
+        const by_saeji = g.saejis.concat(lots.some((x) => !x.saeji) ? [''] : []).map((sj) => {
+          const ls = lots.filter((x) => x.saeji === sj);
+          return { saeji: sj, n_lot: ls.length, kg: Math.round(ls.reduce((s, x) => s + x.kg, 0) * 1000) / 1000,
+            ea: gEa > 0 ? ls.reduce((s, x) => s + (x.ea ?? 0), 0) : null };
+        });
+        return { ...g, lots, by_saeji, kg, g_ea: gEa || null, ea: gEa > 0 ? lots.reduce((s, x) => s + (x.ea ?? 0), 0) : null };
       })
       .sort((a, b) => a.item_code.localeCompare(b.item_code));
     return {

@@ -7,7 +7,8 @@ import { Fragment, useEffect, useState } from 'react';
 import DateButton from './DateButton';
 
 type Item = { item_code: string; item_name: string; n_lot: number; kg: number; g_ea: number | null; ea: number | null;
-  lots?: { time: string; lot: string; kg: number; ea: number | null }[]; saejis?: string[] };
+  lots?: { time: string; lot: string; kg: number; ea: number | null }[]; saejis?: string[];
+  by_saeji?: { saeji: string; n_lot: number; kg: number; ea: number | null }[] };
 type Block = {
   stage: '86' | '84'; short: string; status: 'draft' | 'pending' | 'received' | null;
   n_lot: number; total_kg: number; total_ea: number; n_no_g: number; items: Item[];
@@ -109,7 +110,8 @@ export default function CoProdSummaryView() {
                       <td className="pl-2.5 pr-1 py-2 font-bold text-brand-navy text-[13px] leading-tight">
                         <span data-code>{withBreaks(it.item_code)}</span>
                         {/* Chỉ thị thư dưới mã hàng, mỗi chỉ thị 1 dòng nhỏ (anh Hữu 07/10/2026) */}
-                        {(it.saejis ?? []).map((s) => (
+                        {/* nhiều chỉ thị → đã có dòng riêng bên dưới, không lặp chữ ở đây */}
+                        {(it.by_saeji ?? []).length <= 1 && (it.saejis ?? []).map((s) => (
                           <div key={s} className="text-[11px] font-normal text-brand-navy-soft mt-0.5">Chỉ thị {s}</div>
                         ))}
                       </td>
@@ -125,6 +127,15 @@ export default function CoProdSummaryView() {
                         {it.g_ea !== null && <div className="text-[10px] text-brand-navy-soft font-normal">{it.g_ea} g/EA</div>}
                       </td>
                     </tr>
+                    {/* Mã làm từ 2 chỉ thị trở lên trong ngày → thêm dòng riêng từng chỉ thị: LOT · Kg · EA (anh Hữu 08/10/2026) */}
+                    {(it.by_saeji ?? []).length > 1 && (it.by_saeji ?? []).map((s) => (
+                      <tr key={`sj-${s.saeji}`} className={`${isOpen ? 'bg-sky-50' : 'bg-amber-50/60'} text-[12px] text-brand-navy`}>
+                        <td className="pl-5 pr-1 py-1.5 leading-tight">↳ Chỉ thị <b>{s.saeji || '(chưa có)'}</b></td>
+                        <td className="px-1 py-1.5 text-center tabular-nums">{s.n_lot}</td>
+                        <td className="px-1 py-1.5 text-right tabular-nums">{fmtKg(s.kg)}</td>
+                        <td className="pl-1 pr-2.5 py-1.5 text-right tabular-nums font-semibold">{s.ea !== null ? fmtEa(s.ea) : '—'}</td>
+                      </tr>
+                    ))}
                     {isOpen && (
                       <tr className="bg-sky-50">
                         <td colSpan={4} className="px-2 pb-3 pt-0">
