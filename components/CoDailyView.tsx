@@ -123,6 +123,7 @@ export default function CoDailyView({ currentUserFullName, stage = '86', canSend
   // Ô LOT đổi / quét xong → hiện chữ ngay, rồi CHỜ catalog mới tra; chỉ áp kết quả nếu ô vẫn là chuỗi đó.
   // keepKg: mở Sửa dòng cũ thì giữ kg đã nhập, không thay bằng kg LOT ERP.
   const lotTextRef = useRef('');
+  const dupAskedRef = useRef('');                      // LOT trùng đã hỏi + được đồng ý
   const [lotChecking, setLotChecking] = useState(false);
   async function applyLot(text: string, keepKg = false) {
     lotTextRef.current = text;
@@ -140,6 +141,20 @@ export default function CoDailyView({ currentUserFullName, stage = '86', canSend
     if (!lot && key.length >= 10) { m = await ensureCatalog(true); lot = m?.get(key) ?? null; }
     if (lotTextRef.current !== text) return;           // đã gõ/quét chuỗi khác trong lúc chờ
     setLotChecking(false);
+    // LOT đã có trong phiếu hôm nay → hỏi trước; 1 LOT có thể chia 2 lần nên đồng ý vẫn cho nhập (anh Hữu 08/10/2026).
+    // Đang Sửa dòng cũ thì không hỏi. Mỗi chuỗi chỉ hỏi 1 lần (gõ tay từng phím không hỏi lặp).
+    const dup = !keepKg && !d.editId && (lot || key.length >= 10) ? lines.find((l) => l.lot_no === key) : undefined;
+    if (dup && dupAskedRef.current !== key) {
+      dupAskedRef.current = key;
+      const ok = confirm(`LOT ${lot?.label ?? text} ĐÃ NHẬP ở dòng ${dup.seq_no} (${dup.machine} · ${fmtKg(dup.weight_kg)} Kg) hôm nay.\n\nVẫn tiếp tục nhập LOT này (chia nhiều lần)?`);
+      if (!ok) {
+        dupAskedRef.current = '';
+        lotTextRef.current = '';
+        setD((x) => ({ ...x, lotText: '', lot: null, manual: false, saeji: '', item: '', kg: '' }));
+        setMsg('Đã bỏ LOT trùng — quét LOT khác');
+        return;
+      }
+    }
     setD((x) => ({
       ...x, lotText: text, lot,
       manual: !cfg.requireLot && !lot,
@@ -185,6 +200,7 @@ export default function CoDailyView({ currentUserFullName, stage = '86', canSend
       if (!r.ok) return setErr(j.error || 'Không lưu được');
       setMsg(d.editId ? 'Đã sửa dòng' : `Đã thêm LOT ${d.lot?.label ?? key}`);
       setD(emptyDraft(d.machine, empSel));     // giữ máy + nhân viên cho LOT kế tiếp
+      dupAskedRef.current = '';                // quét lại LOT này lần sau thì hỏi lại
       await load(date);
     } finally { setBusy(false); }
   }
