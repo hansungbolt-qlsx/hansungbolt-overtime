@@ -31,7 +31,7 @@ async function loadUnitWeights(): Promise<{ map: Map<string, number>; labels: Ma
   return gCache;
 }
 
-type Line = { slip_id: string; seq_no: number; machine: string | null; lot_no: string; lot_label: string | null;
+type Line = { slip_id: string; seq_no: number; machine: string | null; lot_no: string; lot_label: string | null; saeji: string | null;
   item_code: string | null; item_name: string | null; weight_kg: number };
 // Chi tiết từng LOT khi bấm số LOT (anh Hữu 07/10/2026): chỉ LOT NO · Trọng lượng · Số lượng
 type LotRow = { lot: string; kg: number; ea: number | null };
@@ -49,7 +49,7 @@ export async function GET(req: Request) {
   let lines: Line[] = [];
   if (ids.length) {
     const { data, error } = await supabaseAdmin
-      .from('co_day_lines').select('slip_id, seq_no, machine, lot_no, lot_label, item_code, item_name, weight_kg').in('slip_id', ids);
+      .from('co_day_lines').select('slip_id, seq_no, machine, lot_no, lot_label, saeji, item_code, item_name, weight_kg').in('slip_id', ids);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     lines = (data ?? []) as Line[];
   }
@@ -58,10 +58,14 @@ export async function GET(req: Request) {
 
   const stages = STAGE_ORDER.map((st) => {
     const slip = (slips ?? []).find((s) => (s.stage ?? '86') === st) ?? null;
-    const by = new Map<string, { item_code: string; item_name: string; n_lot: number; kg: number; lots: { lot: string; kg: number }[] }>();
+    const by = new Map<string, { item_code: string; item_name: string; n_lot: number; kg: number; lots: { lot: string; kg: number }[]; saejis: string[] }>();
     for (const l of lines.filter((x) => slip && x.slip_id === slip.id)) {
       const code = (l.item_code ?? '').trim() || '(chưa có mã)';
-      const g = by.get(code) ?? { item_code: code, item_name: l.item_name ?? '', n_lot: 0, kg: 0, lots: [] };
+      const g = by.get(code) ?? { item_code: code, item_name: l.item_name ?? '', n_lot: 0, kg: 0, lots: [], saejis: [] };
+      // Chỉ thị thư hiện dưới mã hàng (anh Hữu 07/10/2026): '202607261' → '607-261', mỗi chỉ thị 1 dòng, không trùng
+      const sj = (l.saeji ?? '').trim();
+      const sjDisp = sj.length >= 6 ? `${sj.slice(-6, -3)}-${sj.slice(-3)}` : sj;
+      if (sjDisp && !g.saejis.includes(sjDisp)) g.saejis.push(sjDisp);
       g.n_lot += 1;
       g.kg += Number(l.weight_kg) || 0;
       g.lots.push({ lot: l.lot_label || labels.get(l.lot_no) || l.lot_no, kg: Number(l.weight_kg) || 0 });

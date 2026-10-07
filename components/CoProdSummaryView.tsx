@@ -7,7 +7,7 @@ import { Fragment, useEffect, useState } from 'react';
 import DateButton from './DateButton';
 
 type Item = { item_code: string; item_name: string; n_lot: number; kg: number; g_ea: number | null; ea: number | null;
-  lots?: { lot: string; kg: number; ea: number | null }[] };
+  lots?: { lot: string; kg: number; ea: number | null }[]; saejis?: string[] };
 type Block = {
   stage: '86' | '84'; short: string; status: 'draft' | 'pending' | 'received' | null;
   n_lot: number; total_kg: number; total_ea: number; n_no_g: number; items: Item[];
@@ -106,7 +106,13 @@ export default function CoProdSummaryView() {
                     <Fragment key={it.item_code}>
                     <tr className={isOpen ? 'bg-sky-50' : ''}>
                       {/* Chỉ mã hàng, không tên (anh Hữu 07/10/2026) */}
-                      <td className="pl-2.5 pr-1 py-2 font-bold text-brand-navy text-[13px] leading-tight">{withBreaks(it.item_code)}</td>
+                      <td className="pl-2.5 pr-1 py-2 font-bold text-brand-navy text-[13px] leading-tight">
+                        <span data-code>{withBreaks(it.item_code)}</span>
+                        {/* Chỉ thị thư dưới mã hàng, mỗi chỉ thị 1 dòng nhỏ (anh Hữu 07/10/2026) */}
+                        {(it.saejis ?? []).map((s) => (
+                          <div key={s} className="text-[11px] font-normal text-brand-navy-soft mt-0.5">Chỉ thị {s}</div>
+                        ))}
+                      </td>
                       <td className="px-1 py-2 text-center tabular-nums">
                         <button type="button" onClick={() => setOpen(isOpen ? null : key)}
                           className="px-1.5 py-1 rounded-md border border-brand-teal text-brand-teal font-bold text-[13px] whitespace-nowrap active:scale-95">

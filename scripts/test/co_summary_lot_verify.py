@@ -46,6 +46,13 @@ for it in b86["items"]:
         ck(all(x["ea"] == round(x["kg"] * 1000 / it["g_ea"]) for x in lots), f"  EA từng LOT = kg×1000÷{it['g_ea']}")
         ck(sum(x["ea"] for x in lots) == it["ea"], f"  Σ EA từng LOT {sum(x['ea'] for x in lots):,} = EA dòng mã {it['ea']:,} (khớp tuyệt đối)")
 ck(b86["total_ea"] == sum(i["ea"] or 0 for i in b86["items"]), f"Tổng EA khối CO {b86['total_ea']:,} = Σ EA các mã")
+for it in b86["items"]:
+    want = []
+    for l in lines:
+        if (l["item_code"] or "") == it["item_code"] and l["saeji"]:
+            sd = f"{l['saeji'][-6:-3]}-{l['saeji'][-3:]}"
+            if sd not in want: want.append(sd)
+    ck(it.get("saejis") == want, f"{it['item_code']}: chỉ thị thư {it.get('saejis')} = phiếu {want}")
 mine = {l["lot_no"]: l for l in lines}
 for raw in ("2610030154", "2609240006", "2609240001"):
     if raw in mine:
@@ -68,6 +75,9 @@ with sync_playwright() as pw:
     blk.locator("tbody").first.wait_for()
     it0 = b86["items"][0]
     ck(blk.get_by_text(it0["item_code"], exact=True).count() >= 1, f"có mã {it0['item_code']}")
+    for it in b86["items"]:
+        for sd in it.get("saejis") or []:
+            ck(blk.get_by_text(f"Chỉ thị {sd}", exact=True).count() == 1, f"  hiện 'Chỉ thị {sd}' dưới {it['item_code']}")
     names = [i["item_name"] for i in b86["items"] if i["item_name"]]
     ck(all(blk.get_by_text(n, exact=True).count() == 0 for n in names), "không còn hiện tên hàng", names)
     btn = blk.get_by_role("button", name=f"{it0['n_lot']} ▾").first
@@ -93,7 +103,7 @@ with sync_playwright() as pw:
         if w >= 360:
             # mã hàng nằm 1 dòng (chiều cao ô mã ≈ 1 dòng chữ) ở cỡ điện thoại thường
             # đếm số dòng chữ thật trong ô mã (số mức 'top' khác nhau của các mảnh chữ)
-            hs = page.evaluate("""() => [...document.querySelectorAll('tbody > tr > td:first-child.font-bold')].map(td => {
+            hs = page.evaluate("""() => [...document.querySelectorAll('span[data-code]')].map(td => {
                                      const r = document.createRange(); r.selectNodeContents(td);
                                      const tops = new Set([...r.getClientRects()].map(x => Math.round(x.top)));
                                      return [td.innerText, tops.size]; })""")
