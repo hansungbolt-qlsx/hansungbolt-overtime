@@ -25,14 +25,25 @@ export async function GET(req: Request) {
 
   let regQuery = supabaseAdmin
     .from('overtime_registrations')
-    .select('id, overtime_date, day_type, duration_hours')
+    .select('id, overtime_date, day_type, duration_hours, department')
     .gte('overtime_date', startDate)
     .lte('overtime_date', endDate);
   if (filterDept) regQuery = regQuery.eq('department', filterDept);
   const { data: regs, error: regErr } = await regQuery;
 
   if (regErr) return NextResponse.json({ error: regErr.message }, { status: 500 });
-  if (!regs || regs.length === 0) return NextResponse.json({ month, summary: [] });
+  if (!regs || regs.length === 0) return NextResponse.json({ month, summary: [], dates: [] });
+
+  // Chi tiết theo ngày (anh Hữu 08/10/2026): cột ngày = mọi ngày có phiếu (như trang in), kèm bộ phận có phiếu ngày đó
+  // để tab bộ phận chỉ hiện ngày của bộ phận đó (= trang in ?dept=)
+  const dateInfo = new Map<string, { day_type: 'weekday' | 'sunday'; depts: Set<string> }>();
+  for (const r of regs) {
+    const d = dateInfo.get(r.overtime_date) ?? { day_type: r.day_type as 'weekday' | 'sunday', depts: new Set<string>() };
+    if (r.department) d.depts.add(r.department);
+    dateInfo.set(r.overtime_date, d);
+  }
+  const dates = [...dateInfo.entries()].sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, d]) => ({ date, day_type: d.day_type, depts: [...d.depts] }));
 
   const regMap = new Map(
     regs.map((r) => [
@@ -84,7 +95,7 @@ export async function GET(req: Request) {
     empMap.set(empId, b);
   }
 
-  if (empMap.size === 0) return NextResponse.json({ month, summary: [] });
+  if (empMap.size === 0) return NextResponse.json({ month, summary: [], dates });
 
   const empIds = Array.from(empMap.keys());
   const { data: emps } = await supabaseAdmin
@@ -105,8 +116,9 @@ export async function GET(req: Request) {
       weekday_count: b.weekdayDays.size,
       sunday_count: b.sundayDays.size,
       total_hours: Number(b.totalHours.toFixed(2)),
+      by_date: Object.fromEntries([...(empDateHours.get(id) ?? new Map())].map(([d, v]) => [d, v.hours])),
     }))
     .sort((a, b) => (orderMap.get(a.employee_id) ?? 9999) - (orderMap.get(b.employee_id) ?? 9999));
 
-  return NextResponse.json({ month, summary });
+  return NextResponse.json({ month, summary, dates });
 }

@@ -14,7 +14,10 @@ type SummaryRow = {
   weekday_count: number;
   sunday_count: number;
   total_hours: number;
+  by_date?: Record<string, number>;
 };
+type DateCol = { date: string; day_type: 'weekday' | 'sunday'; depts: string[] };
+type View = 'sum' | 'day';
 
 const DEPT_ORDER: Dept[] = ['HD', 'RL', 'CO', 'QLSX'];
 
@@ -35,14 +38,17 @@ export default function OvertimeSummaryCard({ isAdmin = false }: { isAdmin?: boo
   const [rows, setRows] = useState<SummaryRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>('all');
+  // Tab Chi tiết theo ngày (anh Hữu 08/10/2026): người × ngày như phiếu in Tổng hợp giờ tăng ca
+  const [view, setView] = useState<View>('sum');
+  const [dates, setDates] = useState<DateCol[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     fetch(`/api/registrations/summary?month=${month}`)
       .then((r) => r.json())
-      .then((d) => { if (!cancelled) setRows(d.summary ?? []); })
-      .catch(() => { if (!cancelled) setRows([]); })
+      .then((d) => { if (!cancelled) { setRows(d.summary ?? []); setDates(d.dates ?? []); } })
+      .catch(() => { if (!cancelled) { setRows([]); setDates([]); } })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [month]);
@@ -86,6 +92,9 @@ export default function OvertimeSummaryCard({ isAdmin = false }: { isAdmin?: boo
   }, [rows, activeTab]);
 
   const totalHours = displayRows.reduce((s, r) => s + r.total_hours, 0);
+  // Cột ngày: tab bộ phận chỉ ngày có phiếu của bộ phận đó (= trang in ?dept=)
+  const dayCols = activeTab === 'all' ? dates : dates.filter((d) => d.depts.includes(activeTab));
+  const hrs = (v: number) => `${Number(v.toFixed(2))}h`;
 
   // URL print/preview: 'all' tab không pass dept → backend trả về cả 3
   const printDeptParam = activeTab !== 'all' ? `&dept=${activeTab}` : '';
@@ -148,6 +157,23 @@ export default function OvertimeSummaryCard({ isAdmin = false }: { isAdmin?: boo
         </div>
       </div>
 
+      <div className="flex gap-2 px-5 pt-3 bg-white">
+        {([['sum', 'Tổng hợp'], ['day', 'Chi tiết theo ngày']] as [View, string][]).map(([v, label]) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => setView(v)}
+            className={`px-4 py-1.5 text-sm font-bold rounded-full border transition whitespace-nowrap ${
+              view === v
+                ? 'bg-[#063882] text-white border-[#063882]'
+                : 'bg-white text-[#063882] border-[#bbd0f0] hover:bg-[#f0f5ff]'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {showTabs && (
         <div className="flex gap-1 px-5 pt-3 bg-white border-b border-brand-surface-alt overflow-x-auto">
           <button
@@ -198,7 +224,83 @@ export default function OvertimeSummaryCard({ isAdmin = false }: { isAdmin?: boo
               : 'Chưa có dữ liệu tháng này.'}
           </p>
         )}
-        {!loading && displayRows.length > 0 && (
+        {!loading && displayRows.length > 0 && view === 'day' && (
+          <div className="overflow-x-auto rounded-lg">
+            <table className="text-sm bg-white border-separate border-spacing-0 border-l border-t border-[#9db4d6] whitespace-nowrap">
+              <thead className="text-[#063882]">
+                <tr>
+                  <th className="sticky left-0 z-10 w-10 min-w-10 max-w-10 bg-[#d0dff5] border-r border-b border-[#9db4d6] px-2 py-2 w-8">STT</th>
+                  <th className="sticky left-10 z-10 bg-[#d0dff5] border-r border-b border-[#9db4d6] px-3 py-2 text-left">Họ và tên</th>
+                  {dayCols.map((d) => (
+                    <th
+                      key={d.date}
+                      className={`border-r border-b border-[#9db4d6] px-2 py-1 min-w-[44px] ${d.day_type === 'sunday' ? 'bg-[#f5e0c0]' : 'bg-[#d0dff5]'}`}
+                    >
+                      {d.date.slice(8)}
+                      {d.day_type === 'sunday' && <div className="text-[10px] font-normal leading-none">CN</div>}
+                    </th>
+                  ))}
+                  <th className="border-r border-b border-[#9db4d6] bg-[#bbd0f0] px-2 py-1 leading-tight">Ngày<br />thường</th>
+                  <th className="border-r border-b border-[#9db4d6] bg-[#bbd0f0] px-2 py-1 leading-tight">Chủ<br />nhật</th>
+                  <th className="border-r border-b border-[#9db4d6] bg-[#bbd0f0] px-2 py-1 leading-tight">Tổng<br />giờ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayRows.map((r, idx) => {
+                  const bd = r.by_date ?? {};
+                  const wk = dayCols.filter((d) => d.day_type === 'weekday').reduce((s, d) => s + (bd[d.date] ?? 0), 0);
+                  const sun = dayCols.filter((d) => d.day_type === 'sunday').reduce((s, d) => s + (bd[d.date] ?? 0), 0);
+                  return (
+                    <tr key={r.employee_id}>
+                      <td className="sticky left-0 z-10 w-10 min-w-10 max-w-10 bg-white border-r border-b border-[#9db4d6] px-2 py-2 text-center">{idx + 1}</td>
+                      <td className="sticky left-10 z-10 bg-white border-r border-b border-[#9db4d6] px-3 py-2 font-semibold text-brand-navy">
+                        {toTitleCase(r.employee_name)}
+                      </td>
+                      {dayCols.map((d) => {
+                        const h = bd[d.date];
+                        return (
+                          <td
+                            key={d.date}
+                            className={`border-r border-b border-[#9db4d6] px-2 py-2 text-center ${
+                              h ? `font-bold ${d.day_type === 'sunday' ? 'bg-[#fff0d0]' : 'bg-[#e8f4e8]'}` : ''
+                            }`}
+                          >
+                            {h ? hrs(h) : ''}
+                          </td>
+                        );
+                      })}
+                      <td className="border-r border-b border-[#9db4d6] bg-[#dce8fa] px-2 py-2 text-center font-bold">{wk > 0 ? hrs(wk) : ''}</td>
+                      <td className="border-r border-b border-[#9db4d6] bg-[#dce8fa] px-2 py-2 text-center font-bold">{sun > 0 ? hrs(sun) : ''}</td>
+                      <td className="border-r border-b border-[#9db4d6] bg-[#dce8fa] px-2 py-2 text-center font-bold text-[#063882]">
+                        {wk + sun > 0 ? hrs(wk + sun) : ''}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot className="bg-[#dce8fa] font-bold text-[#063882]">
+                <tr>
+                  <td className="sticky left-0 z-10 w-10 min-w-10 max-w-10 bg-[#dce8fa] border-r border-b border-[#9db4d6]"></td>
+                  <td className="sticky left-10 z-10 bg-[#dce8fa] border-r border-b border-[#9db4d6] px-3 py-2 text-right italic">Tổng cộng</td>
+                  {dayCols.map((d) => {
+                    const t = displayRows.reduce((s, r) => s + ((r.by_date ?? {})[d.date] ?? 0), 0);
+                    return <td key={d.date} className="border-r border-b border-[#9db4d6] px-2 py-2 text-center">{t > 0 ? hrs(t) : ''}</td>;
+                  })}
+                  <td className="border-r border-b border-[#9db4d6]"></td>
+                  <td className="border-r border-b border-[#9db4d6]"></td>
+                  <td className="border-r border-b border-[#9db4d6] px-2 py-2 text-center">
+                    {hrs(displayRows.reduce((s, r) => s + dayCols.reduce((a, d) => a + ((r.by_date ?? {})[d.date] ?? 0), 0), 0))}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+            <div className="flex gap-4 mt-2 text-xs text-brand-navy-soft">
+              <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 border border-gray-400 bg-[#e8f4e8]" />Ngày thường</span>
+              <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 border border-gray-400 bg-[#fff0d0]" />Chủ nhật</span>
+            </div>
+          </div>
+        )}
+        {!loading && displayRows.length > 0 && view === 'sum' && (
           <div className="overflow-x-auto rounded-lg">
             <table className="w-full text-sm bg-white">
               <thead className="bg-[#dce8fa] text-[#063882]">
