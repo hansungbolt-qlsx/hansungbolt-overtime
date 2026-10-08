@@ -20,7 +20,8 @@ const getJ = async (cookie, path) => (await fetch(BASE + path, { headers: { cook
 
 async function expected(month, dept) {
   const [y, m] = month.split('-').map(Number);
-  const end = new Date(y, m, 0).toISOString().slice(0, 10);
+  // ngày cuối tháng theo UTC như Vercel (máy +7 dùng new Date(y, m, 0).toISOString() sẽ lùi 1 ngày)
+  const end = `${month}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0')}`;
   let q = `overtime_registrations?select=id,overtime_date,day_type,duration_hours,department&overtime_date=gte.${month}-01&overtime_date=lte.${end}`;
   if (dept) q += `&department=eq.${dept}`;
   const regs = await sb(q);
