@@ -1,10 +1,7 @@
 'use client';
 
-import { useRef } from 'react';
-
 // Nút hiển thị "Ngày DD/MM/YYYY" bằng tiếng Việt (chữ N viết hoa).
-// Click nút -> mở native date picker qua showPicker() (iOS Safari 16.4+, Chrome).
-// Fallback: click input để mở picker cho trình duyệt cũ.
+// Ô <input type="date"> trong suốt phủ kín nút ⇒ chạm vào đâu cũng chạm đúng ô date thật.
 export default function DateButton({
   value,
   onChange,
@@ -16,21 +13,20 @@ export default function DateButton({
   className?: string;
   compact?: boolean;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
   const [y, m, d] = value.split('-');
   const label = y && m && d ? `Ngày ${d}/${m}/${y}` : 'Chọn ngày';
 
-  function openPicker() {
-    const el = inputRef.current;
-    if (!el) return;
+  // Máy có chuột (Chrome desktop): bấm vào ô date chỉ focus từng phần ngày/tháng,
+  // không tự mở lịch ⇒ gọi showPicker(). Điện thoại (iPhone/Android): chạm thẳng vào
+  // ô date là trình duyệt tự mở lịch — KHÔNG gọi showPicker (iPhone Safari bỏ qua
+  // lặng lẽ, lịch không mở; anh Hữu báo 10/10/2026 tổ trưởng CO không lùi ngày được).
+  function openPickerIfMouse(el: HTMLInputElement) {
+    if (typeof window === 'undefined' || !window.matchMedia?.('(pointer: fine)').matches) return;
     if (typeof el.showPicker === 'function') {
       try {
         el.showPicker();
-        return;
       } catch {}
     }
-    el.click();
-    el.focus();
   }
 
   return (
@@ -42,21 +38,13 @@ export default function DateButton({
       <CalendarIcon />
       <span>{label}</span>
       <input
-        ref={inputRef}
         type="date"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        onClick={(e) => {
-          // Trên trình duyệt hỗ trợ, showPicker gọi từ button parent để override display
-          e.stopPropagation();
-        }}
-        className="absolute inset-0 opacity-0 cursor-pointer"
-        style={{ colorScheme: 'light' }}
-      />
-      <button
-        type="button"
-        onClick={openPicker}
-        className="absolute inset-0"
+        onClick={(e) => openPickerIfMouse(e.currentTarget)}
+        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        // 16px: iPhone không tự phóng to trang khi chạm vào ô
+        style={{ colorScheme: 'light', fontSize: 16 }}
         aria-label="Đổi ngày"
       />
     </label>
