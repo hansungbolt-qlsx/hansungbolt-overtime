@@ -134,6 +134,18 @@ vòng tròn 6 giờ 4 phút / 4 giờ mà dự án vẫn chạy) — luôn đọ
 6. **Cần anh Hữu**: tạo Supabase Personal Access Token (chỉ quyền đọc log/usage nếu bản chi tiết cho phép), lưu ngoài Git.
    ⚠ PAT thường có quyền rộng trên tài khoản → giữ như mật khẩu, code chỉ dùng endpoint đọc.
 
+## 7e. Nhật ký triển khai
+
+- **GĐ0 xong 12/10 11:30** (`ec4d094`): nhận lệnh nguyên tử; thử Supabase thật không đổi dòng nào 4/4.
+- **GĐ1 xong 12/10 ~11:40** — anh Hữu chạy 3 phần SQL mục 5 (RLS 3 bảng nvl_* · tạo `agent_heartbeat` · publication
+  `print_jobs` + `agent_heartbeat`), mỗi phần "Success. No rows returned". Đối chiếu sau: số dòng nvl_day_slips 140 ·
+  nvl_slip_lines 1.827 · nvl_slip_events 956 · print_jobs 393 · co_day_slips 8 = **y hệt mốc trước**; khoá agent vẫn đọc
+  đủ bảng nvl_*; agent không lỗi. Thử đầu-cuối `print-agent/thu-realtime.mjs`: **tin về sau 463 ms**.
+- 🪤 **Bài học GĐ1:** trạng thái kênh `SUBSCRIBED` đến TRƯỚC khi máy chủ gắn xong theo dõi bảng — lần thử đầu ghi
+  ngay sau `SUBSCRIBED` bị LỠ tin. Chỉ coi là sẵn sàng khi nhận tin hệ thống
+  `{"extension":"postgres_changes","status":"ok","message":"Subscribed to PostgreSQL"}`; bắt bù (L3) chạy SAU tin này.
+- Dòng `agent_heartbeat.id = 'thu-realtime'` là dòng thử, vô hại (giữ để lần thử sau ghi đè).
+
 ## 8. Rủi ro còn lại
 
 | Rủi ro | Mức | Chặn bằng |
