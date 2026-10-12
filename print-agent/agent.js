@@ -280,6 +280,33 @@ async function updateJob(id, status, errorMessage) {
   }
 }
 
+/**
+ * NHẬN LỆNH NGUYÊN TỬ (12/10/2026 — GĐ0 thiết kế Realtime, docs/realtime-agent-thiet-ke.md lớp L6).
+ * Đổi pending → printing CHỈ KHI lệnh còn 'pending' (điều kiện nằm trong câu PATCH) và đọc lại số dòng đổi:
+ * 1 dòng = mình nhận được → in · 0 dòng = đã có lượt khác nhận / đã hết hạn → BỎ QUA, không in.
+ * Trước đây đổi trạng thái không điều kiện ⇒ khi 2 đường cùng thấy 1 lệnh (tin Realtime + vòng hỏi) sẽ in 2 bản.
+ * Lỗi mạng/Supabase → KHÔNG in lượt này (vòng hỏi 10 giây sau thử lại, còn trong TTL 2 phút): ưu tiên không in trùng.
+ * Đường lui qua Vercel (!SB_ON) giữ nguyên cách cũ.
+ */
+async function nhanLenh(id) {
+  if (!SB_ON) {
+    await updateJob(id, 'printing');
+    return true;
+  }
+  try {
+    const res = await sb(`print_jobs?id=eq.${id}&status=eq.pending`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'printing', started_at: new Date().toISOString() }),
+      headers: { Prefer: 'return=representation' },
+    });
+    const rows = (await res.json()) || [];
+    return rows.length === 1;
+  } catch (e) {
+    console.error(`[${new Date().toISOString()}] Nhận lệnh ${id.slice(0, 8)} lỗi — để lượt sau: ${e.message}`);
+    return false;
+  }
+}
+
 // -----------------------------------------------------------
 // Puppeteer render PDF
 // -----------------------------------------------------------
@@ -1111,8 +1138,11 @@ async function printPDFFile(pdfBuffer, jobId) {
 // -----------------------------------------------------------
 async function processJob(job) {
   console.log(`\n[${new Date().toISOString()}] Processing job ${job.id.slice(0, 8)}... (type=${job.type})`);
+  if (!(await nhanLenh(job.id))) {
+    console.log(`[${new Date().toISOString()}] Bỏ qua job ${job.id.slice(0, 8)} — không nhận được (đã có lượt khác nhận / hết hạn / lỗi)`);
+    return;
+  }
   try {
-    await updateJob(job.id, 'printing');
     if (job.type === 'khsx_tong' || job.type === 'khsx_homnay') {
       await printKhsx(job);
     } else if (job.type === 'dccd') {
