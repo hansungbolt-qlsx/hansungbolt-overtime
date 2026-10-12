@@ -5,3 +5,6 @@ node_modules/
 # So lieu chay (bo dem luot goi ra ngoai) — khong commit
 dem-luot-goi.json
 agent-err.log.truoc-va
+# Chay bong Realtime GD2 (so lieu chay)
+realtime-bong.jsonl
+realtime-bong-trangthai.json
