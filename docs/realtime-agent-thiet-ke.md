@@ -93,6 +93,47 @@ dangKy({ bang: 'co_day_slips', xuLy: dongBoCo, duPhongMoi: 300_000, gom: 10_000 
 Việc mới trên app tăng ca (vd báo dừng máy, yêu cầu vật tư) chỉ cần: Vercel ghi bảng → thêm 1 dòng `dangKy` → được hưởng
 nguyên 8 lớp bảo vệ, không phải viết lại phần kết nối/tự chữa.
 
+## 7b. Chốt của anh Hữu 12/10/2026
+
+- **Lưới dự phòng = phương án B:** hỏi lệnh in 60 giây chỉ trong giờ làm (07:00–19:00, thứ Hai–thứ Bảy); ngoài giờ
+  chỉ dựa Realtime + canary (3 tháng qua 0 lệnh in ngoài giờ). Đồng bộ NVL/CO/tăng ca dự phòng 5 phút giữ nguyên.
+- **Mọi thiết kế dưới 50 % hạn mức Free** để dự phòng phát sinh, và **phải đo được chính xác, báo sớm theo xu hướng** —
+  không kiểm một lần rồi chủ quan, không để gần hết mới biết.
+
+## 7c. Ngân sách hạn mức — mục tiêu ≤ 50 % mỗi chỉ số
+
+Số "hiện tại" đo 12/10/2026 (ảnh dashboard anh gửi + Logs Explorer). Số "sau Realtime" là thiết kế, phải đo lại sau GĐ3.
+
+| Dịch vụ · chỉ số | Hạn mức Free | Hiện tại | Sau Realtime (ước) | ≤ 50 %? | Đo tự động được? |
+|---|---|---|---|---|---|
+| Supabase · Log | 1 GB/chu kỳ | 107 % (trước 12/10) → ~55 % (nhịp 10 giây) | **~8–10 %** + log Realtime (đo GĐ2) | ✅ sau Realtime · ⚠ hiện ~55 % | ✅ Management API (đếm dòng log/ngày) |
+| Supabase · Egress | 5 GB/chu kỳ | ~24 %/tháng (0,97 GB / 24 ngày) | ≤ 24 % (hỏi ít đi còn giảm) | ✅ | ⚠ chưa thấy API → kiểm tay hằng tuần |
+| Supabase · CSDL | 500 MB | 32 MB = 6 % | 6 % | ✅ | ✅ (câu đọc `pg_database_size`) |
+| Supabase · Lưu trữ file | 1 GB | 1 % | 1 % | ✅ | ✅ |
+| Supabase · Tin Realtime | 2 triệu/tháng | 0 | < 1 % (agent tự đếm, là người nghe duy nhất) | ✅ | ✅ (agent đếm) |
+| Supabase · Kết nối Realtime | 200 | 0 | 1 | ✅ | ✅ |
+| Vercel · CPU hoạt động | 4 giờ/30 ngày | ~25 % (1 giờ 0 phút), đang tăng từ 05/10 | không đổi (Realtime không đụng Vercel) | ✅ nhưng **sát nhất** | ❌ không có API công bố → kiểm tay hằng tuần |
+| Vercel · Chuyển khoản gốc | 10 GB | ~19 % | ~19 % | ✅ | ❌ kiểm tay |
+| Vercel · Truyền dữ liệu | 100 GB | ~1 % | ~1 % | ✅ | ❌ kiểm tay |
+
+Lưu ý: vòng tròn tổng trên trang Usage Vercel là số cộng dồn, KHÔNG phải số tính hạn mức 30 ngày (đo 12/10:
+vòng tròn 6 giờ 4 phút / 4 giờ mà dự án vẫn chạy) — luôn đọc tổng ở chú thích dưới biểu đồ khung 30 ngày.
+
+## 7d. Đồng hồ đo — báo sớm theo xu hướng, hỏng thì báo động
+
+1. **Đo hằng ngày từ nguồn gốc** (job app chính 07:55, chỉ đọc): Supabase Management API — đếm dòng log 24 giờ theo
+   nguồn (`logs`, ClickHouse SQL; endpoint `logs.all` cũ bị gỡ 23/09/2026 → dùng endpoint `logs` mới), dung lượng CSDL.
+   Agent ghi thêm: lượt gọi Supabase/Vercel, tin Realtime nhận, phút ở chế độ dự phòng, kết quả canary.
+2. **Quy ra GB bằng hệ số hiệu chỉnh**, không đoán: hệ số byte/dòng lấy từ số dashboard (đầu mỗi chu kỳ anh gửi
+   1 ảnh trang Usage → cập nhật hệ số). Lệch dự báo vs dashboard > 15 % → báo vàng "đồng hồ cần hiệu chỉnh".
+3. **Dự báo cuối chu kỳ**, không chỉ số hiện tại: tốc độ 7 ngày gần nhất × số ngày còn lại của chu kỳ (chu kỳ Supabase
+   ngày 18 → 18; Vercel 30 ngày trượt). **Vàng ≥ 40 % dự báo · Đỏ ≥ 50 % dự báo** → bản tin sáng + Telegram ngay.
+4. **Đồng hồ hỏng thì BÁO ĐỘNG, không báo yên**: token hết hạn, API lỗi, thiếu số ngày nào → đỏ "KHÔNG ĐO ĐƯỢC".
+5. **Chỉ số không có API** (Vercel CPU/chuyển khoản, Supabase egress): bản tin sáng thứ Hai nhắc kiểm tay; quá 8 ngày
+   chưa có số mới → vàng. Nhập số tay vào app chính để đồng hồ vẫn vẽ được xu hướng.
+6. **Cần anh Hữu**: tạo Supabase Personal Access Token (chỉ quyền đọc log/usage nếu bản chi tiết cho phép), lưu ngoài Git.
+   ⚠ PAT thường có quyền rộng trên tài khoản → giữ như mật khẩu, code chỉ dùng endpoint đọc.
+
 ## 8. Rủi ro còn lại
 
 | Rủi ro | Mức | Chặn bằng |
