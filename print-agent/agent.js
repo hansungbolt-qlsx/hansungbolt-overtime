@@ -76,8 +76,13 @@ const SB_ON = Boolean(SUPABASE_URL && SUPABASE_SERVICE_KEY);
 // 2. SÀN TUYỆT ĐỐI 1 GIÂY. Trước đây là `Number(POLL_INTERVAL_MS)` trần trụi:
 //    gõ sai .env (vd "15 000" hay "3s") → NaN → setTimeout(NaN) chạy ngay lập tức
 //    → vòng lặp không nghỉ, đốt hết hạn mức trong một buổi mà không ai biết.
+//
+// 3. LOG SUPABASE (12/10/2026, anh Hữu chốt nhịp 10 giây, chấp nhận in chậm thêm tối đa 7 giây):
+//    mỗi lượt gọi Supabase sinh 1 dòng log; gói Free cho 1 GB log/tháng (Supabase áp từ đầu 2027).
+//    Đo Logs Explorer 12/10: 38.383 lượt API/24 giờ, agent chiếm 98 %, riêng hỏi/dọn lệnh in 83 %
+//    (nhịp 3 giây) → log 1,07 GB/tháng (107 %). Nhịp 10 giây + dọn 5 phút ⇒ ước ~0,55 GB/tháng.
 const POLL_MS = SB_ON
-  ? Math.max(1_000, _pollThoLenh || 3_000)
+  ? Math.max(1_000, _pollThoLenh || 10_000)
   : Math.max(15_000, _pollThoLenh || 15_000);
 if (POLL_MS !== _pollThoLenh) {
   console.log(`⚠ POLL_INTERVAL_MS="${POLL_INTERVAL_MS}" bị điều chỉnh → dùng ${POLL_MS}ms`
@@ -193,9 +198,10 @@ async function login() {
  * lệnh đã hết hạn. Đọc thẳng Supabase thì không còn ai dọn hộ ⇒ nếu bỏ bước này,
  * agent tắt 10 phút rồi bật lại sẽ IN RA lệnh cũ — đúng cái bug đã trả giá 11/7.
  */
-// Dọn mỗi 30 giây là đủ (TTL là 2 phút) — chạy mỗi lượt poll thì tốn 3 lượt gọi
-// Supabase thay vì 1, mà không sớm hơn được phút nào.
-const DON_MOI_MS = 30_000;
+// Dọn mỗi 5 phút (12/10/2026, trước là 30 giây — giảm log Supabase). An toàn vì pollPendingJobs
+// CHỈ lấy lệnh tạo trong 2 phút gần nhất (created_at > now − TTL): lệnh quá hạn chưa kịp dọn
+// cũng KHÔNG BAO GIỜ được in ra; dọn chỉ còn việc đổi trạng thái sang 'error' để app báo người gửi.
+const DON_MOI_MS = 5 * 60_000;
 let lanDonCuoi = 0;
 
 async function donJobHetHan() {
@@ -230,8 +236,10 @@ async function pollPendingJobs() {
     return jobs ?? [];
   }
   await donJobHetHan();
+  // Chỉ lệnh còn hạn — cutoff dạng ...Z (dạng +00:00 làm PostgREST trả 400, xem donJobHetHan)
+  const cutoff = new Date(Date.now() - PRINT_JOB_TTL_MS).toISOString();
   const res = await sb(
-    'print_jobs?status=eq.pending'
+    `print_jobs?status=eq.pending&created_at=gt.${cutoff}`
     + '&select=id,type,ref_id,requested_by,status,created_at'
     + '&order=created_at.asc&limit=5',
   );
