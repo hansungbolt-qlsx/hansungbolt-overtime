@@ -11,6 +11,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import puppeteer from 'puppeteer';
 import printer from 'pdf-to-printer';
+import { taoHub } from './realtime-hub.mjs';
 
 const execFileP = promisify(execFile);
 const AGENT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -92,6 +93,81 @@ if (POLL_MS !== _pollThoLenh) {
 // TTL 2 phút — PHẢI giữ đúng bằng `lib/print-jobs-expire.ts` bên app.
 // Đổi một bên mà quên bên kia là lệnh in hết hạn vẫn chạy ra giấy.
 const PRINT_JOB_TTL_MS = 2 * 60_000;
+
+// ── REALTIME (GĐ3, 12/10/2026 — docs/realtime-agent-thiet-ke.md) ─────────────────────────────────────────
+// CÔNG TẮC: REALTIME_ON=1 trong .env. Tắt (mặc định) = agent chạy y như trước: hỏi lệnh in mỗi POLL_MS.
+// Bật: Supabase đẩy tin lệnh in mới → agent hỏi NGAY (không chờ nhịp). Lưới dự phòng (anh Hữu chốt phương án B):
+//   Realtime KHOẺ  → giờ làm (07:00–18:59 T2–T7 giờ VN) hỏi 60 giây · ngoài giờ chỉ dựa Realtime + canary
+//   KHÔNG KHOẺ     → hỏi mỗi POLL_MS (10 giây) như trước Realtime — xấu nhất không tệ hơn trước
+// Nhận lệnh vẫn qua nhanLenh() (nguyên tử, chống in trùng). Lõi kết nối + tự chữa: realtime-hub.mjs.
+const REALTIME_ON = process.env.REALTIME_ON === '1' && SB_ON;
+const DU_PHONG_IN_MS = 60_000;
+const CANH_BAO_SAU_MS = 10 * 60_000;       // L8: không khoẻ quá 10 phút → nhắn Telegram (1 lần), khoẻ lại → nhắn
+const BOT_CFG = 'F:/0. Quản lý nguyên liệu/telegram-bot/bot.cfg';
+let hub = null;
+let coTinIn = false;
+let danhThuc = null;
+let lanHoiInCuoi = 0;
+const rtDem = { khongKhoeTu: 0, daBao: false, phutKhongKhoe: 0, lanCuoiGhi: 0 };
+
+// 3 tháng 11/07→12/10: 393/393 lệnh in tạo trong 07:00–18:59, không có Chủ nhật.
+function gioLamVN(d = new Date()) {
+  const vn = new Date(d.getTime() + 7 * 3600_000);
+  const thu = vn.getUTCDay();
+  const gio = vn.getUTCHours();
+  return thu >= 1 && thu <= 6 && gio >= 7 && gio < 19;
+}
+function danhThucVong() { if (danhThuc) { const f = danhThuc; danhThuc = null; f(); } }
+function choHoacDanhThuc(ms) {
+  return new Promise((r) => {
+    const t = setTimeout(() => { danhThuc = null; r(); }, ms);
+    danhThuc = () => { clearTimeout(t); r(); };
+  });
+}
+function nhipHoiIn() {
+  if (!hub || !hub.trangThai().khoe) return POLL_MS;
+  return gioLamVN() ? DU_PHONG_IN_MS : Infinity;
+}
+async function nhanTelegram(text) {
+  try {
+    const cfg = JSON.parse(readFileSync(BOT_CFG, 'utf8'));
+    await fetch(`https://api.telegram.org/bot${cfg.bot_token}/sendMessage`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: Number(cfg.allowed_chat_id), text }),
+    });
+  } catch (e) { console.error(`[${new Date().toISOString()}] Telegram lỗi: ${e.message}`); }
+}
+// L8 — gọi mỗi vòng lặp: theo dõi thời gian không khoẻ, cảnh báo, ghi realtime-trangthai.json mỗi phút
+function canhRealtime() {
+  if (!hub) return;
+  const s = hub.trangThai();
+  const now = Date.now();
+  if (!s.khoe) {
+    if (!rtDem.khongKhoeTu) rtDem.khongKhoeTu = now;
+    if (!rtDem.daBao && now - rtDem.khongKhoeTu >= CANH_BAO_SAU_MS) {
+      rtDem.daBao = true;
+      nhanTelegram(`⚠ Agent in: Realtime KHÔNG KHOẺ ${Math.round((now - rtDem.khongKhoeTu) / 60_000)} phút (${s.lyDo}). `
+        + `Agent đang tự hỏi mỗi ${POLL_MS / 1000} giây — in vẫn chạy.`);
+    }
+  } else if (rtDem.khongKhoeTu) {
+    const phut = Math.round((now - rtDem.khongKhoeTu) / 60_000);
+    rtDem.phutKhongKhoe += phut;
+    if (rtDem.daBao) nhanTelegram(`✅ Agent in: Realtime khoẻ lại sau ${phut} phút.`);
+    rtDem.khongKhoeTu = 0;
+    rtDem.daBao = false;
+  }
+  if (now - rtDem.lanCuoiGhi >= 60_000) {
+    rtDem.lanCuoiGhi = now;
+    const n = nhipHoiIn();
+    try {
+      writeFileSync(join(AGENT_DIR, 'realtime-trangthai.json'), JSON.stringify({
+        cap_nhat: new Date().toISOString(), ...s, phut_khong_khoe_tich_luy: rtDem.phutKhongKhoe,
+        khong_khoe_tu: rtDem.khongKhoeTu ? new Date(rtDem.khongKhoeTu).toISOString() : null,
+        nhip_hoi_in_ms: n === Infinity ? null : n,
+      }, null, 1));
+    } catch { /* đo hỏng KHÔNG được làm chết vòng in */ }
+  }
+}
 
 // Đếm lượt gọi ra ngoài, ghi ra file cho bản tin sức khỏe buổi sáng đọc.
 //
@@ -1203,6 +1279,14 @@ async function pollLoop() {
       }
       lastOtSyncAt = Date.now();
     }
+    canhRealtime();
+    // Hỏi lệnh in khi: có tin Realtime / bắt bù, hoặc tới nhịp (xem nhipHoiIn). Tắt Realtime → luôn tới nhịp POLL_MS.
+    if (!coTinIn && Date.now() - lanHoiInCuoi < nhipHoiIn()) {
+      await choHoacDanhThuc(POLL_MS);
+      continue;
+    }
+    coTinIn = false;
+    lanHoiInCuoi = Date.now();
     try {
       const jobs = await pollPendingJobs();
       if (jobs.length > 0) {
@@ -1210,6 +1294,7 @@ async function pollLoop() {
         // Chỉ xử lý job ĐẦU TIÊN mỗi vòng rồi poll lại ngay — danh sách luôn
         // tươi, job đã tự hủy (quá 2') phía server không bao giờ được in ra.
         await processJob(jobs[0]);
+        coTinIn = true;          // hỏi lại ngay vòng sau (còn lệnh khác thì in tiếp)
         continue;
       }
     } catch (e) {
@@ -1224,7 +1309,7 @@ async function pollLoop() {
         }
       }
     }
-    await new Promise((r) => setTimeout(r, POLL_MS));
+    await choHoacDanhThuc(POLL_MS);
   }
 }
 
@@ -1237,6 +1322,21 @@ async function main() {
 
   await login();
   await ensureBrowser();
+  if (REALTIME_ON) {
+    try {
+      hub = taoHub({ url: SUPABASE_URL, key: SUPABASE_SERVICE_KEY, idAgent: 'agent', ghiLog: (m) => console.log(m) });
+      const coViec = () => { coTinIn = true; danhThucVong(); };
+      hub.dangKy({ bang: 'print_jobs', suKien: 'INSERT', xuLy: coViec, batBu: coViec });
+      await hub.batDau();
+      console.log(`Realtime: BẬT — dự phòng lệnh in ${DU_PHONG_IN_MS / 1000} giây trong giờ làm, `
+        + `${POLL_MS / 1000} giây khi không khoẻ`);
+    } catch (e) {
+      hub = null;
+      console.error(`Realtime khởi động lỗi — chạy chế độ hỏi mỗi ${POLL_MS} ms: ${e.message}`);
+    }
+  } else {
+    console.log(`Realtime: TẮT (REALTIME_ON khác 1) — hỏi lệnh in mỗi ${POLL_MS} ms như cũ`);
+  }
   await pollLoop();
 }
 
