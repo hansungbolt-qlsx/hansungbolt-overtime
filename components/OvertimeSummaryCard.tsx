@@ -175,11 +175,12 @@ export default function OvertimeSummaryCard({ isAdmin = false }: { isAdmin?: boo
       </div>
 
       {showTabs && (
-        <div className="flex gap-1 px-5 pt-3 bg-white border-b border-brand-surface-alt overflow-x-auto">
+        {/* Anh Hữu 14/10/2026: điện thoại không vuốt ngang — tab bộ phận tự xuống dòng */}
+        <div className="flex flex-wrap gap-1 px-3 sm:px-5 pt-3 bg-white border-b border-brand-surface-alt">
           <button
             type="button"
             onClick={() => setActiveTab('all')}
-            className={`px-5 py-2 text-sm font-bold rounded-t-lg border border-b-0 transition whitespace-nowrap ${
+            className={`px-3 sm:px-5 py-2 text-sm font-bold rounded-t-lg border border-b-0 transition whitespace-nowrap ${
               activeTab === 'all'
                 ? 'bg-[#dce8fa] text-[#063882] border-[#dce8fa] -mb-px'
                 : 'bg-white text-brand-navy-soft border-transparent hover:bg-[#f0f5ff]'
@@ -197,7 +198,7 @@ export default function OvertimeSummaryCard({ isAdmin = false }: { isAdmin?: boo
                 key={d}
                 type="button"
                 onClick={() => setActiveTab(d)}
-                className={`px-5 py-2 text-sm font-bold rounded-t-lg border border-b-0 transition whitespace-nowrap ${
+                className={`px-3 sm:px-5 py-2 text-sm font-bold rounded-t-lg border border-b-0 transition whitespace-nowrap ${
                   isActive
                     ? 'bg-[#dce8fa] text-[#063882] border-[#dce8fa] -mb-px'
                     : 'bg-white text-brand-navy-soft border-transparent hover:bg-[#f0f5ff]'
