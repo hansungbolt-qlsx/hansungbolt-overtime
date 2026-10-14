@@ -55,11 +55,12 @@ export function taoGcSync({ sb, mainGet, mainPost, upload, gioLam = () => true, 
     for (const p of d.phieu || []) {
       const st = MAP[p.trang_thai];
       if (!st) continue;                         // pending: điện thoại đã là 'pending'
-      const mark = `${st}|${p.version}`;
+      const mark = `${st}|${p.version}|${p.erp_tt ?? ''}|${p.erp_bao ?? ''}`;   // ERP đã xoá (phương án ③) cũng là "đổi"
       if (daBao.get(p.uid) === mark) continue;
       await sb(`gc_slips?uid=eq.${encodeURIComponent(p.uid)}&status=in.(pending,approved,pushed)`, {
         method: 'PATCH', body: { status: st, reject_reason: p.ly_do_tra ?? null, approved_by: p.duyet_boi ?? null,
-          approved_at: p.duyet_luc ?? null, erp_ref: p.erp_ref ?? null, main_version: p.version ?? null } });
+          approved_at: p.duyet_luc ?? null, erp_ref: p.erp_ref ?? null, main_version: p.version ?? null,
+          last_error: st === 'pushed' ? (p.erp_bao ?? null) : undefined } });
       daBao.set(p.uid, mark);
       n++;
     }
