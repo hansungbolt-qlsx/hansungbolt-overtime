@@ -12,6 +12,7 @@ import { promisify } from 'util';
 import puppeteer from 'puppeteer';
 import printer from 'pdf-to-printer';
 import { taoHub } from './realtime-hub.mjs';
+import { taoGcSync } from './gia-cong-sync.mjs';
 
 const execFileP = promisify(execFile);
 const AGENT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -1109,6 +1110,72 @@ async function syncCoOnce() {
   }
 }
 
+// ── NHẬP LIỆU GIA CÔNG 70/80 (anh Hữu chốt 14/10/2026) ─────────────────────────────────────────────
+// Điện thoại (qlsx) lập phiếu đặt / nhập gia công → bảng gc_slips → agent đẩy sang APP CHÍNH /api/ot/gc-phieu
+// (huu duyệt, Đẩy ERP) → trạng thái agent ghi ngược về gc_slips. Danh sách chỉ thị chờ đặt + thùng chờ về: agent đẩy
+// 1 file plan-files/gc-guong.json (Storage) CHỈ KHI ĐỔI. Mục tiêu anh chốt: mọi chỉ số gói Free < 50 % ⇒
+//   · nhận phiếu qua REALTIME (lọc status=pending) — không hỏi dày; lưới dự phòng 30 phút (giờ làm)
+//   · ghi ngược synced_at / trạng thái THẲNG Supabase (không qua Vercel), chỉ khi trạng thái đổi
+//   · trạng thái duyệt đọc từ app chính trên máy này (không tốn gói Free)
+// CÔNG TẮC GC_ON=1 trong .env — CHỈ bật SAU khi anh chạy docs/sql/26-gia-cong.sql (chưa có bảng trong publication
+// mà đăng ký Realtime → kênh lỗi → cả luồng lệnh in quay về hỏi 10 giây).
+const GC_ON = process.env.GC_ON === '1' && SB_ON;
+const GC_GUONG_MS = 10 * 60_000;
+const GC_DU_PHONG_MS = 30 * 60_000;
+const GC_TRANG_THAI_MS = 60_000;
+let lastGcGuongAt = 0;
+let lastGcSyncAt = 0;
+let lastGcTtAt = 0;
+let coTinGc = false;
+
+// Phần gia công nằm ở gia-cong-sync.mjs (kiểm được bằng thu-gia-cong.mjs); đây chỉ nối vào hàm sẵn có của agent.
+const gc = taoGcSync({
+  sb: async (path, o = {}) => {
+    if (!o.method) return (await sb(path)).json();
+    await sb(path, { method: o.method, headers: { Prefer: 'return=minimal' }, body: JSON.stringify(o.body) });
+    return null;
+  },
+  mainGet,
+  mainPost: async (path, body) => {
+    const r = await fetch(`${MAIN_APP_URL}${path}`, {
+      method: 'POST', headers: { 'X-Agent-Token': MAIN_APP_TOKEN, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    return { status: r.status, json: await r.json().catch(() => ({})) };
+  },
+  upload: async (bucket, path, text) => {
+    ghiNhanGoi('supabase');
+    const r = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${path}`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+        'Content-Type': 'application/json', 'x-upsert': 'true', 'cache-control': 'no-cache' },
+      body: text,
+    });
+    if (!r.ok) throw new Error(`đẩy ${path} HTTP ${r.status} ${(await r.text().catch(() => '')).slice(0, 120)}`);
+  },
+  gioLam: () => gioLamVN(),
+  log: (m) => console.log(`[${new Date().toISOString()}] ${m}`),
+  logLoi: (m) => console.error(`[${new Date().toISOString()}] ${m}`),
+});
+
+async function syncGcVong() {
+  if (!GC_ON) return;
+  if (Date.now() - lastGcGuongAt > GC_GUONG_MS) {
+    try { await gc.dayGuong(); lastGcGuongAt = Date.now(); }
+    catch (e) { console.error(`[${new Date().toISOString()}] Gia công gương lỗi: ${e.message}`); lastGcGuongAt = Date.now() - GC_GUONG_MS + 60_000; }
+  }
+  // Phiếu: có tin Realtime, hoặc Realtime không khoẻ (hỏi 60"), hoặc tới lưới dự phòng 30' trong giờ làm
+  const khoe = hub && hub.trangThai().khoe;
+  const toiNhip = Date.now() - lastGcSyncAt > (khoe ? GC_DU_PHONG_MS : 60_000) && (gioLamVN() || !khoe);
+  if (coTinGc || toiNhip) {
+    coTinGc = false;
+    lastGcSyncAt = Date.now();
+    try { await gc.dayPhieu(); } catch (e) { console.error(`[${new Date().toISOString()}] Gia công đẩy phiếu lỗi: ${e.message}`); }
+  }
+  if (Date.now() - lastGcTtAt > GC_TRANG_THAI_MS) {
+    lastGcTtAt = Date.now();
+    try { await gc.keoTrangThai(); } catch (e) { console.error(`[${new Date().toISOString()}] Gia công trạng thái lỗi: ${e.message}`); }
+  }
+}
+
 async function syncNvlOnce() {
   if (!MAIN_APP_URL || !MAIN_APP_TOKEN) return;
   const today = vnDate();
@@ -1279,6 +1346,7 @@ async function pollLoop() {
       }
       lastOtSyncAt = Date.now();
     }
+    await syncGcVong();
     canhRealtime();
     // Hỏi lệnh in khi: có tin Realtime / bắt bù, hoặc tới nhịp (xem nhipHoiIn). Tắt Realtime → luôn tới nhịp POLL_MS.
     if (!coTinIn && Date.now() - lanHoiInCuoi < nhipHoiIn()) {
@@ -1327,6 +1395,10 @@ async function main() {
       hub = taoHub({ url: SUPABASE_URL, key: SUPABASE_SERVICE_KEY, idAgent: 'agent', ghiLog: (m) => console.log(m) });
       const coViec = () => { coTinIn = true; danhThucVong(); };
       hub.dangKy({ bang: 'print_jobs', suKien: 'INSERT', xuLy: coViec, batBu: coViec });
+      if (GC_ON) {
+        const coGc = () => { coTinGc = true; danhThucVong(); };
+        hub.dangKy({ bang: 'gc_slips', suKien: '*', loc: 'status=eq.pending', xuLy: coGc, batBu: coGc });
+      }
       await hub.batDau();
       console.log(`Realtime: BẬT — dự phòng lệnh in ${DU_PHONG_IN_MS / 1000} giây trong giờ làm, `
         + `${POLL_MS / 1000} giây khi không khoẻ`);
@@ -1337,6 +1409,7 @@ async function main() {
   } else {
     console.log(`Realtime: TẮT (REALTIME_ON khác 1) — hỏi lệnh in mỗi ${POLL_MS} ms như cũ`);
   }
+  console.log(`Gia công: ${GC_ON ? 'BẬT (GC_ON=1)' : 'TẮT (GC_ON khác 1 — bật sau khi chạy docs/sql/26-gia-cong.sql)'}`);
   await pollLoop();
 }
 
