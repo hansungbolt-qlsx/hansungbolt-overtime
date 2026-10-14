@@ -175,7 +175,6 @@ export default function OvertimeSummaryCard({ isAdmin = false }: { isAdmin?: boo
       </div>
 
       {showTabs && (
-        {/* Anh Hữu 14/10/2026: điện thoại không vuốt ngang — tab bộ phận tự xuống dòng */}
         <div className="flex flex-wrap gap-1 px-3 sm:px-5 pt-3 bg-white border-b border-brand-surface-alt">
           <button
             type="button"
