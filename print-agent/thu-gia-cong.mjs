@@ -93,7 +93,7 @@ const htmlN = (await (await fetch(MAIN + '/giacong/nhap-kho-gc?loc=tat_ca', { he
 const idNhap = (htmlN.match(/\/giacong\/nhap-kho-gc\/(\d+)/) || [])[1];
 await bam(`/giacong/dat-hang/${idDat}/duyet`);
 await bam(`/giacong/nhap-kho-gc/${idNhap}/tra-lai`, { ly_do: 'Sai thùng, kiểm lại' });
-ck(await gc.keoTrangThai() === 2, '2 trạng thái đổi → ghi về');
+ck(await gc.keoTrangThai() >= 2, '2 trạng thái đổi → ghi về (bản sao DB có thể có phiếu thật, vd #1 14/10)');
 ck(r1.status === 'approved' && r1.approved_by, 'phiếu đặt: đã duyệt + người duyệt', r1);
 ck(r2.status === 'rejected' && r2.reject_reason === 'Sai thùng, kiểm lại', 'phiếu nhập: bị trả lại + lý do', r2);
 const n1 = soGoiSb;

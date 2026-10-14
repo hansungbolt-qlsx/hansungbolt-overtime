@@ -235,7 +235,9 @@ export default function GiaCongView({ onChuaLuu }: { onChuaLuu?: (canhBao: strin
               <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${GC_STATUS_UI[s.status].cls}`}>{GC_STATUS_UI[s.status].label}</span>
             </div>
             {s.reject_reason && <div className="text-xs text-red-700 mt-1">Lý do: {s.reject_reason}</div>}
-            {s.status === 'pushed' && s.last_error && <div className="text-xs font-semibold text-red-700 mt-1 break-words">{s.last_error}</div>}
+            {s.status === 'pushed' && s.last_error && (
+              <div className={`text-xs mt-1 break-words ${s.last_error.startsWith('⚠') ? 'font-semibold text-red-700' : 'text-slate-500'}`}>{s.last_error}</div>
+            )}
             {s.status === 'draft' && <button type="button" className="text-xs text-red-600 mt-1" onClick={() => void xoaNhap(s)}>Xoá nháp</button>}
           </div>
         ))}
