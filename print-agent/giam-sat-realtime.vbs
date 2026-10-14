@@ -1,0 +1,2 @@
+' Chay giam-sat-realtime.mjs AN (khong loe cua so). Task HSB_GiamSat_Realtime goi moi 15 phut.
+CreateObject("Wscript.Shell").Run "cmd /c cd /d ""C:\hansungbolt-overtime\print-agent"" && node giam-sat-realtime.mjs >> giam-sat-realtime-err.log 2>&1", 0, False
