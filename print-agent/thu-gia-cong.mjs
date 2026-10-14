@@ -62,7 +62,7 @@ ck(await gc.dayGuong() === true, 'lần đầu: đẩy file gc-guong.json');
 const g = JSON.parse(kho['plan-files/gc-guong.json'] || '{}');
 ck(g.cho_dat?.length > 100 && g.cho_ve?.length > 50, `có ${g.cho_dat?.length} chỉ thị chờ đặt · ${g.cho_ve?.length} thùng chờ về`);
 const nccs = (g.ncc || []).map((n) => `${n.cong_doan}:${n.ma}`).sort();
-ck(JSON.stringify(nccs) === JSON.stringify(['70:VIK', '80:NPT', '80:TC']), 'NCC: 70 VIK · 80 NPT, TC', nccs);
+ck(JSON.stringify(nccs) === JSON.stringify(['15:VVN', '20:HTP', '67:NPT', '70:VIK', '80:NPT', '80:TC', '89:VVN']), 'NCC: 70 VIK · 80 NPT, TC + CĐ mới 15 VVN · 20 HTP · 67 NPT · 89 VVN (14/10 đêm)', nccs);
 const n0 = soGoiSb;
 ck(await gc.dayGuong() === false && soGoiSb === n0, 'lần 2 không đổi → KHÔNG đẩy (0 lượt Supabase)');
 

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
-import { canUseGiaCong, kiemDong, gcUid, type GcLine, type GcLoai } from '@/lib/gia-cong';
+import { canUseGiaCong, kiemDong, gcUid, GC_CD_NHAP, GC_CONG_DOAN, type GcLine, type GcLoai } from '@/lib/gia-cong';
 
 export const runtime = 'nodejs';
 
@@ -47,7 +47,9 @@ export async function POST(req: Request) {
   try { b = await req.json(); } catch { return NextResponse.json({ error: 'Body không hợp lệ' }, { status: 400 }); }
   const loai = b.loai;
   if (loai !== 'dat' && loai !== 'nhap') return NextResponse.json({ error: 'Loại phiếu không đúng' }, { status: 400 });
-  if (b.cong_doan !== '70' && b.cong_doan !== '80') return NextResponse.json({ error: 'Chỉ công đoạn 70 / 80' }, { status: 400 });
+  const cdHopLe = loai === 'nhap' ? (GC_CD_NHAP as string[]) : Object.keys(GC_CONG_DOAN);
+  if (!b.cong_doan || !cdHopLe.includes(b.cong_doan))
+    return NextResponse.json({ error: `Công đoạn ${loai === 'nhap' ? 'phiếu nhập chỉ 70 / 80' : 'không đúng'}` }, { status: 400 });
   if (!b.ncc) return NextResponse.json({ error: 'Chưa chọn nhà gia công' }, { status: 400 });
   const lines: GcLine[] = (b.lines || []).map((l) => ({
     saeji_no: String(l.saeji_no || '').trim(), ma_hang: String(l.ma_hang || '').trim(), ten_hang: l.ten_hang || '',

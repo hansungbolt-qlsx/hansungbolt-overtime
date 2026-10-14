@@ -5,10 +5,17 @@
 // Bảng: gc_slips (docs/sql/26-gia-cong.sql). Danh sách chỉ thị / thùng: plan-files/gc-guong.json (agent đẩy khi đổi).
 
 export type GcLoai = 'dat' | 'nhap';
-export type GcCongDoan = '70' | '80';
+export type GcCongDoan = '70' | '80' | '89' | '67' | '15' | '20';
 export type GcStatus = 'draft' | 'pending' | 'approved' | 'pushed' | 'rejected';
 
-export const GC_CONG_DOAN: Record<GcCongDoan, string> = { '70': '70 · Xử lý nhiệt', '80': '80 · Xi mạ' };
+export const GC_CONG_DOAN: Record<GcCongDoan, string> = {
+  '70': '70 · Xử lý nhiệt', '80': '80 · Xi mạ',
+  // Mở rộng phiếu ĐẶT (14/10/2026 đêm) — bằng chứng ERP: hsb-material-app/docs/erp/gia_cong_don_vi_theo_cong_doan.md.
+  // Đẩy ERP các công đoạn này còn KHOÁ trên app chính cho tới khi anh Hữu mở. Cần chạy docs/sql/27-gia-cong-cd-moi.sql TRƯỚC.
+  '89': '89 · Phủ đầu (Head coating)', '67': '67 · Đánh bóng (Buffing)', '15': '15 · Gia công (Processing)', '20': '20 · Cắt viền (Trimming)',
+};
+/** Phiếu NHẬP vẫn chỉ 70/80 (công đoạn tính EA về nhiều lần — chưa đủ căn cứ). */
+export const GC_CD_NHAP: GcCongDoan[] = ['70', '80'];
 export const GC_LOAI: Record<GcLoai, string> = { dat: 'Phiếu đặt hàng gia công', nhap: 'Phiếu nhập kho gia công' };
 export const GC_GUONG_BUCKET = 'plan-files';
 export const GC_GUONG_PATH = 'gc-guong.json';

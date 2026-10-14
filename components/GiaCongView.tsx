@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import BarcodeScanButton from './BarcodeScanButton';
 import {
-  GC_CONG_DOAN, GC_LOAI, GC_STATUS_UI, hienSaeji, kiemDong, normalizeSaeji,
+  GC_CD_NHAP, GC_CONG_DOAN, GC_LOAI, GC_STATUS_UI, hienSaeji, kiemDong, normalizeSaeji,
   type GcCongDoan, type GcGuong, type GcLine, type GcLoai, type GcSlip,
 } from '@/lib/gia-cong';
 
@@ -60,6 +60,7 @@ export default function GiaCongView({ onChuaLuu }: { onChuaLuu?: (canhBao: strin
   const doiLoai = (l: GcLoai) => {
     if (lines.length && !window.confirm('Bỏ các dòng chưa lưu để chuyển loại phiếu?')) return;
     lamMoi(); setLoai(l);
+    if (l === 'nhap' && !GC_CD_NHAP.includes(cd)) setCd('80');   // phiếu nhập chỉ 70 / 80
   };
 
   const quet = (text: string) => {
@@ -146,7 +147,7 @@ export default function GiaCongView({ onChuaLuu }: { onChuaLuu?: (canhBao: strin
           <label className="text-sm font-semibold text-slate-600">Công đoạn
             <select className={o} value={cd} disabled={lines.length > 0}
               onChange={(e) => { setCd(e.target.value as GcCongDoan); setChonThung(''); }}>
-              {(Object.keys(GC_CONG_DOAN) as GcCongDoan[]).map((k) => <option key={k} value={k}>{GC_CONG_DOAN[k]}</option>)}
+              {(loai === 'nhap' ? GC_CD_NHAP : (Object.keys(GC_CONG_DOAN) as GcCongDoan[])).map((k) => <option key={k} value={k}>{GC_CONG_DOAN[k]}</option>)}
             </select></label>
           <label className="text-sm font-semibold text-slate-600">Nhà gia công
             <select className={o} value={nccChon} disabled={lines.length > 0} onChange={(e) => { setNcc(e.target.value); setChonThung(''); }}>
