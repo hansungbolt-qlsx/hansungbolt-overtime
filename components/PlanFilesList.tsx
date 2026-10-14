@@ -97,7 +97,7 @@ export default function PlanFilesList() {
                 <div className="text-sm font-semibold text-brand-navy">
                   Ngày {formatDateVN(f.plan_date)}
                 </div>
-                <div className="text-xs text-brand-navy-soft break-all" title={f.file_name}>
+                <div className="text-xs text-brand-navy-soft break-words" title={f.file_name}>
                   {f.file_name}
                   {f.sheet_name && (
                     <span className="ml-1">• sheet {f.sheet_name}</span>
