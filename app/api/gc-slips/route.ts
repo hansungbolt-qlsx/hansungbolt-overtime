@@ -21,7 +21,7 @@ const MO = ['draft', 'pending', 'approved'];
 
 export async function GET(req: Request) {
   const session = await getSession();
-  if (!session || !canUseGiaCong(session.role)) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
+  if (!session || !canUseGiaCong(session)) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   const loai = (new URL(req.url).searchParams.get('loai') || 'dat') as GcLoai;
   const tu = new Date(Date.now() - 30 * 86400_000).toISOString();
   const { data, error } = await supabaseAdmin
@@ -42,7 +42,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   const session = await getSession();
-  if (!session || !canUseGiaCong(session.role)) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
+  if (!session || !canUseGiaCong(session)) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   let b: { uid?: string; loai?: GcLoai; cong_doan?: string; ncc?: string; lines?: GcLine[]; note?: string; send?: boolean };
   try { b = await req.json(); } catch { return NextResponse.json({ error: 'Body không hợp lệ' }, { status: 400 }); }
   const loai = b.loai;
@@ -85,7 +85,7 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   const session = await getSession();
-  if (!session || !canUseGiaCong(session.role)) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
+  if (!session || !canUseGiaCong(session)) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   const uid = new URL(req.url).searchParams.get('uid') || '';
   const { data: cu } = await supabaseAdmin.from('gc_slips').select('status').eq('uid', uid).maybeSingle();
   if (!cu) return NextResponse.json({ error: 'Không có phiếu' }, { status: 404 });

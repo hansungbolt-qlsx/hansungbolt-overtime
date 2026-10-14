@@ -62,8 +62,9 @@ export const GC_STATUS_UI: Record<GcStatus, { label: string; cls: string }> = {
   rejected: { label: '↩ Bị trả lại — sửa rồi gửi lại', cls: 'bg-red-100 text-red-700' },
 };
 
-export function canUseGiaCong(role: string | undefined | null): boolean {
-  return role === 'qlsx' || role === 'admin';
+// Anh Hữu chốt 14/10/2026: áp dụng TÀI KHOẢN ĐĂNG NHẬP `qlsx` (admin) trước; tài khoản anh Cường mở rộng sau nếu cần.
+export function canUseGiaCong(session: { username?: string } | null | undefined): boolean {
+  return session?.username === 'qlsx';
 }
 
 /** Mã vạch phiếu di chuyển → số chỉ thị 9 số (bỏ '*', bỏ gạch; '608-094' / '202608094' đều ra '202608094'). */

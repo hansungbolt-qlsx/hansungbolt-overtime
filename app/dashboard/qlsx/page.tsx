@@ -22,7 +22,7 @@ export default async function QlsxOvertimePage() {
   return (
     <main className="min-h-screen bg-brand-pattern p-4 md:p-8">
       <div className="max-w-2xl mx-auto">
-        <DashboardHeader fullName={session.fullName} active="qlsx" />
+        <DashboardHeader fullName={session.fullName} username={session.username} active="qlsx" />
 
         <div className="mb-5">
           <h2 className="text-lg font-bold text-brand-navy">Đăng ký tăng ca — Bộ phận QLSX</h2>

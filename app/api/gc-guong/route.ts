@@ -10,7 +10,7 @@ export const runtime = 'nodejs';
 // (≈ 60–70 KB), giữ 5 phút ⇒ ít lượt Vercel nhất.
 export async function GET() {
   const session = await getSession();
-  if (!session || !canUseGiaCong(session.role)) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
+  if (!session || !canUseGiaCong(session)) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   const { data, error } = await supabaseAdmin.storage.from(GC_GUONG_BUCKET).download(GC_GUONG_PATH);
   if (error || !data) {
     return NextResponse.json({ ncc: [], cho_dat: [], cho_ve: [], error: 'Chưa có danh sách (agent chưa đẩy)' });

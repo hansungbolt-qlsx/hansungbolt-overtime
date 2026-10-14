@@ -100,7 +100,7 @@ export default async function DashboardPage({
   return (
     <main className="min-h-screen bg-brand-pattern p-4 md:p-8">
       <div className="max-w-5xl mx-auto">
-        <DashboardHeader fullName={session.fullName} active="overview" />
+        <DashboardHeader fullName={session.fullName} username={session.username} active="overview" />
 
         <div className="grid gap-4 md:grid-cols-3 mb-6">
           <section className="md:col-span-2 bg-white rounded-xl shadow-sm border border-brand-surface-alt p-5">

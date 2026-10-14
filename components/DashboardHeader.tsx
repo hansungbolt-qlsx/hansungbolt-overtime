@@ -4,21 +4,25 @@ import LogoutButton from './LogoutButton';
 import ChangePasswordButton from './ChangePasswordButton';
 import { toTitleCase } from '@/lib/format';
 
-type Tab = 'overview' | 'users' | 'qlsx' | 'stops';
+type Tab = 'overview' | 'users' | 'qlsx' | 'stops' | 'gia_cong';
 
 const TABS: Array<{ key: Tab; label: string; href: string }> = [
   { key: 'overview', label: 'Tổng quan', href: '/dashboard' },
   { key: 'users', label: 'Quản lý tài khoản', href: '/dashboard/users' },
   { key: 'qlsx', label: 'Tăng ca QLSX', href: '/dashboard/qlsx' },
   { key: 'stops', label: 'Máy dừng hôm nay', href: '/dashboard/stop-reasons' },
+  // Gia công 70/80 (anh Hữu chốt 14/10/2026): CHỈ tài khoản đăng nhập `qlsx` — xem lib/gia-cong.ts canUseGiaCong
+  { key: 'gia_cong', label: '🏭 Gia công', href: '/dashboard/gia-cong' },
 ];
 
 export default function DashboardHeader({
   fullName,
   active,
+  username,
 }: {
   fullName: string;
   active: Tab;
+  username?: string;
 }) {
   return (
     <header className="mb-6">
@@ -50,8 +54,8 @@ export default function DashboardHeader({
         </div>
       </div>
 
-      <nav className="flex gap-2 border-b border-brand-surface-alt">
-        {TABS.map((t) => {
+      <nav className="flex gap-2 border-b border-brand-surface-alt overflow-x-auto whitespace-nowrap">
+        {TABS.filter((t) => t.key !== 'gia_cong' || username === 'qlsx').map((t) => {
           const isActive = t.key === active;
           return (
             <Link

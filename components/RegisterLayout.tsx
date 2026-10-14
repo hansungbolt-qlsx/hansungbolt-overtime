@@ -13,7 +13,6 @@ import CoDailyView from './CoDailyView';
 import CoDccdCard from './CoDccdCard';
 import CoProdSummaryView from './CoProdSummaryView';
 import { chanNeuChuaLuu } from '@/lib/nvl-slips';
-import GiaCongView from './GiaCongView';
 
 const todayISO = () => {
   const d = new Date();
@@ -23,7 +22,7 @@ const todayISO = () => {
   return `${y}-${m}-${day}`;
 };
 
-type Tab = 'overtime' | 'labels' | 'summary' | 'today' | 'plan' | 'dccd' | 'co_day' | 'ab_day' | 'prod_sum' | 'stops' | 'wh_out' | 'wh_in' | 'gia_cong';
+type Tab = 'overtime' | 'labels' | 'summary' | 'today' | 'plan' | 'dccd' | 'co_day' | 'ab_day' | 'prod_sum' | 'stops' | 'wh_out' | 'wh_in';
 
 function OvertimeView({ department, isLeader }: { department: string; isLeader: boolean }) {
   return (
@@ -133,8 +132,6 @@ export default function RegisterLayout({
     tabs.push({ key: 'wh_out', label: '📤 Xuất kho', color: 'teal' });
     tabs.push({ key: 'wh_in', label: '📥 Trả kho', color: 'green' });
   }
-  // Gia công 70/80 (anh Hữu chốt 14/10/2026): CHỈ qlsx — đặt / nhập gia công, duyệt + đẩy ERP ở app chính
-  if (isQlsx) tabs.push({ key: 'gia_cong', label: '🏭 Gia công', color: 'navy' });
 
   // Chỉ 1 tab → bỏ tab bar, render trực tiếp
   if (tabs.length === 1) {
@@ -236,7 +233,6 @@ export default function RegisterLayout({
 
       {activeTab === 'wh_out' && <WarehouseSlipView kind="issue" onChuaLuu={setKhoChuaLuu} />}
       {activeTab === 'wh_in' && <WarehouseSlipView kind="return" onChuaLuu={setKhoChuaLuu} />}
-      {activeTab === 'gia_cong' && <GiaCongView onChuaLuu={setKhoChuaLuu} />}
     </>
   );
 }

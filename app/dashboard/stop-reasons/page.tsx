@@ -15,7 +15,7 @@ export default async function AdminStopReasonsPage() {
   return (
     <main className="min-h-screen bg-brand-pattern p-4 md:p-8">
       <div className="max-w-3xl mx-auto">
-        <DashboardHeader fullName={session.fullName} active="stops" />
+        <DashboardHeader fullName={session.fullName} username={session.username} active="stops" />
         <StopReasonsView />
       </div>
     </main>

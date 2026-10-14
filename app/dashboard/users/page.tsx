@@ -11,7 +11,7 @@ export default async function DashboardUsersPage() {
   return (
     <main className="min-h-screen bg-brand-pattern p-4 md:p-8">
       <div className="max-w-5xl mx-auto">
-        <DashboardHeader fullName={session.fullName} active="users" />
+        <DashboardHeader fullName={session.fullName} username={session.username} active="users" />
         <UserManagementCard />
       </div>
     </main>
