@@ -154,12 +154,12 @@ export default function GiaCongView({ onChuaLuu }: { onChuaLuu?: (canhBao: strin
             </select></label>
         </div>
         {lines.length > 0 && <div className="text-xs text-slate-500">Đã có dòng → khoá công đoạn + nhà gia công (1 phiếu = 1 công đoạn + 1 nhà gia công).</div>}
+        <BarcodeScanButton label="📷 Quét phiếu di chuyển" onScan={(t) => quet(t)} />
         <div className="flex gap-2 items-center">
-          <BarcodeScanButton label="📷 Quét phiếu di chuyển" onScan={(t) => quet(t)} />
-          <input className={`${o} flex-1`} inputMode="numeric" placeholder="hoặc gõ số chỉ thị" value={nhapTay}
+          <input className={`${o} flex-1 min-w-0`} inputMode="numeric" placeholder="hoặc gõ số chỉ thị" value={nhapTay}
             onChange={(e) => setNhapTay(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && nhapTay) { quet(nhapTay); setNhapTay(''); } }} />
-          <button type="button" className="rounded-lg bg-brand-teal text-white px-3 py-2 text-sm font-semibold"
+          <button type="button" className="shrink-0 rounded-lg bg-brand-teal text-white px-4 py-2 text-sm font-semibold"
             onClick={() => { if (nhapTay) { quet(nhapTay); setNhapTay(''); } }}>Thêm</button>
         </div>
         {msg && <div className={`rounded-lg px-3 py-2 text-sm ${msg.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-700'}`}>{msg.text}</div>}

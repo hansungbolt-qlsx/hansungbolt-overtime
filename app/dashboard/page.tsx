@@ -103,7 +103,7 @@ export default async function DashboardPage({
         <DashboardHeader fullName={session.fullName} username={session.username} active="overview" />
 
         <div className="grid gap-4 md:grid-cols-3 mb-6">
-          <section className="md:col-span-2 bg-white rounded-xl shadow-sm border border-brand-surface-alt p-5">
+          <section className="min-w-0 md:col-span-2 bg-white rounded-xl shadow-sm border border-brand-surface-alt p-5">
             <h2 className="text-lg font-semibold text-brand-navy mb-2">
               Kế hoạch sản xuất
             </h2>

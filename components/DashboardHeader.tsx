@@ -54,14 +54,15 @@ export default function DashboardHeader({
         </div>
       </div>
 
-      <nav className="flex gap-2 border-b border-brand-surface-alt overflow-x-auto whitespace-nowrap">
+      {/* Anh Hữu 14/10/2026: app tăng ca dùng trên điện thoại — giao diện nằm gọn 100 % bề ngang, không vuốt trái/phải */}
+      <nav className="grid grid-cols-3 gap-1 sm:flex sm:gap-2 border-b border-brand-surface-alt">
         {TABS.filter((t) => t.key !== 'gia_cong' || username === 'qlsx').map((t) => {
           const isActive = t.key === active;
           return (
             <Link
               key={t.key}
               href={t.href}
-              className={`px-4 py-2.5 text-sm font-semibold rounded-t-lg transition border border-b-0 ${
+              className={`px-2 sm:px-4 py-2 sm:py-2.5 text-[13px] sm:text-sm leading-tight text-center font-semibold rounded-t-lg transition border border-b-0 ${
                 isActive
                   ? 'bg-white text-brand-navy border-brand-surface-alt -mb-px'
                   : 'text-brand-navy-soft border-transparent hover:bg-brand-surface-alt/50 hover:text-brand-navy'
