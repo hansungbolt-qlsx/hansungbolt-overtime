@@ -16,9 +16,9 @@ export const GC_CONG_DOAN: Record<GcCongDoan, string> = {
 };
 /** Phiếu NHẬP vẫn chỉ 70/80 (công đoạn tính EA về nhiều lần — chưa đủ căn cứ). */
 export const GC_CD_NHAP: GcCongDoan[] = ['70', '80'];
-/** Phiếu ĐẶT được chọn trên điện thoại — mở TỪNG giai đoạn (anh Hữu duyệt 15/10/2026: 89 → 67/20 → 15).
- *  Thêm công đoạn ở đây CÙNG LÚC mở CD_MO_DAY app chính (kẻo phiếu gửi lên mà không đẩy ERP được). */
-export const GC_CD_DAT: GcCongDoan[] = ['70', '80', '89'];
+/** Phiếu ĐẶT được chọn trên điện thoại = CD_MO_DAY app chính (anh Hữu 15/10/2026: mở hết 6 công đoạn).
+ *  Đổi danh sách này CÙNG LÚC với CD_MO_DAY app chính (kẻo phiếu gửi lên mà không đẩy ERP được). */
+export const GC_CD_DAT: GcCongDoan[] = ['70', '80', '89', '67', '15', '20'];
 export const GC_LOAI: Record<GcLoai, string> = { dat: 'Phiếu đặt hàng gia công', nhap: 'Phiếu nhập kho gia công' };
 export const GC_GUONG_BUCKET = 'plan-files';
 export const GC_GUONG_PATH = 'gc-guong.json';
