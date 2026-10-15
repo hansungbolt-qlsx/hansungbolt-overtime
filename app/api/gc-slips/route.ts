@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
-import { canUseGiaCong, kiemDong, gcUid, GC_CD_NHAP, GC_CONG_DOAN, type GcLine, type GcLoai } from '@/lib/gia-cong';
+import { canUseGiaCong, kiemDong, gcUid, GC_CD_DAT, GC_CD_NHAP, type GcLine, type GcLoai } from '@/lib/gia-cong';
 
 export const runtime = 'nodejs';
 
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
   try { b = await req.json(); } catch { return NextResponse.json({ error: 'Body không hợp lệ' }, { status: 400 }); }
   const loai = b.loai;
   if (loai !== 'dat' && loai !== 'nhap') return NextResponse.json({ error: 'Loại phiếu không đúng' }, { status: 400 });
-  const cdHopLe = loai === 'nhap' ? (GC_CD_NHAP as string[]) : Object.keys(GC_CONG_DOAN);
+  const cdHopLe: string[] = loai === 'nhap' ? GC_CD_NHAP : GC_CD_DAT;
   if (!b.cong_doan || !cdHopLe.includes(b.cong_doan))
     return NextResponse.json({ error: `Công đoạn ${loai === 'nhap' ? 'phiếu nhập chỉ 70 / 80' : 'không đúng'}` }, { status: 400 });
   if (!b.ncc) return NextResponse.json({ error: 'Chưa chọn nhà gia công' }, { status: 400 });
