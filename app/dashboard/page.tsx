@@ -10,6 +10,7 @@ import DeleteRegistrationButton from '@/components/DeleteRegistrationButton';
 import TodayOvertimeCard from '@/components/TodayOvertimeCard';
 import PlanFilesList from '@/components/PlanFilesList';
 import { toTitleCase } from '@/lib/format';
+import { shiftLabel } from '@/lib/overtime-shift';
 
 // Server Vercel chạy giờ UTC (lệch −7h so VN): trước 7h sáng VN dashboard sẽ nhầm
 // "hôm nay" thành hôm trước + mọi giờ hiển thị lệch 7 tiếng → cộng 7h rồi đọc
@@ -64,7 +65,7 @@ export default async function DashboardPage({
     supabaseAdmin
       .from('overtime_registrations')
       .select(
-        'id, department, day_type, time_from, time_to, duration_hours, status, created_at, registered_by',
+        'id, department, day_type, shift, time_from, time_to, duration_hours, status, created_at, registered_by',
       )
       .eq('overtime_date', selectedDate)
       .order('created_at', { ascending: false }),
@@ -202,7 +203,7 @@ export default async function DashboardPage({
                         {r.department}
                       </td>
                       <td className="px-4 py-3 text-brand-navy">
-                        {r.day_type === 'weekday' ? 'Ngày thường' : 'Chủ nhật'}
+                        {shiftLabel(r.day_type, r.shift)}
                       </td>
                       <td className="px-4 py-3 text-brand-navy-soft">
                         {formatTime(r.time_from)}–{formatTime(r.time_to)} ({r.duration_hours}h)

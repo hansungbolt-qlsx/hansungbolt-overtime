@@ -5,6 +5,8 @@ import { toTitleCase } from '@/lib/format';
 import DateButton from './DateButton';
 import { deptNeedsManualRpm } from '@/lib/departments';
 import { CO_ITEMS, CO_ITEMS_DATALIST_ID, findCoItem } from '@/lib/co-items';
+import { presetOf, presetText, qtyHoursOf, type Shift } from '@/lib/overtime-shift';
+import ShiftPicker from './ShiftPicker';
 
 type Employee = { id: string; full_name: string; order_no: number };
 type PlanItem = { item_code: string; item_name: string | null };
@@ -57,6 +59,8 @@ export default function OvertimeForm({ department }: { department: string }) {
   const [date, setDate] = useState(todayISO());
   // Mặc định null — form chọn NV/máy ẩn; user phải click 1 nút loại ngày trước.
   const [dayType, setDayType] = useState<'weekday' | 'sunday' | null>(null);
+  // Ca ngày thường: mặc định PM, AM = tăng ca sáng 06:00–07:30 (anh Hữu 21/10/2026)
+  const [shift, setShift] = useState<Shift>('PM');
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [machines, setMachines] = useState<Machine[]>([]);
   // Ngày KHSX máy chủ thực dùng (khác `date` = đang dùng bản cũ sau cùng, anh Hữu 25/09)
@@ -69,7 +73,8 @@ export default function OvertimeForm({ department }: { department: string }) {
 
   // Giờ tính sản lượng (trừ break) — KHÁC giờ hiển thị. Khi dayType=null,
   // form NV/máy bị ẩn nên giá trị này không hiển thị; dùng 0 cho an toàn.
-  const calcHours = dayType === 'sunday' ? 7.5 : dayType === 'weekday' ? 2.5 : 0;
+  const preset = dayType ? presetOf(dayType, shift) : null;
+  const calcHours = preset ? qtyHoursOf(preset.duration_hours, dayType === 'sunday' ? 'PM' : shift) : 0;
   const manualRpm = deptNeedsManualRpm(department);
   const totalItems = rows.reduce(
     (sum, row) => sum + row.checkedMachineIds.length + (row.useOther ? 1 : 0),
@@ -250,7 +255,7 @@ export default function OvertimeForm({ department }: { department: string }) {
       const res = await fetch('/api/registrations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ overtime_date: date, day_type: dayType, items }),
+        body: JSON.stringify({ overtime_date: date, day_type: dayType, shift, items }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Không gửi được phiếu'); return; }
@@ -280,13 +285,16 @@ export default function OvertimeForm({ department }: { department: string }) {
           <div className="grid grid-cols-2 gap-2">
             {(['weekday', 'sunday'] as const).map((type) => {
               const isActive = dayType === type;
-              const timeText = type === 'weekday' ? '16:30 – 19:30 (3h)' : '06:00 – 14:00 (8h)';
+              const timeText = presetText(presetOf(type, shift));
               return (
                 <div key={type} className="flex flex-col gap-1">
                   <button
                     type="button"
                     // Click nút đang active -> thu gọn (dayType=null); click nút khác -> switch
-                    onClick={() => setDayType(isActive ? null : type)}
+                    onClick={() => {
+                      setDayType(isActive ? null : type);
+                      if (!isActive) setShift('PM'); // mỗi lần chọn lại loại ngày → về mặc định PM
+                    }}
                     className={`py-2.5 rounded-md border text-sm font-medium transition ${
                       isActive
                         ? 'bg-brand-teal text-white border-brand-teal'
@@ -295,7 +303,7 @@ export default function OvertimeForm({ department }: { department: string }) {
                   >
                     {type === 'weekday' ? 'Ngày thường' : 'Chủ nhật'}
                   </button>
-                  {isActive && (
+                  {isActive && type === 'sunday' && (
                     <p className="text-xs text-brand-navy-soft text-center">
                       {timeText}
                     </p>
@@ -304,6 +312,7 @@ export default function OvertimeForm({ department }: { department: string }) {
               );
             })}
           </div>
+          {dayType === 'weekday' && <ShiftPicker value={shift} onChange={setShift} />}
           {!dayType && (
             <p className="text-xs mt-1.5 text-brand-teal font-medium">
               Chọn loại ngày để bắt đầu thêm nhân viên
@@ -581,7 +590,9 @@ export default function OvertimeForm({ department }: { department: string }) {
           disabled={submitting}
           className="w-full bg-brand-teal hover:bg-brand-teal-dark disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-md transition shadow-md shadow-brand-teal/30"
         >
-          {submitting ? 'Đang gửi...' : `Gửi phiếu (${totalItems} dòng) • Bộ phận ${department}`}
+          {submitting
+            ? 'Đang gửi...'
+            : `Gửi phiếu ${dayType === 'weekday' ? shift + ' ' : ''}(${totalItems} dòng) • Bộ phận ${department}`}
         </button>
       )}
     </div>

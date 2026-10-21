@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { supabaseAdmin } from '@/lib/supabase';
 import { toTitleCase } from '@/lib/format';
+import { MORNING_NOTE, normShift } from '@/lib/overtime-shift';
 
 // Thân phiếu tăng ca A4 (article) — TÁCH từ /dashboard/registrations/[id]/view
 // để dùng chung 2 nơi: trang xem/in 1 phiếu + trang in gộp cả ngày (print-day).
@@ -115,7 +116,7 @@ export default async function OvertimeSheetArticle({
 }) {
   const { data: reg } = await supabaseAdmin
     .from('overtime_registrations')
-    .select('id, department, overtime_date, day_type, time_from, time_to, duration_hours, registered_by')
+    .select('id, department, overtime_date, day_type, shift, time_from, time_to, duration_hours, registered_by')
     .eq('id', regId)
     .maybeSingle();
 
@@ -247,6 +248,8 @@ export default async function OvertimeSheetArticle({
     });
 
   const { d: dd, m: mm, y: yyyy } = formatDateVN(reg.overtime_date);
+  // Tờ tăng ca sáng = phiếu riêng; cột Ghi chú mỗi dòng ghi "Tăng ca sáng" (anh Hữu 21/10/2026)
+  const rowNote = normShift(reg.day_type, reg.shift) === 'AM' ? MORNING_NOTE : '';
 
   // Chiều cao dòng tự cân để fit 1 trang A4 dọc — RÀNG BUỘC CỨNG.
   // A4 portrait: 297mm. Margin 8mm × 2 = 16mm. Vùng in 281mm.
@@ -437,7 +440,7 @@ export default async function OvertimeSheetArticle({
                     <td className="ot-cell px-1 py-1"></td>
                     <td className="ot-cell px-1 py-1"></td>
                     <td className="ot-cell px-1 py-1"></td>
-                    <td className="ot-cell px-1 py-1"></td>
+                    <td className="ot-cell px-1 py-1 leading-tight">{rowNote}</td>
                   </>
                 ) : (
                   <>
@@ -448,7 +451,7 @@ export default async function OvertimeSheetArticle({
                     </td>
                     <td className="ot-cell px-1 py-1"></td>
                     <td className="ot-cell px-1 py-1"></td>
-                    <td className="ot-cell px-1 py-1"></td>
+                    <td className="ot-cell px-1 py-1 leading-tight">{rowNote}</td>
                   </>
                 )}
               </tr>

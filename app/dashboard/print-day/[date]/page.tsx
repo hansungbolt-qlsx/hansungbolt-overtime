@@ -36,6 +36,7 @@ export default async function PrintDayPage({
     .select('id, department')
     .eq('overtime_date', date)
     .order('department', { ascending: true })
+    .order('shift', { ascending: true }) // AM trước PM (tờ sáng in trước — 21/10/2026)
     .order('created_at', { ascending: true });
 
   if (!regs || regs.length === 0) {

@@ -4,12 +4,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toTitleCase } from '@/lib/format';
+import { normShift, qtyHoursOf, shiftLabel } from '@/lib/overtime-shift';
 
 type Reg = {
   id: string;
   department: string;
   overtime_date: string;
   day_type: 'weekday' | 'sunday';
+  shift?: string | null;
   time_from: string;
   time_to: string;
   duration_hours: number;
@@ -58,10 +60,6 @@ function diffHours(from: string, to: string): number {
   return (th * 60 + tm - fh * 60 - fm) / 60;
 }
 
-// Giờ break cố định 30 phút
-function calcQtyHours(duration: number): number {
-  return Math.max(0, duration - 0.5);
-}
 
 export default function EditRegistrationForm({
   reg,
@@ -79,6 +77,8 @@ export default function EditRegistrationForm({
   const router = useRouter();
   const headerFrom = toHM(reg.time_from);
   const headerTo = toHM(reg.time_to);
+  // Ca của phiếu: AM tính SL đủ giờ, PM/Chủ nhật trừ 0,5h nghỉ (anh Hữu 21/10/2026)
+  const shift = normShift(reg.day_type, reg.shift);
 
   const [rows, setRows] = useState<RowState[]>(
     items.map((it) => ({
@@ -131,7 +131,7 @@ export default function EditRegistrationForm({
     if (eq.machine_type === 'OTHER') return '—';
     const d = rowDuration(row);
     if (d <= 0) return '—';
-    const qtyH = calcQtyHours(d);
+    const qtyH = qtyHoursOf(d, shift);
     return Math.round(eq.rpm * 60 * qtyH).toLocaleString('en-US');
   }
 
@@ -182,7 +182,7 @@ export default function EditRegistrationForm({
           <h1 className="text-xl font-bold text-brand-navy">Sửa phiếu tăng ca</h1>
           <p className="text-sm text-brand-navy-soft">
             Ngày {reg.overtime_date} • Bộ phận {reg.department} •{' '}
-            {reg.day_type === 'weekday' ? 'Ngày thường' : 'Chủ nhật'}
+            {shiftLabel(reg.day_type, reg.shift)}
           </p>
         </div>
         <Link
@@ -200,7 +200,9 @@ export default function EditRegistrationForm({
               Chi tiết ({rows.length} dòng)
             </h2>
             <p className="text-xs text-brand-navy-soft mt-0.5">
-              Mỗi dòng có giờ riêng — SL dự kiến tự tính = RPM × 60 × (tổng giờ − 0.5h break).
+              {shift === 'AM'
+                ? 'Mỗi dòng có giờ riêng — tăng ca sáng: SL dự kiến tự tính = RPM × 60 × tổng giờ (không trừ nghỉ).'
+                : 'Mỗi dòng có giờ riêng — SL dự kiến tự tính = RPM × 60 × (tổng giờ − 0.5h break).'}
             </p>
           </div>
           <button

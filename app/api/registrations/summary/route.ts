@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
+import { buildEmpDateHours } from '@/lib/overtime-hours';
 
 export const runtime = 'nodejs';
 
@@ -25,7 +26,7 @@ export async function GET(req: Request) {
 
   let regQuery = supabaseAdmin
     .from('overtime_registrations')
-    .select('id, overtime_date, day_type, duration_hours, department')
+    .select('id, overtime_date, day_type, duration_hours, department, shift')
     .gte('overtime_date', startDate)
     .lte('overtime_date', endDate);
   if (filterDept) regQuery = regQuery.eq('department', filterDept);
@@ -45,16 +46,6 @@ export async function GET(req: Request) {
   const dates = [...dateInfo.entries()].sort(([a], [b]) => a.localeCompare(b))
     .map(([date, d]) => ({ date, day_type: d.day_type, depts: [...d.depts] }));
 
-  const regMap = new Map(
-    regs.map((r) => [
-      r.id,
-      {
-        date: r.overtime_date as string,
-        dayType: r.day_type as 'weekday' | 'sunday',
-        durationHours: Number(r.duration_hours ?? 0),
-      },
-    ]),
-  );
   const regIds = regs.map((r) => r.id);
 
   const { data: items, error: itemErr } = await supabaseAdmin
@@ -64,31 +55,16 @@ export async function GET(req: Request) {
 
   if (itemErr) return NextResponse.json({ error: itemErr.message }, { status: 500 });
 
-  // Per employee per date: hours thực tế
-  //   Ưu tiên duration_hours item (admin sửa per-row), fallback reg.duration_hours,
-  //   fallback hardcoded 3/8 theo day_type. Nhiều item cùng ngày → lấy MAX.
+  // Giờ người × ngày: luật DÙNG CHUNG lib/overtime-hours.ts (item admin sửa → phiếu → 3h/8h;
+  // trong một ca lấy MAX, ca AM + PM cộng lại — anh Hữu 21/10/2026). Đừng chép luật vào đây.
+  const { empDateMap, dateTypeMap } = buildEmpDateHours(regs, items ?? []);
+
   type Bucket = { weekdayDays: Set<string>; sundayDays: Set<string>; totalHours: number };
   const empMap = new Map<string, Bucket>();
-  // Trước tiên collect hours per (emp, date) để tránh double-count khi cùng NV có nhiều items/ngày
-  const empDateHours = new Map<string, Map<string, { hours: number; dayType: 'weekday' | 'sunday' }>>();
-  for (const it of items ?? []) {
-    const reg = regMap.get(it.registration_id);
-    if (!reg) continue;
-    if (!empDateHours.has(it.employee_id)) empDateHours.set(it.employee_id, new Map());
-    const dateMap = empDateHours.get(it.employee_id)!;
-    const hours = Number(
-      it.duration_hours ?? reg.durationHours ?? (reg.dayType === 'sunday' ? 8 : 3),
-    );
-    const existing = dateMap.get(reg.date);
-    if (!existing || hours > existing.hours) {
-      dateMap.set(reg.date, { hours, dayType: reg.dayType });
-    }
-  }
-
-  for (const [empId, dateMap] of empDateHours) {
+  for (const [empId, dateMap] of empDateMap) {
     const b: Bucket = { weekdayDays: new Set(), sundayDays: new Set(), totalHours: 0 };
-    for (const [date, { hours, dayType }] of dateMap) {
-      if (dayType === 'sunday') b.sundayDays.add(date);
+    for (const [date, hours] of dateMap) {
+      if (dateTypeMap.get(date) === 'sunday') b.sundayDays.add(date);
       else b.weekdayDays.add(date);
       b.totalHours += hours;
     }
@@ -116,7 +92,7 @@ export async function GET(req: Request) {
       weekday_count: b.weekdayDays.size,
       sunday_count: b.sundayDays.size,
       total_hours: Number(b.totalHours.toFixed(2)),
-      by_date: Object.fromEntries([...(empDateHours.get(id) ?? new Map())].map(([d, v]) => [d, v.hours])),
+      by_date: Object.fromEntries(empDateMap.get(id) ?? new Map<string, number>()),
     }))
     .sort((a, b) => (orderMap.get(a.employee_id) ?? 9999) - (orderMap.get(b.employee_id) ?? 9999));
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { buildEmpDateHours, type RegRow, type ItemRow } from '@/lib/overtime-hours';
+import { normShift } from '@/lib/overtime-shift';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -71,6 +72,7 @@ export async function GET(req: Request) {
   try {
     type FullReg = RegRow & {
       department: string; time_from: string | null; time_to: string | null;
+      shift: string | null;
     };
     type FullItem = ItemRow & {
       equipment_id: string | null; item_code: string | null; item_name: string | null;
@@ -80,7 +82,7 @@ export async function GET(req: Request) {
     const [regs, items, emps, eqs] = await Promise.all([
       pullAll<FullReg>(
         'overtime_registrations',
-        'id, overtime_date, day_type, duration_hours, department, time_from, time_to',
+        'id, overtime_date, day_type, duration_hours, department, time_from, time_to, shift',
         'overtime_date',
       ),
       pullAll<FullItem>(
@@ -126,6 +128,8 @@ export async function GET(req: Request) {
         hours: it.duration_hours ?? rg.duration_hours,
         note: it.note,
         reg_id: it.registration_id,
+        // Ca AM/PM (21/10/2026) — app chính in lại tờ AM có ghi chú "Tăng ca sáng"
+        shift: normShift(rg.day_type, rg.shift),
       }];
     });
 

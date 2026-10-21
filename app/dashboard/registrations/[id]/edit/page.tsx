@@ -19,7 +19,7 @@ export default async function EditRegistrationPage({
 
   const { data: reg } = await supabaseAdmin
     .from('overtime_registrations')
-    .select('id, department, overtime_date, day_type, time_from, time_to, duration_hours')
+    .select('id, department, overtime_date, day_type, shift, time_from, time_to, duration_hours')
     .eq('id', id)
     .maybeSingle();
 
@@ -72,6 +72,7 @@ export default async function EditRegistrationPage({
             department={reg.department}
             initialDate={reg.overtime_date}
             initialDayType={reg.day_type as 'weekday' | 'sunday'}
+            initialShift={reg.shift === 'AM' ? 'AM' : 'PM'}
             initialItems={(items ?? []).map((i) => ({
               id: i.id,
               employee_id: i.employee_id,

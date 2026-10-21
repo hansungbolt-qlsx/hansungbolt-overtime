@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { toTitleCase } from '@/lib/format';
+import { shiftLabel } from '@/lib/overtime-shift';
 import PrintJobButton from './PrintJobButton';
 import DateButton from './DateButton';
 
@@ -10,6 +11,7 @@ type Reg = {
   id: string;
   department: string;
   day_type: 'weekday' | 'sunday';
+  shift?: string | null;
   time_from: string;
   time_to: string;
   duration_hours: number;
@@ -137,7 +139,7 @@ export default function DepartmentRegistrationsList({
                 <div className="flex items-baseline justify-between gap-2">
                   <div className="min-w-0">
                     <div className="text-sm font-bold text-brand-navy">
-                      {r.day_type === 'weekday' ? 'Ngày thường' : 'Chủ nhật'}
+                      {shiftLabel(r.day_type, r.shift)}
                       <span className="text-brand-navy-soft font-normal ml-2">
                         • {r.items_count} dòng
                       </span>

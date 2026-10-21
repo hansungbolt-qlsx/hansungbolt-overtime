@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toTitleCase } from '@/lib/format';
+import { presetOf, presetText, type Shift } from '@/lib/overtime-shift';
+import ShiftPicker from './ShiftPicker';
 
 type Employee = { id: string; full_name: string; order_no: number };
 
@@ -31,17 +33,16 @@ export default function QlsxOvertimeForm({
   const router = useRouter();
   const [date, setDate] = useState(todayISO());
   const [dayType, setDayType] = useState<'weekday' | 'sunday' | null>(null);
+  // Ca ngày thường: mặc định PM, AM = tăng ca sáng (anh Hữu 21/10/2026)
+  const [shift, setShift] = useState<Shift>('PM');
   const [rows, setRows] = useState<EmployeeRow[]>([emptyRow()]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const timeLabel =
-    dayType === 'weekday'
-      ? '16:30 – 19:30 (3 giờ)'
-      : dayType === 'sunday'
-        ? '06:00 – 14:00 (8 giờ)'
-        : 'Chọn loại ngày để bắt đầu thêm nhân viên';
+  const timeLabel = dayType
+    ? presetText(presetOf(dayType, shift))
+    : 'Chọn loại ngày để bắt đầu thêm nhân viên';
 
   function updateEmployee(idx: number, employeeId: string) {
     setRows((prev) => {
@@ -88,6 +89,7 @@ export default function QlsxOvertimeForm({
         body: JSON.stringify({
           overtime_date: date,
           day_type: dayType,
+          shift,
           items: rows.map((r) => ({
             employee_id: r.employeeId,
             reason: r.reason.trim(),
@@ -130,7 +132,10 @@ export default function QlsxOvertimeForm({
               <button
                 key={type}
                 type="button"
-                onClick={() => setDayType(type)}
+                onClick={() => {
+                  if (dayType !== type) setShift('PM');
+                  setDayType(type);
+                }}
                 className={`py-2.5 rounded-md border text-sm font-medium transition ${
                   dayType === type
                     ? 'bg-brand-teal text-white border-brand-teal'
@@ -141,11 +146,15 @@ export default function QlsxOvertimeForm({
               </button>
             ))}
           </div>
-          <p
-            className={`text-xs mt-1.5 ${dayType ? 'text-brand-navy-soft' : 'text-brand-teal font-medium'}`}
-          >
-            {timeLabel}
-          </p>
+          {dayType === 'weekday' ? (
+            <ShiftPicker value={shift} onChange={setShift} />
+          ) : (
+            <p
+              className={`text-xs mt-1.5 ${dayType ? 'text-brand-navy-soft' : 'text-brand-teal font-medium'}`}
+            >
+              {timeLabel}
+            </p>
+          )}
         </div>
         <div className="text-xs text-brand-navy-soft border-t border-brand-surface-alt pt-3">
           Người yêu cầu: <strong className="text-brand-navy">{toTitleCase(defaultRequestor)}</strong>

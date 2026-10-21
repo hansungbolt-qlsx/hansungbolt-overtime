@@ -5,6 +5,7 @@ import path from 'node:path';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
 import { toTitleCase } from '@/lib/format';
+import { MORNING_NOTE, normShift } from '@/lib/overtime-shift';
 
 export const runtime = 'nodejs';
 
@@ -43,7 +44,7 @@ export async function GET(
 
   const { data: reg, error: regErr } = await supabaseAdmin
     .from('overtime_registrations')
-    .select('id, department, overtime_date, day_type, time_from, time_to, duration_hours')
+    .select('id, department, overtime_date, day_type, shift, time_from, time_to, duration_hours')
     .eq('id', id)
     .single();
   if (regErr || !reg) {
@@ -61,7 +62,7 @@ export async function GET(
 
   const { data: items, error: itemErr } = await supabaseAdmin
     .from('overtime_items')
-    .select('employee_id, equipment_id, item_code, item_name, planned_quantity')
+    .select('employee_id, equipment_id, item_code, item_name, planned_quantity, time_from, time_to, duration_hours')
     .eq('registration_id', id);
   if (itemErr) {
     return NextResponse.json({ error: itemErr.message }, { status: 500 });
@@ -105,6 +106,9 @@ export async function GET(
     {
       order_no: number;
       full_name: string;
+      time_from: string;
+      time_to: string;
+      hours: number;
       individual: GroupRow[];
       m4: GroupRow[];
       m3: GroupRow[];
@@ -115,9 +119,13 @@ export async function GET(
     const eq = eqMap.get(it.equipment_id);
     if (!emp || !eq) continue;
     if (!groups.has(emp.id)) {
+      // Giờ THẬT đã đăng ký (anh Hữu 21/10/2026): giờ dòng admin sửa → giờ phiếu — y bản in A4
       groups.set(emp.id, {
         order_no: emp.order_no,
         full_name: emp.full_name,
+        time_from: it.time_from ?? reg.time_from,
+        time_to: it.time_to ?? reg.time_to,
+        hours: Number(it.duration_hours ?? reg.duration_hours ?? (reg.day_type === 'sunday' ? 8 : 3)),
         individual: [],
         m4: [],
         m3: [],
@@ -157,7 +165,13 @@ export async function GET(
           qty: g.m3.reduce((s, r) => s + r.qty, 0),
         });
       }
-      return { order_no: g.order_no, full_name: g.full_name, rows };
+      return {
+        order_no: g.order_no,
+        full_name: g.full_name,
+        timeLabel: `${formatTime(g.time_from)}-${formatTime(g.time_to)}`,
+        hours: g.hours,
+        rows,
+      };
     });
 
   const buf = await fs.readFile(TEMPLATE_PATH);
@@ -186,9 +200,8 @@ export async function GET(
 
   sheet.getCell('H5').value = `Bộ phận:  ${department}\r\nDepartment:`;
 
-  const timeLabel = `${formatTime(reg.time_from)}-${formatTime(reg.time_to)}`;
-  // Giờ hiển thị (3h hoặc 8h theo day_type) — bỏ qua duration_hours cũ trong DB
-  const hours = reg.day_type === 'sunday' ? 8 : 3;
+  // Phiếu tăng ca sáng: cột Ghi chú (M) mỗi dòng ghi "Tăng ca sáng"
+  const rowNote = normShift(reg.day_type, reg.shift) === 'AM' ? MORNING_NOTE : null;
 
   let rowPtr = 9;
   let stt = 1;
@@ -203,9 +216,10 @@ export async function GET(
       if (i === 0) {
         row.getCell(2).value = stt;
         row.getCell(3).value = toTitleCase(group.full_name);
-        row.getCell(4).value = timeLabel;
-        row.getCell(5).value = hours;
+        row.getCell(4).value = group.timeLabel;
+        row.getCell(5).value = group.hours;
       }
+      if (rowNote) row.getCell(13).value = rowNote;
       row.getCell(8).value = item.code;
       row.getCell(9).value = item.item_code;
       // Giữ là số (calculable), format dấu , là phân cách hàng nghìn
@@ -235,7 +249,7 @@ export async function GET(
   noteCell.font = { italic: true, size: 10 };
 
   const outBuf = await wb.xlsx.writeBuffer();
-  const filename = `Phieu_TangCa_${department}_${reg.overtime_date}.xlsx`;
+  const filename = `Phieu_TangCa_${department}_${reg.overtime_date}${rowNote ? '_AM' : ''}.xlsx`;
 
   return new Response(outBuf as BodyInit, {
     headers: {

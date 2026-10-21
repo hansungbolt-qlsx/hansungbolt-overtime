@@ -6,6 +6,8 @@ import { CO_ITEMS, CO_ITEMS_DATALIST_ID, findCoItem } from '@/lib/co-items';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toTitleCase } from '@/lib/format';
+import { presetOf, presetText, qtyHoursOf, shiftLabel, type Shift } from '@/lib/overtime-shift';
+import ShiftPicker from './ShiftPicker';
 
 type Employee = { id: string; full_name: string; order_no: number };
 type PlanItem = { item_code: string; item_name: string | null };
@@ -124,6 +126,7 @@ export default function LeaderEditForm({
   department,
   initialDate,
   initialDayType,
+  initialShift,
   initialItems,
   equipments,
   backHref,
@@ -132,12 +135,15 @@ export default function LeaderEditForm({
   department: string;
   initialDate: string;
   initialDayType: 'weekday' | 'sunday';
+  initialShift: Shift;
   initialItems: InitialItem[];
   equipments: Equipment[];
   backHref: string;
 }) {
   const router = useRouter();
   const [dayType, setDayType] = useState<'weekday' | 'sunday'>(initialDayType);
+  // Ca AM/PM (anh Hữu 21/10/2026) — đổi ca thì giờ về mặc định của ca mới
+  const [shift, setShift] = useState<Shift>(initialShift);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [machines, setMachines] = useState<Machine[]>([]);
   // Ngày KHSX máy chủ thực dùng (khác initialDate = đang dùng bản cũ sau cùng, anh Hữu 25/09)
@@ -152,10 +158,11 @@ export default function LeaderEditForm({
     equipments.filter((e) => e.machine_type === 'OTHER').map((e) => e.id),
   );
 
-  const calcHours = dayType === 'weekday' ? 2.5 : 7.5;
+  const qtyHoursFor = (dt: 'weekday' | 'sunday', sh: Shift) =>
+    qtyHoursOf(presetOf(dt, sh).duration_hours, dt === 'sunday' ? 'PM' : sh);
+  const calcHours = qtyHoursFor(dayType, shift);
   const manualRpm = deptNeedsManualRpm(department);
-  const timeLabel =
-    dayType === 'weekday' ? '16:30 – 19:30 (3 giờ)' : '06:00 – 14:00 (8 giờ)';
+  const timeLabel = presetText(presetOf(dayType, shift));
   const totalItems = rows.reduce(
     (sum, row) => sum + row.checkedMachineIds.length + (row.useOther ? 1 : 0),
     0,
@@ -180,7 +187,7 @@ export default function LeaderEditForm({
         setMachines(d.machines ?? []);
         setPlanDateUsed(d.plan_date_used ?? null);
         if (!rowsInit) {
-          const initRows = itemsToRows(initialItems, otherEquipmentIds, initialDayType === 'weekday' ? 2.5 : 7.5);
+          const initRows = itemsToRows(initialItems, otherEquipmentIds, qtyHoursFor(initialDayType, initialShift));
           setRows(initRows.length > 0 ? initRows : [emptyRow()]);
           setRowsInit(true);
         }
@@ -367,7 +374,7 @@ export default function LeaderEditForm({
       const res = await fetch(`/api/registrations/${registrationId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ day_type: dayType, items }),
+        body: JSON.stringify({ day_type: dayType, shift, items }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -394,7 +401,7 @@ export default function LeaderEditForm({
             Sửa phiếu — Bộ phận {department}
           </h1>
           <p className="text-xs text-brand-navy-soft mt-0.5">
-            Ngày {dateLabel} • {dayType === 'weekday' ? 'Ngày thường' : 'Chủ nhật'}
+            Ngày {dateLabel} • {shiftLabel(dayType, shift)}
           </p>
         </div>
         <Link
@@ -416,7 +423,10 @@ export default function LeaderEditForm({
               <button
                 key={type}
                 type="button"
-                onClick={() => setDayType(type)}
+                onClick={() => {
+                  if (type !== dayType) setShift('PM');
+                  setDayType(type);
+                }}
                 className={`py-2.5 rounded-md border text-sm font-medium transition ${
                   dayType === type
                     ? 'bg-brand-teal text-white border-brand-teal'
@@ -427,7 +437,11 @@ export default function LeaderEditForm({
               </button>
             ))}
           </div>
-          <p className="text-xs text-brand-navy-soft mt-1.5">{timeLabel}</p>
+          {dayType === 'weekday' && <ShiftPicker value={shift} onChange={setShift} />}
+          <p className="text-xs text-brand-navy-soft mt-1.5">
+            {dayType === 'sunday' && <>{timeLabel} · </>}
+            Giờ mặc định — chỉ admin sửa được giờ thực tế.
+          </p>
         </div>
       </div>
 

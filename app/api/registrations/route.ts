@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
+import { normShift, presetOf } from '@/lib/overtime-shift';
+import { duplicateShiftError, overlapError } from '@/lib/overtime-guard';
 
 export const runtime = 'nodejs';
 
@@ -14,12 +16,8 @@ type ItemInput = {
   other_description?: string;
 };
 
-// duration_hours = giờ hiển thị trên phiếu (3h, 8h)
-// Số giờ tính sản lượng dự kiến nằm ở client (2.5h, 7.5h) — xem OvertimeForm
-const DAY_PRESETS = {
-  weekday: { time_from: '16:30:00', time_to: '19:30:00', duration_hours: 3 },
-  sunday: { time_from: '06:00:00', time_to: '14:00:00', duration_hours: 8 },
-} as const;
+// duration_hours = giờ hiển thị trên phiếu (PM 3h · AM 1,5h · CN 8h) — lib/overtime-shift.ts
+// Số giờ tính sản lượng dự kiến nằm ở client (PM 2.5h, AM 1.5h, CN 7.5h) — xem OvertimeForm
 
 export async function POST(req: Request) {
   const session = await getSession();
@@ -35,6 +33,7 @@ export async function POST(req: Request) {
   const { overtime_date, day_type, items } = body as {
     overtime_date?: string;
     day_type?: 'weekday' | 'sunday';
+    shift?: 'AM' | 'PM';
     items?: ItemInput[];
   };
 
@@ -63,7 +62,17 @@ export async function POST(req: Request) {
     }
   }
 
-  const preset = DAY_PRESETS[day_type];
+  // Ca: ngày thường mặc định PM (anh Hữu 21/10/2026), Chủ nhật luôn PM
+  const shift = normShift(day_type, (body as { shift?: unknown }).shift);
+  const preset = presetOf(day_type, shift);
+
+  const dupErr = await duplicateShiftError(overtime_date, session.department, shift);
+  if (dupErr) return NextResponse.json({ error: dupErr }, { status: 409 });
+  const ovErr = await overlapError(
+    overtime_date,
+    items.map((it) => ({ employee_id: it.employee_id, time_from: preset.time_from, time_to: preset.time_to })),
+  );
+  if (ovErr) return NextResponse.json({ error: ovErr }, { status: 409 });
 
   // Nếu có dòng "Công việc khác" → đảm bảo equipment row CVK-{dept} tồn tại để dùng làm FK
   let cvkEquipmentId: string | null = null;
@@ -105,6 +114,7 @@ export async function POST(req: Request) {
       registered_by: session.userId,
       overtime_date,
       day_type,
+      shift,
       time_from: preset.time_from,
       time_to: preset.time_to,
       duration_hours: preset.duration_hours,

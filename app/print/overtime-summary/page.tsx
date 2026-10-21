@@ -38,7 +38,7 @@ export default async function PrintOvertimeSummaryPage({
       : requestedDept;
   let regQuery = supabaseAdmin
     .from('overtime_registrations')
-    .select('id, overtime_date, day_type, duration_hours')
+    .select('id, overtime_date, day_type, duration_hours, shift')
     .gte('overtime_date', startDate)
     .lte('overtime_date', endDate)
     .order('overtime_date');

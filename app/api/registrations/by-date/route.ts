@@ -20,12 +20,13 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'date phải là YYYY-MM-DD' }, { status: 400 });
   }
 
-  // HD in trước RL (alphabet trùng ý user), cùng bộ phận thì phiếu gửi trước in trước
+  // HD in trước RL (alphabet trùng ý user), cùng bộ phận thì tờ AM trước PM, rồi phiếu gửi trước in trước
   const { data, error } = await supabaseAdmin
     .from('overtime_registrations')
     .select('id, department, created_at')
     .eq('overtime_date', date)
     .order('department', { ascending: true })
+    .order('shift', { ascending: true }) // AM trước PM (tờ sáng in trước — 21/10/2026)
     .order('created_at', { ascending: true });
 
   if (error) {

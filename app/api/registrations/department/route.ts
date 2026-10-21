@@ -25,7 +25,7 @@ export async function GET(req: Request) {
   let regQuery = supabaseAdmin
     .from('overtime_registrations')
     .select(
-      'id, department, day_type, time_from, time_to, duration_hours, status, created_at, registered_by',
+      'id, department, day_type, shift, time_from, time_to, duration_hours, status, created_at, registered_by',
     )
     .eq('overtime_date', date)
     .order('created_at', { ascending: false });

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
+import { normShift, presetOf, qtyHoursOf } from '@/lib/overtime-shift';
+import { duplicateShiftError, overlapError } from '@/lib/overtime-guard';
 
 export const runtime = 'nodejs';
 
@@ -24,17 +26,9 @@ type PatchItem = {
 
 type PatchBody = {
   day_type?: 'weekday' | 'sunday';
+  shift?: 'AM' | 'PM';
   items?: PatchItem[];
 };
-
-const DAY_PRESETS = {
-  weekday: { time_from: '16:30:00', time_to: '19:30:00', duration_hours: 3 },
-  sunday: { time_from: '06:00:00', time_to: '14:00:00', duration_hours: 8 },
-} as const;
-
-function calcQtyHours(durationHours: number): number {
-  return Math.max(0, durationHours - 0.5);
-}
 
 function diffHours(from: string, to: string): number {
   const [fh, fm] = from.split(':').map(Number);
@@ -78,7 +72,7 @@ export async function PATCH(
   // Load phiếu
   const { data: reg, error: regErr } = await supabaseAdmin
     .from('overtime_registrations')
-    .select('id, department, day_type')
+    .select('id, department, day_type, shift, overtime_date')
     .eq('id', id)
     .maybeSingle();
   if (regErr) return NextResponse.json({ error: regErr.message }, { status: 500 });
@@ -91,9 +85,25 @@ export async function PATCH(
     );
   }
 
+  // Chỉ admin sửa giờ từng dòng (anh Hữu 21/10/2026) — tổ trưởng gửi giờ lên cũng bỏ qua
+  if (session.role !== 'admin') {
+    for (const it of items) {
+      delete it.time_from;
+      delete it.time_to;
+    }
+  }
+
   const effectiveDayType: 'weekday' | 'sunday' =
     dayTypeIn ?? (reg.day_type as 'weekday' | 'sunday');
-  const preset = DAY_PRESETS[effectiveDayType];
+  const oldShift = normShift(reg.day_type, reg.shift);
+  const effectiveShift = normShift(effectiveDayType, body.shift ?? oldShift);
+  const preset = presetOf(effectiveDayType, effectiveShift);
+  const caDoi = effectiveDayType !== reg.day_type || effectiveShift !== oldShift;
+
+  if (caDoi) {
+    const dupErr = await duplicateShiftError(reg.overtime_date, reg.department, effectiveShift, id);
+    if (dupErr) return NextResponse.json({ error: dupErr }, { status: 409 });
+  }
 
   // Validate từng item
   for (let i = 0; i < items.length; i++) {
@@ -186,34 +196,55 @@ export async function PATCH(
   if (eqErr) return NextResponse.json({ error: eqErr.message }, { status: 500 });
   const eqMap = new Map((eqs ?? []).map((e) => [e.id, e]));
 
-  // Header time/duration:
-  //   - Nếu tất cả items có per-row time (admin) → min/max derive
-  //   - Nếu không (leader simple) → dùng day_type preset
-  const allHavePerRowTime = items.every((it) => it.time_from && it.time_to);
-  let headerFrom: string;
-  let headerTo: string;
-  let headerDuration: number;
-  if (allHavePerRowTime) {
-    headerFrom = items
-      .map((it) => toSqlTime(it.time_from!))
-      .reduce((min, t) => (t < min ? t : min));
-    headerTo = items
-      .map((it) => toSqlTime(it.time_to!))
-      .reduce((max, t) => (t > max ? t : max));
-    headerDuration = Math.max(
-      ...items.map((it) => diffHours(it.time_from!, it.time_to!)),
-    );
-  } else {
-    headerFrom = preset.time_from;
-    headerTo = preset.time_to;
-    headerDuration = preset.duration_hours;
-  }
+  // Load existing item ids for diff
+  const { data: existingItems, error: loadItemsErr } = await supabaseAdmin
+    .from('overtime_items')
+    .select('id, time_from, time_to')
+    .eq('registration_id', id);
+  if (loadItemsErr)
+    return NextResponse.json({ error: loadItemsErr.message }, { status: 500 });
 
-  // Update header
+  const existingIds = new Set((existingItems ?? []).map((i) => i.id));
+  // Tổ trưởng sửa phiếu (không đổi ca) → dòng cũ GIỮ giờ admin đã sửa, không đặt lại về mặc định
+  const keptTime = new Map(
+    (existingItems ?? [])
+      .filter(() => session.role !== 'admin' && !caDoi)
+      .filter((i) => i.time_from && i.time_to)
+      .map((i) => [i.id, { from: i.time_from as string, to: i.time_to as string }]),
+  );
+  const submittedIds = new Set(
+    items.map((it) => it.id).filter(Boolean) as string[],
+  );
+  const idsToDelete = [...existingIds].filter((eid) => !submittedIds.has(eid));
+
+  const rowTime = (it: PatchItem) => {
+    if (it.time_from && it.time_to) {
+      return { tFrom: toSqlTime(it.time_from), tTo: toSqlTime(it.time_to), d: diffHours(it.time_from, it.time_to) };
+    }
+    const kept = it.id ? keptTime.get(it.id) : undefined;
+    if (kept) return { tFrom: kept.from, tTo: kept.to, d: diffHours(kept.from, kept.to) };
+    return { tFrom: preset.time_from, tTo: preset.time_to, d: preset.duration_hours };
+  };
+
+  // Giờ cùng một người trên phiếu khác cùng ngày không được chồng nhau
+  const ovErr = await overlapError(
+    reg.overtime_date,
+    items.map((it) => {
+      const t = rowTime(it);
+      return { employee_id: it.employee_id, time_from: t.tFrom, time_to: t.tTo };
+    }),
+    id,
+  );
+  if (ovErr) return NextResponse.json({ error: ovErr }, { status: 409 });
+
+  // Header time/duration = min giờ bắt đầu / max giờ kết thúc / max số giờ của các dòng
+  //   (admin sửa từng dòng → theo dòng; tổ trưởng → giờ mặc định của ca hoặc giờ cũ giữ lại)
+  const times = items.map(rowTime);
   const headerUpdate: Record<string, unknown> = {
-    time_from: headerFrom,
-    time_to: headerTo,
-    duration_hours: headerDuration,
+    time_from: times.map((t) => t.tFrom).reduce((min, t) => (t < min ? t : min)),
+    time_to: times.map((t) => t.tTo).reduce((max, t) => (t > max ? t : max)),
+    duration_hours: Math.max(...times.map((t) => t.d)),
+    shift: effectiveShift,
   };
   if (dayTypeIn) headerUpdate.day_type = dayTypeIn;
   const { error: updHeaderErr } = await supabaseAdmin
@@ -223,32 +254,14 @@ export async function PATCH(
   if (updHeaderErr)
     return NextResponse.json({ error: updHeaderErr.message }, { status: 500 });
 
-  // Load existing item ids for diff
-  const { data: existingItems, error: loadItemsErr } = await supabaseAdmin
-    .from('overtime_items')
-    .select('id')
-    .eq('registration_id', id);
-  if (loadItemsErr)
-    return NextResponse.json({ error: loadItemsErr.message }, { status: 500 });
-
-  const existingIds = new Set((existingItems ?? []).map((i) => i.id));
-  const submittedIds = new Set(
-    items.map((it) => it.id).filter(Boolean) as string[],
-  );
-  const idsToDelete = [...existingIds].filter((eid) => !submittedIds.has(eid));
-
   const buildRow = (it: PatchItem) => {
     const equipmentId = resolveEquipmentId(it);
     const eq = eqMap.get(equipmentId);
     const isOther = it.is_other || eq?.machine_type === 'OTHER';
 
-    // Per-row time hoặc preset
-    const tFrom = it.time_from ? toSqlTime(it.time_from) : preset.time_from;
-    const tTo = it.time_to ? toSqlTime(it.time_to) : preset.time_to;
-    const d = it.time_from && it.time_to
-      ? diffHours(it.time_from, it.time_to)
-      : preset.duration_hours;
-    const qtyH = calcQtyHours(d);
+    // Per-row time (admin) → giờ cũ giữ lại (tổ trưởng sửa) → giờ mặc định của ca
+    const { tFrom, tTo, d } = rowTime(it);
+    const qtyH = qtyHoursOf(d, effectiveShift);
 
     const itemCode = it.is_other
       ? it.other_description!.trim()
