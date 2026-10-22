@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { toTitleCase } from '@/lib/format';
 import DateButton from './DateButton';
 import { deptNeedsManualRpm } from '@/lib/departments';
-import { CO_ITEMS, CO_ITEMS_DATALIST_ID, findCoItem } from '@/lib/co-items';
+import { CO_ITEMS_DATALIST_ID, findCoItem } from '@/lib/co-items';
+import { CoItemsDatalist } from './CoCodes';
 import { presetOf, presetText, qtyHoursOf, type Shift } from '@/lib/overtime-shift';
 import ShiftPicker from './ShiftPicker';
 
@@ -346,11 +347,7 @@ export default function OvertimeForm({ department }: { department: string }) {
       )}
 
       {manualRpm && (
-        <datalist id={CO_ITEMS_DATALIST_ID}>
-          {CO_ITEMS.map((it) => (
-            <option key={it.code} value={it.code}>{`RPM ${it.rpm} · ${it.coating} · ${it.name}`}</option>
-          ))}
-        </datalist>
+        <CoItemsDatalist />
       )}
       {!loadingOpts && machines.length > 0 && dayType && (
         <>

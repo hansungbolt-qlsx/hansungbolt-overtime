@@ -1,6 +1,7 @@
-// Danh sách MÃ HÀNG COATING + RPM chuẩn (anh Hữu gửi 05/10/2026, 15 mã — đã đối chiếu master ERP Good, đủ 15/15).
-// Dùng cho form đăng ký tăng ca bộ phận CO: gõ mã → gợi ý, chọn mã → RPM tự điền (vẫn sửa tay được).
-// Thêm/sửa mã: sửa mảng dưới rồi deploy.
+// RPM chuẩn + loại coating của MÃ HÀNG COATING (anh Hữu gửi 05/10/2026, 15 mã).
+// 22/10/2026: DANH SÁCH MÃ Coating nay theo route hiện hành ERP (components/CoCodes.tsx ← /api/co-codes) — file này
+// CHỈ còn giữ RPM để form tăng ca CO tự điền; mã ERP chưa có ở đây vẫn gợi ý, RPM gõ tay. Mảng cũng là danh sách
+// dự phòng khi chưa tải được mã từ ERP. Thêm RPM cho mã mới: thêm dòng dưới rồi deploy.
 export type CoItem = { code: string; name: string; rpm: number; coating: string; adhesive_g_ea: number };
 
 export const CO_ITEMS: CoItem[] = [
