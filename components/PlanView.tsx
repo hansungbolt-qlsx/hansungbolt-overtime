@@ -245,7 +245,8 @@ export function DccdCard({ options, onlyCodes }: { options: [string, string][]; 
     <div className="bg-white rounded-lg border border-brand-surface-alt p-3 mb-3">
       <div className="text-sm font-bold text-brand-navy mb-2">🖨 In phiếu DCCD</div>
       <div className="flex flex-wrap items-end gap-2">
-        <div className="flex-1 min-w-[180px]">
+        {/* CO (byGj): ô gõ chiếm trọn 1 dòng, các ô còn lại xuống dòng dưới — vừa màn điện thoại (anh Hữu 22/10/2026) */}
+        <div className={byGj ? 'basis-full min-w-0' : 'flex-1 min-w-[180px]'}>
           <label className="block text-[11px] text-brand-navy-soft mb-0.5">
             Mã hàng (gợi ý chỉ thị đang mở) — hoặc gõ thẳng số chỉ thị
           </label>
@@ -254,14 +255,14 @@ export function DccdCard({ options, onlyCodes }: { options: [string, string][]; 
             value={sel ? `${sel.code} · ${fmtSaeji(sel)}` : q}
             onChange={(e) => { setSel(null); setQ(e.target.value); }}
             onFocus={() => { if (sel) { setSel(null); setQ(''); } }}
-            placeholder={only ? `Gõ vài ký tự mã hàng ${groupName}, hoặc chọn bên dưới` : 'vd 050200-FS2W hoặc 606-169'}
+            placeholder={byGj ? 'Gõ mã hàng hoặc số chỉ thị' : only ? `Gõ vài ký tự mã hàng ${groupName}, hoặc chọn bên dưới` : 'vd 050200-FS2W hoặc 606-169'}
             className="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm font-mono text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal"
           />
         </div>
         {byGj ? (
-          <div>
+          <div className="flex-1 min-w-[9rem]">
             <label className="block text-[11px] text-brand-navy-soft mb-0.5">Công đoạn</label>
-            <div className="px-2 py-1.5 border border-gray-200 bg-slate-50 rounded-md text-sm text-brand-navy min-w-[120px]">
+            <div className="px-2 py-1.5 border border-gray-200 bg-slate-50 rounded-md text-sm text-brand-navy truncate">
               {effGj ? gjLabel(effGj) : <span className="text-brand-navy-soft">tự theo mã hàng</span>}
             </div>
           </div>
@@ -335,13 +336,11 @@ export function DccdCard({ options, onlyCodes }: { options: [string, string][]; 
                   key={`${l.saeji}-${l.code}`}
                   type="button"
                   onClick={() => setSel(l)}
-                  className="w-full flex items-center gap-4 px-3 py-2 text-left hover:bg-sky-50 transition"
+                  className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-sky-50 transition"
                 >
-                  <span className="font-mono text-sm text-brand-navy flex-1">{l.code}</span>
-                  {byGj && (
-                    <span className="text-[11px] text-brand-navy-soft">{gjLabel(gjMap.get(l.code.toUpperCase()))}</span>
-                  )}
-                  <span className="font-mono font-bold text-[#063882] text-sm">{fmtSaeji(l)}</span>
+                  {/* Bỏ cột công đoạn ở giữa (anh Hữu 22/10/2026) — công đoạn hiện ở ô "Công đoạn" khi chọn */}
+                  <span className="font-mono text-sm text-brand-navy flex-1 min-w-0 truncate">{l.code}</span>
+                  <span className="font-mono font-bold text-[#063882] text-sm whitespace-nowrap shrink-0">{fmtSaeji(l)}</span>
                 </button>
               ))}
             </div>
