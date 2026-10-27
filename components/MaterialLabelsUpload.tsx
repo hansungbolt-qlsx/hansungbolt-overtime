@@ -3,6 +3,35 @@
 import { useEffect, useRef, useState } from 'react';
 import { HD_EMPLOYEES } from '@/lib/hd-employees';
 import PrintJobButton from './PrintJobButton';
+import { compressImage } from '@/lib/image-compress';
+
+// fetch không báo % lúc GỬI → dùng XMLHttpRequest. status 0 = mất kết nối / hết giờ.
+function postWithProgress(
+  url: string,
+  body: FormData,
+  onPct: (pct: number) => void,
+): Promise<{ status: number; data: unknown }> {
+  return new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    xhr.timeout = 180000;
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && e.total > 0) onPct(Math.min(99, Math.round((e.loaded / e.total) * 100)));
+    };
+    xhr.onload = () => {
+      let data: unknown = null;
+      try {
+        data = JSON.parse(xhr.responseText);
+      } catch {
+        /* không phải JSON (vd 413 của Vercel) */
+      }
+      resolve({ status: xhr.status, data });
+    };
+    xhr.onerror = () => resolve({ status: 0, data: null });
+    xhr.ontimeout = () => resolve({ status: 0, data: null });
+    xhr.send(body);
+  });
+}
 
 type Photo = {
   id: string;
@@ -21,6 +50,8 @@ export default function MaterialLabelsUpload({
 }) {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [uploading, setUploading] = useState(false);
+  // Ảnh thứ i/n · pct = % đã gửi của ảnh đó · step 'nen' = đang thu nhỏ trên máy, 'tai' = đang gửi
+  const [progress, setProgress] = useState<{ i: number; n: number; pct: number; step: 'nen' | 'tai' } | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ kind: 'info' | 'error'; text: string } | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -68,29 +99,39 @@ export default function MaterialLabelsUpload({
     setUploading(true);
     setMessage(null);
 
-    const formData = new FormData();
-    formData.append('date', date);
-    if (employeeName) formData.append('employee_name', employeeName);
-    for (const f of files) formData.append('files', f);
-
+    // Từng ảnh một: nén trên máy → gửi kèm % (anh Hữu 27/10/2026: 4G chờ lâu, không biết còn bao lâu).
+    // Ảnh lỗi chỉ hỏng ảnh đó, ảnh khác vẫn lên.
+    let ok = 0;
+    const warns: string[] = [];
     try {
-      const res = await fetch('/api/labels', { method: 'POST', body: formData });
-      const data = await res.json();
-      if (!res.ok) {
-        setMessage({ kind: 'error', text: data.error || 'Upload thất bại' });
-      } else {
-        const warns = (data.warnings as string[]) ?? [];
-        const text =
-          warns.length > 0
-            ? `Đã upload ${data.uploaded}/${data.total} ảnh. Cảnh báo: ${warns.join('; ')}`
-            : `Đã upload ${data.uploaded} ảnh.`;
-        setMessage({ kind: warns.length > 0 ? 'error' : 'info', text });
-        await loadPhotos();
+      for (let i = 0; i < files.length; i++) {
+        setProgress({ i: i + 1, n: files.length, pct: 0, step: 'nen' });
+        const f = await compressImage(files[i]);
+        setProgress({ i: i + 1, n: files.length, pct: 0, step: 'tai' });
+        const formData = new FormData();
+        formData.append('date', date);
+        if (employeeName) formData.append('employee_name', employeeName);
+        formData.append('files', f);
+        const r = await postWithProgress('/api/labels', formData, (pct) =>
+          setProgress({ i: i + 1, n: files.length, pct, step: 'tai' }),
+        );
+        const data = (r.data ?? {}) as { uploaded?: number; warnings?: string[]; error?: string };
+        if (r.status === 0) warns.push(`Ảnh ${i + 1}: mất kết nối`);
+        else if (r.status < 200 || r.status >= 300) warns.push(`Ảnh ${i + 1}: ${data.error || `lỗi ${r.status}`}`);
+        else {
+          ok += data.uploaded ?? 0;
+          warns.push(...(data.warnings ?? []));
+        }
       }
-    } catch {
-      setMessage({ kind: 'error', text: 'Không kết nối được máy chủ' });
+      setMessage(
+        warns.length > 0
+          ? { kind: 'error', text: `Đã upload ${ok}/${files.length} ảnh. Cảnh báo: ${warns.join('; ')}` }
+          : { kind: 'info', text: `Đã upload ${ok} ảnh.` },
+      );
+      if (ok > 0) await loadPhotos();
     } finally {
       setUploading(false);
+      setProgress(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   }
@@ -209,6 +250,23 @@ export default function MaterialLabelsUpload({
         >
           {uploading ? 'Đang upload...' : '+ Chụp / chọn ảnh tem'}
         </label>
+
+        {progress && (
+          <div className="mt-3" aria-live="polite">
+            <div className="flex justify-between text-sm font-semibold text-[#063882]">
+              <span>
+                {progress.step === 'nen' ? 'Đang chuẩn bị' : 'Đang tải'} ảnh {progress.i}/{progress.n}
+              </span>
+              <span>{Math.round(((progress.i - 1) * 100 + progress.pct) / progress.n)}%</span>
+            </div>
+            <div className="mt-1 h-3 w-full rounded-full bg-white border border-[#c7d6f0] overflow-hidden">
+              <div
+                className="h-full bg-[#063882] transition-all duration-200"
+                style={{ width: `${((progress.i - 1) * 100 + progress.pct) / progress.n}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {message && (
           <div
