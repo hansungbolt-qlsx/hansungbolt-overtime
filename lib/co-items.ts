@@ -2,7 +2,8 @@
 // 22/10/2026: DANH SÁCH MÃ Coating nay theo route hiện hành ERP (components/CoCodes.tsx ← /api/co-codes) — file này
 // CHỈ còn giữ RPM để form tăng ca CO tự điền; mã ERP chưa có ở đây vẫn gợi ý, RPM gõ tay. Mảng cũng là danh sách
 // dự phòng khi chưa tải được mã từ ERP. Thêm RPM cho mã mới: thêm dòng dưới rồi deploy.
-export type CoItem = { code: string; name: string; rpm: number; coating: string; adhesive_g_ea: number };
+// adhesive_g_ea = null: chưa có số liệu tiêu thụ keo (bổ sung sau).
+export type CoItem = { code: string; name: string; rpm: number; coating: string; adhesive_g_ea: number | null };
 
 export const CO_ITEMS: CoItem[] = [
   { code: '080620-UM1A-2A', name: 'HEX BOLT P/W B=13 8*62', rpm: 110, coating: '593SB', adhesive_g_ea: 0.1093 },
@@ -20,6 +21,8 @@ export const CO_ITEMS: CoItem[] = [
   { code: '050180-K54A-AZ', name: 'TH/W(ISO)M/S COATING M5*18', rpm: 60, coating: '593SB', adhesive_g_ea: 0.0324 },
   { code: '260080-P52A-3PN', name: 'PH M/S S/W M2.6x8', rpm: 100, coating: '593SB', adhesive_g_ea: 0.04 },
   { code: '120362-UM1A-4A', name: 'HEX(UP) S, P/W CO M12x36.2', rpm: 70, coating: '1193SBO', adhesive_g_ea: 0.1077 },
+  // anh Hữu 28/10/2026: sơn cam như 080290-FM6R-D, lượng keo bổ sung sau
+  { code: '040100-T56R', name: 'TH M/S CO (STS304) M4x10', rpm: 100, coating: '1193SBO', adhesive_g_ea: null },
 ];
 
 const BY_CODE = new Map(CO_ITEMS.map((i) => [i.code.toUpperCase(), i]));
