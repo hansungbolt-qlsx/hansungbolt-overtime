@@ -7,7 +7,7 @@ export type NvlNhomA = { size: string; nhom: 'STS' | 'THEP'; mac: NvlMac[] };
 export type NvlDongB = {
   may: string;
   size: string;
-  tu: { ma: string; mac: string };
+  tu: { ma: string; mac: string; ngay?: string }; // ngay = 'dd/mm' khi so với lần chạy cuối trước hôm nay
   sang: { ma: string; mac: string };
 };
 export type NvlCanhBao = {

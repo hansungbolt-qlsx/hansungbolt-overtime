@@ -150,13 +150,14 @@ export default function NvlCanhBaoCard({ canShare }: { canShare: boolean }) {
         ))}
 
         <div style={{ fontWeight: 800, marginTop: 10 }}>
-          B. Máy đổi mã trong ngày, cùng size khác loại NVL — kiểm và thay cuộn trước khi Setting
+          B. Máy đổi mã, cùng size khác loại NVL — kiểm và thay cuộn trước khi Setting
         </div>
         {b.length === 0 && <div style={{ marginLeft: 6 }}>• Hôm nay không có</div>}
-        {b.map((x) => (
-          <div key={x.may} style={{ marginLeft: 6, marginTop: 2 }}>
+        {b.map((x, i) => (
+          <div key={`${x.may}-${i}`} style={{ marginLeft: 6, marginTop: 2 }}>
             • <Chip text={x.may} /> Size {x.size}
             <div style={{ marginLeft: 18 }}>
+              {x.tu.ngay ? `chạy cuối ${x.tu.ngay}: ` : ''}
               {x.tu.ma} <b style={{ color: MAU_MAC[0] }}>{x.tu.mac}</b>
             </div>
             <div style={{ marginLeft: 18 }}>
