@@ -12,6 +12,7 @@ import WarehouseSlipView from './WarehouseSlipView';
 import CoDailyView from './CoDailyView';
 import CoDccdCard from './CoDccdCard';
 import CoProdSummaryView from './CoProdSummaryView';
+import NvlCanhBaoCard from './NvlCanhBaoCard';
 import { chanNeuChuaLuu } from '@/lib/nvl-slips';
 
 const todayISO = () => {
@@ -161,6 +162,8 @@ export default function RegisterLayout({
 
   return (
     <>
+      {/* Cảnh báo nhầm NVL theo KHSX hôm nay — mọi user HD; chỉ tổ trưởng chia sẻ Zalo (anh Hữu 30/10/2026) */}
+      {isHD && <NvlCanhBaoCard canShare={isLeader} />}
       <div className={`grid ${cols} gap-2 mb-5`}>
         {tabs.map((t) => {
           const active = activeTab === t.key;
