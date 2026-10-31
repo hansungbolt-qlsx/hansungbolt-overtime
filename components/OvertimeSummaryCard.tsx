@@ -15,6 +15,8 @@ type SummaryRow = {
   sunday_count: number;
   total_hours: number;
   by_date?: Record<string, number>;
+  // Ngày tính giờ Chủ nhật — theo phiếu người đó có tên (anh Hữu 31/10/2026)
+  sunday_dates?: string[];
 };
 type DateCol = { date: string; day_type: 'weekday' | 'sunday'; depts: string[] };
 type View = 'sum' | 'day';
@@ -248,8 +250,11 @@ export default function OvertimeSummaryCard({ isAdmin = false }: { isAdmin?: boo
               <tbody>
                 {displayRows.map((r, idx) => {
                   const bd = r.by_date ?? {};
-                  const wk = dayCols.filter((d) => d.day_type === 'weekday').reduce((s, d) => s + (bd[d.date] ?? 0), 0);
-                  const sun = dayCols.filter((d) => d.day_type === 'sunday').reduce((s, d) => s + (bd[d.date] ?? 0), 0);
+                  // Ô Chủ nhật theo phiếu của người đó; bản API cũ chưa có sunday_dates → theo cột
+                  const sunSet = r.sunday_dates ? new Set(r.sunday_dates) : null;
+                  const laCN = (d: DateCol) => (sunSet ? sunSet.has(d.date) : d.day_type === 'sunday');
+                  const wk = dayCols.filter((d) => !laCN(d)).reduce((s, d) => s + (bd[d.date] ?? 0), 0);
+                  const sun = dayCols.filter((d) => laCN(d)).reduce((s, d) => s + (bd[d.date] ?? 0), 0);
                   return (
                     <tr key={r.employee_id}>
                       <td className="sticky left-0 z-10 w-10 min-w-10 max-w-10 bg-white border-r border-b border-[#9db4d6] px-2 py-2 text-center">{idx + 1}</td>
@@ -262,7 +267,7 @@ export default function OvertimeSummaryCard({ isAdmin = false }: { isAdmin?: boo
                           <td
                             key={d.date}
                             className={`border-r border-b border-[#9db4d6] px-2 py-2 text-center ${
-                              h ? `font-bold ${d.day_type === 'sunday' ? 'bg-[#fff0d0]' : 'bg-[#e8f4e8]'}` : ''
+                              h ? `font-bold ${laCN(d) ? 'bg-[#fff0d0]' : 'bg-[#e8f4e8]'}` : ''
                             }`}
                           >
                             {h ? hrs(h) : ''}

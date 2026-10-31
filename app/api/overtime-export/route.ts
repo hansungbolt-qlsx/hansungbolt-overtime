@@ -99,7 +99,7 @@ export async function GET(req: Request) {
         'equipments', 'id, code, machine_type', 'code'),
     ]);
 
-    const { empDateMap, dateTypeMap } = buildEmpDateHours(regs, items);
+    const { empDateMap, dateTypeMap, empDateType } = buildEmpDateHours(regs, items);
 
     // BẢN SAO LƯU TOÀN BỘ (user chốt 29/7 tối): kèm chi tiết từng dòng phiếu —
     // máy, mã hàng, số lượng, khung giờ, ghi chú — để app chính lưu vĩnh viễn.
@@ -133,9 +133,14 @@ export async function GET(req: Request) {
       }];
     });
 
-    const rows: Array<{ employee_id: string; date: string; hours: number }> = [];
+    // day_type từng dòng = loại ngày theo PHIẾU người đó có tên (anh Hữu 31/10/2026);
+    // app chính ưu tiên trường này, thiếu thì lấy theo `dates` như bản cũ.
+    const rows: Array<{ employee_id: string; date: string; hours: number; day_type: string }> = [];
     for (const [empId, dateMap] of empDateMap) {
-      for (const [date, hours] of dateMap) rows.push({ employee_id: empId, date, hours });
+      const types = empDateType.get(empId);
+      for (const [date, hours] of dateMap) {
+        rows.push({ employee_id: empId, date, hours, day_type: types?.get(date) ?? dateTypeMap.get(date) ?? 'weekday' });
+      }
     }
     rows.sort((a, b) => a.date.localeCompare(b.date) || a.employee_id.localeCompare(b.employee_id));
 

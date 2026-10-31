@@ -63,7 +63,7 @@ export default async function PrintOvertimeSummaryPage({
   // Luật quy giờ (item admin sửa → registration → 8h CN/3h thường, trùng ngày
   // lấy MAX) nằm MỘT CHỖ ở lib/overtime-hours.ts — dùng chung với API đồng bộ
   // sang app chính (menu Overtime). Sửa luật thì sửa ở lib, đừng sửa tại đây.
-  const { empDateMap, dateTypeMap } = buildEmpDateHours(regs, items ?? []);
+  const { empDateMap, dateTypeMap, empDateType } = buildEmpDateHours(regs, items ?? []);
 
   const empIds = Array.from(empDateMap.keys());
   const { data: emps } = await supabaseAdmin
@@ -80,6 +80,9 @@ export default async function PrintOvertimeSummaryPage({
     id: e.id,
     name: e.full_name,
     byDate: Object.fromEntries(empDateMap.get(e.id) ?? new Map<string, number>()),
+    // Ngày tính giờ Chủ nhật theo phiếu người đó có tên (anh Hữu 31/10/2026)
+    sundayDates: [...(empDateType.get(e.id) ?? new Map<string, string>())]
+      .filter(([, t]) => t === 'sunday').map(([d]) => d),
   }));
 
   return (

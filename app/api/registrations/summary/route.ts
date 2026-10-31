@@ -39,7 +39,9 @@ export async function GET(req: Request) {
   // để tab bộ phận chỉ hiện ngày của bộ phận đó (= trang in ?dept=)
   const dateInfo = new Map<string, { day_type: 'weekday' | 'sunday'; depts: Set<string> }>();
   for (const r of regs) {
-    const d = dateInfo.get(r.overtime_date) ?? { day_type: r.day_type as 'weekday' | 'sunday', depts: new Set<string>() };
+    const d = dateInfo.get(r.overtime_date) ?? { day_type: 'weekday' as 'weekday' | 'sunday', depts: new Set<string>() };
+    // Cột ngày tô Chủ nhật khi có ít nhất một phiếu Chủ nhật (31/10/2026 — trước lấy phiếu đọc đầu tiên)
+    if (r.day_type === 'sunday') d.day_type = 'sunday';
     if (r.department) d.depts.add(r.department);
     dateInfo.set(r.overtime_date, d);
   }
@@ -57,14 +59,16 @@ export async function GET(req: Request) {
 
   // Giờ người × ngày: luật DÙNG CHUNG lib/overtime-hours.ts (item admin sửa → phiếu → 3h/8h;
   // trong một ca lấy MAX, ca AM + PM cộng lại — anh Hữu 21/10/2026). Đừng chép luật vào đây.
-  const { empDateMap, dateTypeMap } = buildEmpDateHours(regs, items ?? []);
+  // Loại ngày từng ô theo PHIẾU người đó có tên (anh Hữu 31/10/2026), không theo cả ngày
+  const { empDateMap, empDateType } = buildEmpDateHours(regs, items ?? []);
 
   type Bucket = { weekdayDays: Set<string>; sundayDays: Set<string>; totalHours: number };
   const empMap = new Map<string, Bucket>();
   for (const [empId, dateMap] of empDateMap) {
     const b: Bucket = { weekdayDays: new Set(), sundayDays: new Set(), totalHours: 0 };
+    const types = empDateType.get(empId);
     for (const [date, hours] of dateMap) {
-      if (dateTypeMap.get(date) === 'sunday') b.sundayDays.add(date);
+      if (types?.get(date) === 'sunday') b.sundayDays.add(date);
       else b.weekdayDays.add(date);
       b.totalHours += hours;
     }
@@ -93,6 +97,8 @@ export async function GET(req: Request) {
       sunday_count: b.sundayDays.size,
       total_hours: Number(b.totalHours.toFixed(2)),
       by_date: Object.fromEntries(empDateMap.get(id) ?? new Map<string, number>()),
+      // Ngày tính giờ Chủ nhật của người này (31/10/2026) — giao diện cộng cột Chủ nhật theo đây
+      sunday_dates: [...b.sundayDays].sort(),
     }))
     .sort((a, b) => (orderMap.get(a.employee_id) ?? 9999) - (orderMap.get(b.employee_id) ?? 9999));
 

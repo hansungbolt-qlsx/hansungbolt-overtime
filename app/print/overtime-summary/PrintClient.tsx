@@ -4,7 +4,8 @@ import { useEffect } from 'react';
 import { toTitleCase } from '@/lib/format';
 
 type DateEntry = { date: string; dayType: 'weekday' | 'sunday' };
-type EmpRow = { id: string; name: string; byDate: Record<string, number> };
+// sundayDates: ngày tính giờ Chủ nhật theo phiếu người đó có tên (anh Hữu 31/10/2026)
+type EmpRow = { id: string; name: string; byDate: Record<string, number>; sundayDates?: string[] };
 
 export default function PrintClient({
   month,
@@ -153,12 +154,14 @@ export default function PrintClient({
           </thead>
           <tbody>
             {employees.map((emp, idx) => {
-              // Tổng giờ ngày thường = sum giờ thực tế mọi ngày weekday NV đã tăng ca
+              // Giờ Chủ nhật / ngày thường theo phiếu của chính người đó (không theo cột ngày)
+              const sunSet = emp.sundayDates ? new Set(emp.sundayDates) : null;
+              const laCN = (d: DateEntry) => (sunSet ? sunSet.has(d.date) : d.dayType === 'sunday');
               const weekdayHours = overtimeDates
-                .filter((d) => d.dayType === 'weekday')
+                .filter((d) => !laCN(d))
                 .reduce((s, d) => s + (emp.byDate[d.date] ?? 0), 0);
               const sundayHours = overtimeDates
-                .filter((d) => d.dayType === 'sunday')
+                .filter((d) => laCN(d))
                 .reduce((s, d) => s + (emp.byDate[d.date] ?? 0), 0);
               const total = weekdayHours + sundayHours;
               return (
@@ -170,7 +173,7 @@ export default function PrintClient({
                     return (
                       <td
                         key={d.date}
-                        className={h ? (d.dayType === 'sunday' ? 'sunday-worked' : 'worked') : ''}
+                        className={h ? (laCN(d) ? 'sunday-worked' : 'worked') : ''}
                       >
                         {h ? `${h}h` : ''}
                       </td>
