@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toTitleCase } from '@/lib/format';
-import { normShift, qtyHoursOf, shiftLabel } from '@/lib/overtime-shift';
+import { dayTypeMismatch, normShift, qtyHoursOf, shiftLabel } from '@/lib/overtime-shift';
+import DateButton from './DateButton';
 
 type Reg = {
   id: string;
@@ -91,6 +92,9 @@ export default function EditRegistrationForm({
       time_to: toHM(it.time_to) || headerTo,
     })),
   );
+  // Sửa được NGÀY tăng ca (anh Hữu 31/10/2026 — tổ trưởng quên đổi ngày khi đăng ký Chủ nhật)
+  const [date, setDate] = useState(reg.overtime_date);
+  const lechNgay = dayTypeMismatch(date, reg.day_type);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -147,12 +151,15 @@ export default function EditRegistrationForm({
       if (rowDuration(r) <= 0)
         return setError(`Dòng ${i + 1}: giờ kết thúc phải sau giờ bắt đầu`);
     }
+    if (lechNgay && !window.confirm(`${lechNgay}
+Vẫn lưu phiếu?`)) return;
     setSaving(true);
     try {
       const res = await fetch(`/api/registrations/${reg.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          overtime_date: date,
           items: rows.map((r) => ({
             id: r.id,
             employee_id: r.employee_id,
@@ -168,7 +175,8 @@ export default function EditRegistrationForm({
         setError(data.error || 'Không lưu được phiếu');
         return;
       }
-      router.push(backHref);
+      // Đổi ngày → về Dashboard của ngày mới
+      router.push(date !== reg.overtime_date ? backHref.replace(reg.overtime_date, date) : backHref);
       router.refresh();
     } finally {
       setSaving(false);
@@ -192,6 +200,22 @@ export default function EditRegistrationForm({
           ← Quay lại
         </Link>
       </div>
+
+      <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-5 space-y-2">
+        <label className="block text-sm font-semibold text-brand-navy">Ngày tăng ca</label>
+        <DateButton value={date} onChange={(v) => v && setDate(v)} />
+        {date !== reg.overtime_date && (
+          <p className="text-xs text-amber-700 font-medium">
+            Đổi từ ngày {reg.overtime_date.split('-').reverse().join('/')} — bấm Lưu thay đổi để áp dụng.
+            Phiếu đã in thì in lại theo ngày mới.
+          </p>
+        )}
+        {lechNgay && (
+          <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-md p-2 font-medium">
+            ⚠ {lechNgay}
+          </p>
+        )}
+      </section>
 
       <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden">
         <div className="p-5 border-b border-brand-surface-alt flex items-center justify-between gap-3">

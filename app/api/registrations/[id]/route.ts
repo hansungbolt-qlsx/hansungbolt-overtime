@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
-import { normShift, presetOf, qtyHoursOf } from '@/lib/overtime-shift';
+import { isISODate, normShift, presetOf, qtyHoursOf } from '@/lib/overtime-shift';
 import { duplicateShiftError, overlapError } from '@/lib/overtime-guard';
 
 export const runtime = 'nodejs';
@@ -25,6 +25,8 @@ type PatchItem = {
 };
 
 type PatchBody = {
+  // Đổi ngày tăng ca (anh Hữu 31/10/2026) — kiểm trùng ca + trùng giờ theo NGÀY MỚI
+  overtime_date?: string;
   day_type?: 'weekday' | 'sunday';
   shift?: 'AM' | 'PM';
   items?: PatchItem[];
@@ -68,6 +70,9 @@ export async function PATCH(
   if (dayTypeIn && dayTypeIn !== 'weekday' && dayTypeIn !== 'sunday') {
     return NextResponse.json({ error: 'day_type không hợp lệ' }, { status: 400 });
   }
+  if (body.overtime_date !== undefined && !isISODate(body.overtime_date)) {
+    return NextResponse.json({ error: 'Ngày tăng ca không hợp lệ' }, { status: 400 });
+  }
 
   // Load phiếu
   const { data: reg, error: regErr } = await supabaseAdmin
@@ -99,9 +104,11 @@ export async function PATCH(
   const effectiveShift = normShift(effectiveDayType, body.shift ?? oldShift);
   const preset = presetOf(effectiveDayType, effectiveShift);
   const caDoi = effectiveDayType !== reg.day_type || effectiveShift !== oldShift;
+  const effectiveDate: string = body.overtime_date ?? reg.overtime_date;
+  const ngayDoi = effectiveDate !== reg.overtime_date;
 
-  if (caDoi) {
-    const dupErr = await duplicateShiftError(reg.overtime_date, reg.department, effectiveShift, id);
+  if (caDoi || ngayDoi) {
+    const dupErr = await duplicateShiftError(effectiveDate, reg.department, effectiveShift, id);
     if (dupErr) return NextResponse.json({ error: dupErr }, { status: 409 });
   }
 
@@ -228,7 +235,7 @@ export async function PATCH(
 
   // Giờ cùng một người trên phiếu khác cùng ngày không được chồng nhau
   const ovErr = await overlapError(
-    reg.overtime_date,
+    effectiveDate,
     items.map((it) => {
       const t = rowTime(it);
       return { employee_id: it.employee_id, time_from: t.tFrom, time_to: t.tTo };
@@ -247,6 +254,7 @@ export async function PATCH(
     shift: effectiveShift,
   };
   if (dayTypeIn) headerUpdate.day_type = dayTypeIn;
+  if (ngayDoi) headerUpdate.overtime_date = effectiveDate;
   const { error: updHeaderErr } = await supabaseAdmin
     .from('overtime_registrations')
     .update(headerUpdate)

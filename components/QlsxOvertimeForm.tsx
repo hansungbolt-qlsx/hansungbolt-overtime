@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toTitleCase } from '@/lib/format';
-import { presetOf, presetText, type Shift } from '@/lib/overtime-shift';
+import {
+  dayTypeMismatch, isSundayISO, nextSundayISO, presetOf, presetText, type Shift,
+} from '@/lib/overtime-shift';
 import ShiftPicker from './ShiftPicker';
 
 type Employee = { id: string; full_name: string; order_no: number };
@@ -35,10 +37,27 @@ export default function QlsxOvertimeForm({
   const [dayType, setDayType] = useState<'weekday' | 'sunday' | null>(null);
   // Ca ngày thường: mặc định PM, AM = tăng ca sáng (anh Hữu 21/10/2026)
   const [shift, setShift] = useState<Shift>('PM');
+  // Ngày trước khi bấm "Chủ nhật" tự nhảy sang Chủ nhật kế tiếp (anh Hữu 31/10/2026)
+  const [dateBeforeSunday, setDateBeforeSunday] = useState<string | null>(null);
   const [rows, setRows] = useState<EmployeeRow[]>([emptyRow()]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const lechNgay = dayTypeMismatch(date, dayType);
+
+  // Bấm "Chủ nhật" → ngày tự nhảy sang Chủ nhật kế tiếp gần nhất; quay về "Ngày thường" → trả ngày cũ
+  function chooseDayType(type: 'weekday' | 'sunday') {
+    if (dayType !== type) setShift('PM');
+    setDayType(type);
+    if (type === 'sunday' && !isSundayISO(date)) {
+      setDateBeforeSunday(date);
+      setDate(nextSundayISO(date));
+    } else if (type === 'weekday' && dateBeforeSunday) {
+      setDate(dateBeforeSunday);
+      setDateBeforeSunday(null);
+    }
+  }
 
   const timeLabel = dayType
     ? presetText(presetOf(dayType, shift))
@@ -81,6 +100,8 @@ export default function QlsxOvertimeForm({
       if (!r.reason.trim())
         return setError(`Nhân viên ${i + 1}: chưa nhập lý do tăng ca`);
     }
+    if (lechNgay && !window.confirm(`${lechNgay}
+Vẫn gửi phiếu?`)) return;
     setSubmitting(true);
     try {
       const res = await fetch('/api/registrations/qlsx', {
@@ -119,7 +140,7 @@ export default function QlsxOvertimeForm({
           <input
             type="date"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(e) => { if (e.target.value) { setDate(e.target.value); setDateBeforeSunday(null); } }}
             className="w-full px-3 py-2.5 border border-gray-300 rounded-md text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal focus:border-transparent"
           />
         </div>
@@ -132,10 +153,7 @@ export default function QlsxOvertimeForm({
               <button
                 key={type}
                 type="button"
-                onClick={() => {
-                  if (dayType !== type) setShift('PM');
-                  setDayType(type);
-                }}
+                onClick={() => chooseDayType(type)}
                 className={`py-2.5 rounded-md border text-sm font-medium transition ${
                   dayType === type
                     ? 'bg-brand-teal text-white border-brand-teal'
@@ -152,7 +170,15 @@ export default function QlsxOvertimeForm({
             <p
               className={`text-xs mt-1.5 ${dayType ? 'text-brand-navy-soft' : 'text-brand-teal font-medium'}`}
             >
+              {dayType === 'sunday' && !lechNgay && (
+                <strong className="text-brand-navy">Chủ nhật {date.split('-').reverse().join('/')} · </strong>
+              )}
               {timeLabel}
+            </p>
+          )}
+          {lechNgay && (
+            <p className="text-sm mt-1.5 text-red-700 bg-red-50 border border-red-200 rounded-md p-2 font-medium">
+              ⚠ {lechNgay} Kiểm tra lại ô Ngày tăng ca.
             </p>
           )}
         </div>

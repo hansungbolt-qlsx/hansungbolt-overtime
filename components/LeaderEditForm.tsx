@@ -1,14 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { deptNeedsManualRpm } from '@/lib/departments';
 import { CO_ITEMS_DATALIST_ID, findCoItem } from '@/lib/co-items';
 import { CoItemsDatalist } from './CoCodes';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toTitleCase } from '@/lib/format';
-import { presetOf, presetText, qtyHoursOf, shiftLabel, type Shift } from '@/lib/overtime-shift';
+import {
+  dayTypeMismatch, isSundayISO, nextSundayISO, presetOf, presetText, qtyHoursOf, shiftLabel, type Shift,
+} from '@/lib/overtime-shift';
 import ShiftPicker from './ShiftPicker';
+import DateButton from './DateButton';
 
 type Employee = { id: string; full_name: string; order_no: number };
 type PlanItem = { item_code: string; item_name: string | null };
@@ -143,6 +146,11 @@ export default function LeaderEditForm({
 }) {
   const router = useRouter();
   const [dayType, setDayType] = useState<'weekday' | 'sunday'>(initialDayType);
+  // Sửa được NGÀY tăng ca (anh Hữu 31/10/2026 — tổ trưởng quên đổi ngày khi đăng ký Chủ nhật)
+  const [date, setDate] = useState(initialDate);
+  const [dateBeforeSunday, setDateBeforeSunday] = useState<string | null>(null);
+  // Đổi ngày → máy không có trong KHSX ngày mới bị bỏ chọn; báo cho tổ trưởng biết
+  const [pruneNote, setPruneNote] = useState('');
   // Ca AM/PM (anh Hữu 21/10/2026) — đổi ca thì giờ về mặc định của ca mới
   const [shift, setShift] = useState<Shift>(initialShift);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -154,6 +162,9 @@ export default function LeaderEditForm({
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [rowsInit, setRowsInit] = useState(false);
+  // Dòng hiện tại cho lượt tải KHSX sau khi đổi ngày (đang tải thì form ẩn, dòng không đổi được)
+  const rowsRef = useRef(rows);
+  useEffect(() => { rowsRef.current = rows; }, [rows]);
 
   const otherEquipmentIds = new Set(
     equipments.filter((e) => e.machine_type === 'OTHER').map((e) => e.id),
@@ -169,12 +180,13 @@ export default function LeaderEditForm({
     0,
   );
 
-  // Load options 1 lần khi mount (date không đổi trong edit)
+  // Load options khi mount + mỗi lần đổi ngày (KHSX theo ngày)
   useEffect(() => {
     let cancelled = false;
     setLoadingOpts(true);
     setError('');
-    fetch(`/api/register/options?date=${initialDate}`)
+    setPruneNote('');
+    fetch(`/api/register/options?date=${date}`)
       .then((r) => r.json())
       .then((d) => {
         if (cancelled) return;
@@ -191,6 +203,15 @@ export default function LeaderEditForm({
           const initRows = itemsToRows(initialItems, otherEquipmentIds, qtyHoursFor(initialDayType, initialShift));
           setRows(initRows.length > 0 ? initRows : [emptyRow()]);
           setRowsInit(true);
+        } else {
+          // Đã đổi ngày: bỏ chọn máy không có trong danh sách ngày mới (không thấy thì không bỏ chọn tay được)
+          const ids = new Set(((d.machines ?? []) as Machine[]).map((m) => m.id));
+          const bo = new Set(rowsRef.current.flatMap((r) => r.checkedMachineIds.filter((id) => !ids.has(id))));
+          if (bo.size > 0) {
+            setRows((prev) => prev.map((r) => ({ ...r, checkedMachineIds: r.checkedMachineIds.filter((id) => ids.has(id)) })));
+            const codes = equipments.filter((e) => bo.has(e.id)).map((e) => e.code);
+            setPruneNote(`Kế hoạch ngày mới không có máy ${codes.join(', ') || '(không rõ mã)'} — đã bỏ chọn, kiểm tra lại từng nhân viên.`);
+          }
         }
       })
       .catch(() => !cancelled && setError('Không tải được dữ liệu'))
@@ -199,7 +220,21 @@ export default function LeaderEditForm({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialDate]);
+  }, [date]);
+
+  // Bấm "Chủ nhật" → ngày tự nhảy sang Chủ nhật kế tiếp gần nhất; quay về "Ngày thường" → trả ngày cũ
+  function chooseDayType(type: 'weekday' | 'sunday') {
+    if (type === dayType) return;
+    setShift('PM');
+    setDayType(type);
+    if (type === 'sunday' && !isSundayISO(date)) {
+      setDateBeforeSunday(date);
+      setDate(nextSundayISO(date));
+    } else if (type === 'weekday' && dateBeforeSunday) {
+      setDate(dateBeforeSunday);
+      setDateBeforeSunday(null);
+    }
+  }
 
   function toggleMachine(rowIdx: number, machineId: string) {
     setRows((prev) => {
@@ -316,7 +351,10 @@ export default function LeaderEditForm({
       } else {
         for (const mId of r.checkedMachineIds) {
           const m = machines.find((mm) => mm.id === mId);
-          if (!m) continue;
+          if (!m) {
+            const code = equipments.find((e) => e.id === mId)?.code ?? '';
+            return setError(`Nhân viên ${i + 1}: máy ${code} không có trong kế hoạch ngày đang chọn — bỏ chọn máy này`);
+          }
           if (!m.items[0] && !r.machineItemCodes[mId]?.trim()) {
             return setError(
               `Nhân viên ${i + 1}: máy ${m.code} chưa nhập mã hàng`,
@@ -369,13 +407,16 @@ export default function LeaderEditForm({
     }
 
     if (items.length === 0) return setError('Không có dòng nào hợp lệ');
+    const lech = dayTypeMismatch(date, dayType);
+    if (lech && !window.confirm(`${lech}
+Vẫn lưu phiếu?`)) return;
 
     setSubmitting(true);
     try {
       const res = await fetch(`/api/registrations/${registrationId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ day_type: dayType, shift, items }),
+        body: JSON.stringify({ overtime_date: date, day_type: dayType, shift, items }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -390,7 +431,8 @@ export default function LeaderEditForm({
   }
 
   const noPlan = !loadingOpts && machines.length === 0;
-  const [yy, mm, dd] = initialDate.split('-');
+  const lechNgay = dayTypeMismatch(date, dayType);
+  const [yy, mm, dd] = date.split('-');
   const dateLabel = `${dd}/${mm}/${yy}`;
 
   return (
@@ -413,8 +455,21 @@ export default function LeaderEditForm({
         </Link>
       </div>
 
-      {/* Day type readonly (chuyển giữa weekday/sunday) */}
+      {/* Ngày + loại ngày (chuyển giữa weekday/sunday) */}
       <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-4 space-y-4">
+        <div>
+          <label className="block text-sm font-semibold text-brand-navy mb-1.5">Ngày tăng ca</label>
+          <DateButton
+            value={date}
+            onChange={(v) => { if (v) { setDate(v); setDateBeforeSunday(null); } }}
+            className="w-full justify-start"
+          />
+          {date !== initialDate && (
+            <p className="text-xs mt-1.5 text-amber-700 font-medium">
+              Đổi từ ngày {fmtDateVN(initialDate)} — bấm Lưu phiếu để áp dụng.
+            </p>
+          )}
+        </div>
         <div>
           <span className="block text-sm font-semibold text-brand-navy mb-1.5">
             Loại ngày
@@ -424,10 +479,7 @@ export default function LeaderEditForm({
               <button
                 key={type}
                 type="button"
-                onClick={() => {
-                  if (type !== dayType) setShift('PM');
-                  setDayType(type);
-                }}
+                onClick={() => chooseDayType(type)}
                 className={`py-2.5 rounded-md border text-sm font-medium transition ${
                   dayType === type
                     ? 'bg-brand-teal text-white border-brand-teal'
@@ -443,6 +495,11 @@ export default function LeaderEditForm({
             {dayType === 'sunday' && <>{timeLabel} · </>}
             Giờ mặc định — chỉ admin sửa được giờ thực tế.
           </p>
+          {lechNgay && (
+            <p className="text-sm mt-1.5 text-red-700 bg-red-50 border border-red-200 rounded-md p-2 font-medium">
+              ⚠ {lechNgay} Kiểm tra lại ô Ngày tăng ca.
+            </p>
+          )}
         </div>
       </div>
 
@@ -456,7 +513,7 @@ export default function LeaderEditForm({
         <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm p-3 rounded-md">
           {department === 'HD' ? (
             <>
-              Chưa có kế hoạch sản xuất nào tính đến ngày <strong>{fmtDateVN(initialDate)}</strong>.
+              Chưa có kế hoạch sản xuất nào tính đến ngày <strong>{fmtDateVN(date)}</strong>.
               Liên hệ admin upload kế hoạch trước.
             </>
           ) : (
@@ -465,10 +522,16 @@ export default function LeaderEditForm({
         </div>
       )}
 
-      {!loadingOpts && department === 'HD' && planDateUsed && planDateUsed !== initialDate && (
+      {!loadingOpts && department === 'HD' && planDateUsed && planDateUsed !== date && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm p-3 rounded-md">
-          Ngày <strong>{fmtDateVN(initialDate)}</strong> chưa có kế hoạch sản xuất mới — đang dùng
+          Ngày <strong>{fmtDateVN(date)}</strong> chưa có kế hoạch sản xuất mới — đang dùng
           kế hoạch <strong>ngày {fmtDateVN(planDateUsed)}</strong> (bản sau cùng).
+        </div>
+      )}
+
+      {pruneNote && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm p-3 rounded-md">
+          {pruneNote}
         </div>
       )}
 

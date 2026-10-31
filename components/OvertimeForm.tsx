@@ -6,7 +6,9 @@ import DateButton from './DateButton';
 import { deptNeedsManualRpm } from '@/lib/departments';
 import { CO_ITEMS_DATALIST_ID, findCoItem } from '@/lib/co-items';
 import { CoItemsDatalist } from './CoCodes';
-import { presetOf, presetText, qtyHoursOf, type Shift } from '@/lib/overtime-shift';
+import {
+  dayTypeMismatch, isSundayISO, nextSundayISO, presetOf, presetText, qtyHoursOf, type Shift,
+} from '@/lib/overtime-shift';
 import ShiftPicker from './ShiftPicker';
 
 type Employee = { id: string; full_name: string; order_no: number };
@@ -62,6 +64,9 @@ export default function OvertimeForm({ department }: { department: string }) {
   const [dayType, setDayType] = useState<'weekday' | 'sunday' | null>(null);
   // Ca ngày thường: mặc định PM, AM = tăng ca sáng 06:00–07:30 (anh Hữu 21/10/2026)
   const [shift, setShift] = useState<Shift>('PM');
+  // Ngày trước khi bấm "Chủ nhật" tự nhảy sang Chủ nhật kế tiếp (anh Hữu 31/10/2026) —
+  // bỏ chọn Chủ nhật / chọn Ngày thường thì trả về ngày này. Tự đổi ngày bằng lịch → bỏ nhớ.
+  const [dateBeforeSunday, setDateBeforeSunday] = useState<string | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [machines, setMachines] = useState<Machine[]>([]);
   // Ngày KHSX máy chủ thực dùng (khác `date` = đang dùng bản cũ sau cùng, anh Hữu 25/09)
@@ -251,6 +256,9 @@ export default function OvertimeForm({ department }: { department: string }) {
     }
     if (items.length === 0) return setError('Không có dòng nào hợp lệ');
     if (!dayType) return setError('Chưa chọn loại ngày');
+    const lech = dayTypeMismatch(date, dayType);
+    if (lech && !window.confirm(`${lech}
+Vẫn gửi phiếu?`)) return;
     setSubmitting(true);
     try {
       const res = await fetch('/api/registrations', {
@@ -272,6 +280,26 @@ export default function OvertimeForm({ department }: { department: string }) {
   }
 
   const noPlan = !loadingOpts && machines.length === 0;
+  const lechNgay = dayTypeMismatch(date, dayType);
+
+  // Bấm nút loại ngày: Chủ nhật → ngày tự nhảy sang Chủ nhật kế tiếp gần nhất (anh Hữu 31/10/2026)
+  function chooseDayType(type: 'weekday' | 'sunday') {
+    if (dayType === type) {
+      // Bấm lại nút đang chọn → thu gọn; Chủ nhật đã tự nhảy ngày → trả ngày cũ
+      setDayType(null);
+      if (dateBeforeSunday) { setDate(dateBeforeSunday); setDateBeforeSunday(null); }
+      return;
+    }
+    setDayType(type);
+    setShift('PM'); // mỗi lần chọn lại loại ngày → về mặc định PM
+    if (type === 'sunday' && !isSundayISO(date)) {
+      setDateBeforeSunday(date);
+      setDate(nextSundayISO(date));
+    } else if (type === 'weekday' && dateBeforeSunday) {
+      setDate(dateBeforeSunday);
+      setDateBeforeSunday(null);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -279,7 +307,11 @@ export default function OvertimeForm({ department }: { department: string }) {
       <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-4 space-y-4">
         <div>
           <label className="block text-sm font-semibold text-brand-navy mb-1.5">Ngày tăng ca</label>
-          <DateButton value={date} onChange={setDate} className="w-full justify-start" />
+          <DateButton
+            value={date}
+            onChange={(v) => { if (v) { setDate(v); setDateBeforeSunday(null); } }}
+            className="w-full justify-start"
+          />
         </div>
         <div>
           <span className="block text-sm font-semibold text-brand-navy mb-1.5">Loại ngày</span>
@@ -292,10 +324,7 @@ export default function OvertimeForm({ department }: { department: string }) {
                   <button
                     type="button"
                     // Click nút đang active -> thu gọn (dayType=null); click nút khác -> switch
-                    onClick={() => {
-                      setDayType(isActive ? null : type);
-                      if (!isActive) setShift('PM'); // mỗi lần chọn lại loại ngày → về mặc định PM
-                    }}
+                    onClick={() => chooseDayType(type)}
                     className={`py-2.5 rounded-md border text-sm font-medium transition ${
                       isActive
                         ? 'bg-brand-teal text-white border-brand-teal'
@@ -314,6 +343,16 @@ export default function OvertimeForm({ department }: { department: string }) {
             })}
           </div>
           {dayType === 'weekday' && <ShiftPicker value={shift} onChange={setShift} />}
+          {dayType === 'sunday' && !lechNgay && (
+            <p className="text-sm mt-1.5 text-brand-navy font-semibold text-center">
+              Ngày tăng ca: Chủ nhật {fmtDateVN(date)}
+            </p>
+          )}
+          {lechNgay && (
+            <p className="text-sm mt-1.5 text-red-700 bg-red-50 border border-red-200 rounded-md p-2 font-medium">
+              ⚠ {lechNgay} Kiểm tra lại ô Ngày tăng ca.
+            </p>
+          )}
           {!dayType && (
             <p className="text-xs mt-1.5 text-brand-teal font-medium">
               Chọn loại ngày để bắt đầu thêm nhân viên

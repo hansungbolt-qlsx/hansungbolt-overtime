@@ -64,3 +64,39 @@ export function toMinutes(t: string): number {
 export function overlaps(a1: string, a2: string, b1: string, b2: string): boolean {
   return toMinutes(a1) < toMinutes(b2) && toMinutes(b1) < toMinutes(a2);
 }
+
+// -----------------------------------------------------------------------------
+// NGÀY ↔ LOẠI NGÀY (anh Hữu 31/10/2026): Chủ nhật thường đăng ký từ hôm trước →
+// bấm "Chủ nhật" thì ngày tự nhảy sang Chủ nhật kế tiếp gần nhất. Ngày không khớp
+// loại ngày chỉ CẢNH BÁO + hỏi xác nhận (ngày lễ có thể đăng ký loại Chủ nhật).
+// -----------------------------------------------------------------------------
+
+/** 'YYYY-MM-DD' hợp lệ (đúng lịch) không. */
+export function isISODate(s: unknown): s is string {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+
+/** 'YYYY-MM-DD' là Chủ nhật không (tính theo lịch, không theo múi giờ máy). */
+export function isSundayISO(iso: string): boolean {
+  return new Date(`${iso}T00:00:00Z`).getUTCDay() === 0;
+}
+
+/** Chủ nhật gần nhất từ ngày này trở đi: Chủ nhật → giữ nguyên, ngày khác → Chủ nhật kế tiếp. */
+export function nextSundayISO(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + ((7 - d.getUTCDay()) % 7));
+  return d.toISOString().slice(0, 10);
+}
+
+/** Câu cảnh báo khi ngày không khớp loại ngày; khớp → null. */
+export function dayTypeMismatch(iso: string, dayType: DayType | null | undefined): string | null {
+  if (!dayType || !isISODate(iso)) return null;
+  const sun = isSundayISO(iso);
+  const [y, m, d] = iso.split('-');
+  const ngay = `${d}/${m}/${y}`;
+  if (dayType === 'sunday' && !sun) return `Ngày ${ngay} không phải Chủ nhật nhưng phiếu đang chọn loại "Chủ nhật".`;
+  if (dayType === 'weekday' && sun) return `Ngày ${ngay} là Chủ nhật nhưng phiếu đang chọn loại "Ngày thường".`;
+  return null;
+}
