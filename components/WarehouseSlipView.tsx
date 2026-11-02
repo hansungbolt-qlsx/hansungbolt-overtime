@@ -124,6 +124,12 @@ function ddmm(iso?: string | null): string {
   return `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 }
 
+/** 'YYYY-MM-DD' → 'DD/MM/YYYY' (ngày nhập gốc có thể cách nhiều năm nên cần năm). */
+function ddmmyyyy(iso?: string | null): string {
+  if (!iso || iso.length < 10) return '';
+  return `${ddmm(iso)}/${iso.slice(0, 4)}`;
+}
+
 const STATUS_UI: Record<string, { label: string; cls: string }> = {
   draft: { label: '📝 Đang ghi (chưa gửi)', cls: 'bg-slate-100 text-slate-700 border-slate-300' },
   pending: { label: '📤 Đã gửi — chờ duyệt', cls: 'bg-amber-50 text-amber-800 border-amber-300' },
@@ -1600,6 +1606,14 @@ export default function WarehouseSlipView(
                               title={sup}
                             >
                               · {supShort(sup)}
+                            </span>
+                          )}
+                          {/* Trả kho: kèm NGÀY NHẬP KHO GỐC của cuộn (anh Hữu 02/11/2026) —
+                              đầu đợt đã có ngày xuất line; app chính duyệt trả kho
+                              cũng lấy ngày nhập gốc này cho cuộn mới. */}
+                          {isReturn && c.received_at && (
+                            <span className="ml-1 text-xs text-brand-navy-soft whitespace-nowrap">
+                              · nhập {ddmmyyyy(c.received_at)}
                             </span>
                           )}
                         </span>
