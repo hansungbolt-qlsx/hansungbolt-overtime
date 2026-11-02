@@ -1608,12 +1608,13 @@ export default function WarehouseSlipView(
                               · {supShort(sup)}
                             </span>
                           )}
-                          {/* Trả kho: kèm NGÀY NHẬP KHO GỐC của cuộn (anh Hữu 02/11/2026) —
-                              đầu đợt đã có ngày xuất line; app chính duyệt trả kho
-                              cũng lấy ngày nhập gốc này cho cuộn mới. */}
-                          {isReturn && c.received_at && (
+                          {/* Trả kho: kèm NGÀY NHẬP NCC ĐẦU TIÊN của cuộn (anh Hữu 02/11/2026) —
+                              đầu đợt đã có ngày xuất line. Lấy `ngay_goc` (app chính tính
+                              bằng đúng hàm duyệt trả kho), KHÔNG dùng received_at: cuộn đã
+                              trả kho 1 lần còn mang ngày trả. Thiếu → không hiện. */}
+                          {isReturn && c.ngay_goc && (
                             <span className="ml-1 text-xs text-brand-navy-soft whitespace-nowrap">
-                              · nhập {ddmmyyyy(c.received_at)}
+                              · nhập {ddmmyyyy(c.ngay_goc)}
                             </span>
                           )}
                         </span>
