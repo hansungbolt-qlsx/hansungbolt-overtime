@@ -70,6 +70,7 @@ export async function middleware(req: NextRequest) {
 export const config = {
   matcher: [
     // api/overtime-export: agent kéo tăng ca (tự check Bearer AGENT_SECRET như print-jobs)
-    '/((?!_next/static|_next/image|favicon.ico|api/auth|api/labels/cleanup|api/registrations/cleanup|api/print-jobs|api/overtime-export).*)',
+    // api/version: mã phiên bản cho TaiBanMoi (04/11/2026) — không có dữ liệu, không cần đăng nhập
+    '/((?!_next/static|_next/image|favicon.ico|api/auth|api/labels/cleanup|api/registrations/cleanup|api/print-jobs|api/overtime-export|api/version).*)',
   ],
 };

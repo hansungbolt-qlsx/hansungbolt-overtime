@@ -1,18 +1,29 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { toTitleCase } from '@/lib/format';
 import DateButton from './DateButton';
 import { deptNeedsManualRpm } from '@/lib/departments';
 import { CO_ITEMS_DATALIST_ID, findCoItem } from '@/lib/co-items';
 import { CoItemsDatalist } from './CoCodes';
 import {
-  dayTypeMismatch, hasPerPersonHours, isSundayISO, nextSundayISO, presetOf, presetText, qtyHoursOf, type Shift,
+  dayTypeMismatch, hasPerPersonHours, isSundayISO, nextSundayISO, normShift, presetOf, presetText, qtyHoursOf,
+  shiftLabel, type Shift,
 } from '@/lib/overtime-shift';
 import ShiftPicker from './ShiftPicker';
-import HoursPicker, { DEFAULT_HOURS, HOURS_RULE_TEXT, hoursOf, type HoursChoice } from './HoursPicker';
+import EmployeeSelect from './EmployeeSelect';
+import { datDangNhapDo } from '@/lib/dang-nhap-do';
+import HoursPicker, {
+  DEFAULT_HOURS, HOURS_RULE_TEXT, hoursOf, theoNhanVien1, type HoursChoice,
+} from './HoursPicker';
 
 type Employee = { id: string; full_name: string; order_no: number };
+// Phiếu đã có của bộ phận trong ngày (API /api/registrations/department — tổ trưởng chỉ thấy bộ phận mình)
+type PhieuDaCo = {
+  id: string; day_type: string; shift?: string | null; created_at: string;
+  items_count: number; registered_by_name: string | null;
+};
 type PlanItem = { item_code: string; item_name: string | null };
 type Machine = { id: string; code: string; rpm: number; spec: string; items: PlanItem[] };
 
@@ -27,6 +38,8 @@ type EmployeeRow = {
   otherTask: string;
   // Số giờ tăng ca chiều của người này (anh Hữu 04/11/2026) — chỉ dùng khi ngày thường + PM
   hours: HoursChoice;
+  // Tổ trưởng đã tự bấm giờ cho ô này chưa. Chưa bấm → giờ đi theo Nhân viên 1 (xem theoNhanVien1)
+  hoursTouched: boolean;
 };
 
 const todayISO = () => {
@@ -45,7 +58,9 @@ const emptyRow = (): EmployeeRow => ({
   useOther: false,
   otherTask: '',
   hours: DEFAULT_HOURS,
+  hoursTouched: false,
 });
+
 
 // Màu chữ mã máy theo nhóm prefix — giúp dễ phân biệt RL/SM/CT/HD
 function machineCodeColor(code: string): string {
@@ -80,6 +95,11 @@ export default function OvertimeForm({ department }: { department: string }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // Phiếu đã gửi trong ngày đang chọn của bộ phận này (anh Hữu 04/11/2026): trùng ca → báo ngay từ đầu
+  const [phieuDaCo, setPhieuDaCo] = useState<{ date: string; list: PhieuDaCo[] } | null>(null);
+  const [dangXoaCu, setDangXoaCu] = useState(false);
+  // Phiếu vừa gửi xong từ form này → không báo đỏ "đã có phiếu", chỉ báo đã gửi + nút Sửa
+  const [vuaGuiId, setVuaGuiId] = useState<string | null>(null);
 
   // Giờ tính sản lượng (trừ break) — KHÁC giờ hiển thị. Khi dayType=null,
   // form NV/máy bị ẩn nên giá trị này không hiển thị; dùng 0 cho an toàn.
@@ -114,6 +134,57 @@ export default function OvertimeForm({ department }: { department: string }) {
       .finally(() => !cancelled && setLoadingOpts(false));
     return () => { cancelled = true; };
   }, [date]);
+
+  // Đang nhập dở (đã chọn tên / máy / Công việc khác) → TaiBanMoi không tự tải lại trang
+  const dangNhapDo = rows.some((r) => r.employeeId !== '' || r.checkedMachineIds.length > 0 || r.useOther);
+  useEffect(() => {
+    datDangNhapDo('dang-ky-tang-ca', dangNhapDo);
+    return () => datDangNhapDo('dang-ky-tang-ca', false);
+  }, [dangNhapDo]);
+
+  // Tải danh sách phiếu đã gửi của bộ phận cho ngày đang chọn. Tải lại khi: đổi ngày, vừa gửi/xóa phiếu,
+  // quay lại màn hình (tổ trưởng có thể xóa phiếu ở máy khác).
+  const taiPhieuDaCo = useCallback(async (ngay: string) => {
+    try {
+      const res = await fetch(`/api/registrations/department?date=${ngay}`, { cache: 'no-store' });
+      const d = await res.json();
+      if (res.ok) setPhieuDaCo({ date: ngay, list: d.registrations ?? [] });
+    } catch { /* lỗi mạng: không báo trước được, máy chủ vẫn chặn phiếu trùng lúc gửi */ }
+  }, []);
+  useEffect(() => {
+    let huy = false;
+    const tai = () => { if (!huy) taiPhieuDaCo(date); };
+    tai();
+    const khiHien = () => { if (document.visibilityState === 'visible') tai(); };
+    window.addEventListener('overtime:registered', tai);
+    window.addEventListener('overtime:deleted', tai);
+    document.addEventListener('visibilitychange', khiHien);
+    return () => {
+      huy = true;
+      window.removeEventListener('overtime:registered', tai);
+      window.removeEventListener('overtime:deleted', tai);
+      document.removeEventListener('visibilitychange', khiHien);
+    };
+  }, [date, taiPhieuDaCo]);
+  // Phiếu cùng ca đã có (cùng luật chặn của máy chủ: một bộ phận một ngày một phiếu mỗi ca)
+  const phieuTrung = dayType && phieuDaCo?.date === date
+    ? phieuDaCo.list.find((r) => normShift(r.day_type, r.shift) === normShift(dayType, shift)) ?? null
+    : null;
+
+  async function xoaPhieuCu(id: string) {
+    if (!window.confirm('Xóa phiếu cũ này? Thao tác không thể khôi phục.')) return;
+    setDangXoaCu(true);
+    try {
+      const res = await fetch(`/api/registrations/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        window.alert(`Xóa thất bại: ${data.error ?? res.statusText}`);
+        return;
+      }
+      // Báo danh sách phiếu bên dưới + chính form này tải lại
+      window.dispatchEvent(new CustomEvent('overtime:deleted', { detail: { id } }));
+    } finally { setDangXoaCu(false); }
+  }
 
   function toggleMachine(rowIdx: number, machineId: string) {
     setRows((prev) => {
@@ -183,8 +254,14 @@ export default function OvertimeForm({ department }: { department: string }) {
 
   function updateHours(rowIdx: number, hours: HoursChoice) {
     setRows((prev) => {
+      if (rowIdx === 0) {
+        // Đổi giờ Nhân viên 1 → các ô sau chưa tự bấm đi theo
+        const mau = theoNhanVien1(hours);
+        return prev.map((r, i) =>
+          i === 0 ? { ...r, hours } : r.hoursTouched ? r : { ...r, hours: mau });
+      }
       const next = [...prev];
-      next[rowIdx] = { ...next[rowIdx], hours };
+      next[rowIdx] = { ...next[rowIdx], hours, hoursTouched: true };
       return next;
     });
   }
@@ -205,7 +282,9 @@ export default function OvertimeForm({ department }: { department: string }) {
     return Number.isFinite(v) && v > 0 ? v : 0;
   }
 
-  function addRow() { setRows((prev) => [...prev, emptyRow()]); }
+  function addRow() {
+    setRows((prev) => [...prev, { ...emptyRow(), hours: theoNhanVien1(prev[0]?.hours) }]);
+  }
   function removeRow(idx: number) {
     setRows((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
   }
@@ -304,6 +383,7 @@ Vẫn gửi phiếu?`)) return;
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Không gửi được phiếu'); return; }
       setSuccess(`Đã gửi phiếu với ${data.items_count} dòng. (ID: ${data.id.slice(0, 8)}…)`);
+      setVuaGuiId(data.id);
       setRows([emptyRow()]);
       // Báo DepartmentRegistrationsList tự refetch (không cần user reload trang)
       if (typeof window !== 'undefined') {
@@ -377,7 +457,12 @@ Vẫn gửi phiếu?`)) return;
               );
             })}
           </div>
-          {dayType === 'weekday' && <ShiftPicker value={shift} onChange={setShift} />}
+          {dayType === 'weekday' && <ShiftPicker value={shift} onChange={setShift} pmGioRieng />}
+          {perPerson && (
+            <p className="text-xs mt-1.5 text-brand-navy-soft">
+              Chọn 3h / 4h / Khác cho từng người ở ô bên phải &quot;Nhân viên&quot;.
+            </p>
+          )}
           {dayType === 'sunday' && !lechNgay && (
             <p className="text-sm mt-1.5 text-brand-navy font-semibold text-center">
               Ngày tăng ca: Chủ nhật {fmtDateVN(date)}
@@ -395,6 +480,54 @@ Vẫn gửi phiếu?`)) return;
           )}
         </div>
       </div>
+
+      {/* Đã có phiếu cùng ca trong ngày → báo ngay, ẩn phần nhập (anh Hữu 04/11/2026) */}
+      {phieuTrung && phieuTrung.id === vuaGuiId && (
+        <div className="bg-green-50 border border-green-300 rounded-xl p-4 space-y-3">
+          <p className="text-sm font-semibold text-green-800">
+            Đã gửi phiếu {shiftLabel(phieuTrung.day_type, phieuTrung.shift)} ngày {fmtDateVN(date)} ({phieuTrung.items_count} dòng).
+            Cần đổi người, máy hoặc số giờ thì bấm Sửa phiếu.
+          </p>
+          <Link
+            href={`/dashboard/registrations/${phieuTrung.id}/edit`}
+            className="block text-center bg-[#f59e0b] hover:bg-[#d97706] text-white text-sm font-semibold py-2.5 rounded-md transition"
+          >
+            Sửa phiếu
+          </Link>
+        </div>
+      )}
+      {phieuTrung && phieuTrung.id !== vuaGuiId && (
+        <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 space-y-3">
+          <p className="text-sm font-bold text-red-700">
+            ⚠ Ngày {fmtDateVN(date)} bộ phận {department} đã có phiếu {shiftLabel(phieuTrung.day_type, phieuTrung.shift)}
+          </p>
+          <p className="text-sm text-red-800">
+            Phiếu gửi lúc {new Date(phieuTrung.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+            {phieuTrung.registered_by_name ? ` bởi ${toTitleCase(phieuTrung.registered_by_name)}` : ''}
+            {' '}({phieuTrung.items_count} dòng). Mỗi ca chỉ được một phiếu nên không gửi thêm phiếu mới được.
+          </p>
+          <ul className="text-sm text-red-800 list-disc pl-5 space-y-0.5">
+            <li>Đổi người, máy hoặc số giờ: bấm <strong>Sửa phiếu cũ</strong>.</li>
+            <li>Làm lại từ đầu: bấm <strong>Xóa phiếu cũ</strong> rồi đăng ký lại.</li>
+          </ul>
+          <div className="flex gap-2">
+            <Link
+              href={`/dashboard/registrations/${phieuTrung.id}/edit`}
+              className="flex-1 text-center bg-[#f59e0b] hover:bg-[#d97706] text-white text-sm font-semibold py-2.5 rounded-md transition"
+            >
+              Sửa phiếu cũ
+            </Link>
+            <button
+              type="button"
+              onClick={() => xoaPhieuCu(phieuTrung.id)}
+              disabled={dangXoaCu}
+              className="flex-1 bg-white hover:bg-red-50 border border-red-400 text-red-600 text-sm font-semibold py-2.5 rounded-md transition disabled:opacity-60"
+            >
+              {dangXoaCu ? 'Đang xóa...' : 'Xóa phiếu cũ'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {loadingOpts && (
         <p className="text-sm text-brand-navy-soft text-center py-4">Đang tải dữ liệu...</p>
@@ -423,7 +556,7 @@ Vẫn gửi phiếu?`)) return;
       {manualRpm && (
         <CoItemsDatalist />
       )}
-      {!loadingOpts && machines.length > 0 && dayType && (
+      {!loadingOpts && machines.length > 0 && dayType && !phieuTrung && (
         <>
           <div className="space-y-4">
             {rows.map((row, idx) => {
@@ -465,18 +598,11 @@ Vẫn gửi phiếu?`)) return;
                   <label className="block text-xs font-semibold text-brand-navy mb-1">
                     Tên nhân viên
                   </label>
-                  <select
+                  <EmployeeSelect
                     value={row.employeeId}
-                    onChange={(e) => updateEmployee(idx, e.target.value)}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-md text-brand-navy bg-white focus:outline-none focus:ring-2 focus:ring-brand-teal focus:border-transparent"
-                  >
-                    <option value="">— Chọn nhân viên —</option>
-                    {employees.map((e) => (
-                      <option key={e.id} value={e.id}>
-                        {e.order_no}. {toTitleCase(e.full_name)}
-                      </option>
-                    ))}
-                  </select>
+                    employees={employees}
+                    onChange={(v) => updateEmployee(idx, v)}
+                  />
                 </div>
 
                 {/* Machine checkboxes */}
@@ -562,7 +688,7 @@ Vẫn gửi phiếu?`)) return;
                                   placeholder={manualRpm ? "Gõ mã hàng — chọn gợi ý để tự điền RPM" : "Nhập mã hàng"}
                                   list={manualRpm ? CO_ITEMS_DATALIST_ID : undefined}
                                   autoComplete="off"
-                                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-brand-teal bg-white"
+                                  className="w-full px-2 py-1 text-base border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-brand-teal bg-white"
                                 />
                               </div>
                             )}
@@ -576,7 +702,7 @@ Vẫn gửi phiếu?`)) return;
                                   value={row.machineRpm[machine.id] ?? ''}
                                   onChange={(e) => updateMachineRpm(idx, machine.id, e.target.value)}
                                   placeholder="Nhập RPM"
-                                  className="w-full px-2 py-1 text-xs border border-amber-300 rounded focus:outline-none focus:ring-1 focus:ring-amber-500 bg-amber-50"
+                                  className="w-full px-2 py-1 text-base border border-amber-300 rounded focus:outline-none focus:ring-1 focus:ring-amber-500 bg-amber-50"
                                 />
                               </div>
                             )}
@@ -660,7 +786,7 @@ Vẫn gửi phiếu?`)) return;
         </div>
       )}
 
-      {!loadingOpts && machines.length > 0 && dayType && (
+      {!loadingOpts && machines.length > 0 && dayType && !phieuTrung && (
         <button
           type="button"
           onClick={submit}

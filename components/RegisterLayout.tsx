@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { datDangNhapDo } from '@/lib/dang-nhap-do';
 import OvertimeForm from './OvertimeForm';
 import MaterialLabelsUpload from './MaterialLabelsUpload';
 import OvertimeSummaryCard from './OvertimeSummaryCard';
@@ -115,6 +116,11 @@ export default function RegisterLayout({
    * Nên cờ phải chạy ngược lên đây thì mới chặn được ĐÚNG LÚC — trước khi đổi tab.
    */
   const [khoChuaLuu, setKhoChuaLuu] = useState('');
+  // Phiếu kho còn dòng chưa lưu → TaiBanMoi không tự tải lại trang (anh Hữu 04/11/2026)
+  useEffect(() => {
+    datDangNhapDo('phieu-kho', khoChuaLuu !== '');
+    return () => datDangNhapDo('phieu-kho', false);
+  }, [khoChuaLuu]);
 
   const tabs: Array<{ key: Tab; label: string; color: 'teal' | 'navy' | 'green' | 'red' }> = [];
   if (showOvertimeTab) tabs.push({ key: 'overtime', label: 'Đăng ký tăng ca', color: 'teal' });

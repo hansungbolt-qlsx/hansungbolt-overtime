@@ -5,6 +5,7 @@ import { getSession } from '@/lib/auth-server';
 import LogoutButton from '@/components/LogoutButton';
 import ChangePasswordButton from '@/components/ChangePasswordButton';
 import RegisterLayout from '@/components/RegisterLayout';
+import TaiBanMoi from '@/components/TaiBanMoi';
 import { toTitleCase } from '@/lib/format';
 
 export default async function RegisterPage() {
@@ -19,6 +20,8 @@ export default async function RegisterPage() {
 
   return (
     <main className="min-h-screen bg-brand-pattern p-4">
+      {/* Mở / quay lại app → tự tải bản mới nhất (anh Hữu 04/11/2026) */}
+      <TaiBanMoi />
       <div className="max-w-lg mx-auto">
         <header className="flex justify-between items-center mb-5 gap-3">
           <div className="flex items-center gap-2 min-w-0 flex-1">

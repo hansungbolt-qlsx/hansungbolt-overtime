@@ -7,10 +7,17 @@ import {
 // Chọn số giờ tăng ca CHIỀU cho từng nhân viên (anh Hữu 04/11/2026): 3h / 4h / Khác.
 // Bắt đầu luôn 16:30, giờ kết thúc tự tính và hiện ngay dưới nút để tổ trưởng kiểm lại.
 // Dùng chung cho form đăng ký (OvertimeForm) và form sửa phiếu của tổ trưởng (LeaderEditForm).
+// 04/11 chiều: nút to hơn ~20% cho dễ bấm; ô nhập "Khác" chữ 16px — dưới 16px iPhone tự phóng to trang.
 
 export type HoursChoice = { choice: 3 | 4 | 'other'; otherText: string };
 
 export const DEFAULT_HOURS: HoursChoice = { choice: 3, otherText: '' };
+
+/** Giờ mặc định cho các nhân viên thêm sau (anh Hữu 04/11/2026): Nhân viên 1 chọn 4h → ô sau mặc định 4h;
+ *  Nhân viên 1 chọn 3h hoặc Khác → ô sau mặc định 3h. Ô nào tổ trưởng đã tự bấm thì giữ nguyên. */
+export function theoNhanVien1(h: HoursChoice | null | undefined): HoursChoice {
+  return h?.choice === 4 ? { choice: 4, otherText: '' } : DEFAULT_HOURS;
+}
 
 /** Số giờ đang chọn; "Khác" gõ sai/thiếu → null. */
 export function hoursOf(h: HoursChoice): number | null {
@@ -51,7 +58,7 @@ export default function HoursPicker({
               key={q}
               type="button"
               onClick={() => onChange({ choice: q, otherText: value.otherText })}
-              className={`px-2.5 py-1 rounded-md border text-xs font-bold transition ${
+              className={`px-3 py-[5px] rounded-md border text-sm font-bold transition ${
                 active
                   ? 'bg-brand-teal text-white border-brand-teal'
                   : 'bg-white text-brand-navy border-gray-300 hover:border-brand-teal'
@@ -64,7 +71,7 @@ export default function HoursPicker({
         <button
           type="button"
           onClick={() => onChange({ choice: 'other', otherText: value.otherText })}
-          className={`px-2.5 py-1 rounded-md border text-xs font-bold transition ${
+          className={`px-3 py-[5px] rounded-md border text-sm font-bold transition ${
             !kept && value.choice === 'other'
               ? 'bg-brand-teal text-white border-brand-teal'
               : 'bg-white text-brand-navy border-gray-300 hover:border-brand-teal'
@@ -87,7 +94,7 @@ export default function HoursPicker({
               value={value.otherText}
               onChange={(e) => onChange({ choice: 'other', otherText: e.target.value })}
               placeholder="Số giờ"
-              className={`w-16 px-2 py-0.5 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-brand-teal bg-white ${
+              className={`w-20 px-2 py-1 text-base border rounded focus:outline-none focus:ring-1 focus:ring-brand-teal bg-white ${
                 typed && h == null ? 'border-red-400' : 'border-gray-300'
               }`}
             />

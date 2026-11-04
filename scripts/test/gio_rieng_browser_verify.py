@@ -85,8 +85,17 @@ def chan(route):
                           body=json.dumps({"id": "gia-lap-00000000", "items_count": 0}))
         else:
             route.fulfill(status=200, content_type="application/json", body=json.dumps({"ok": True}))
+    elif "/api/registrations/department" in req.url:
+        # 04/11 chiều: form ẩn phần nhập khi ngày đã có phiếu cùng ca → giả lập "chưa có phiếu" (chỉ đọc)
+        route.fulfill(status=200, content_type="application/json", body=json.dumps({"registrations": []}))
     else:
         route.continue_()
+
+
+def chon_nv(pg, the, i):
+    """Ô chọn tên mới (EmployeeSelect, 04/11 chiều) thay <select>: mở khung → bấm tên thứ i (đếm từ 1 như select cũ)."""
+    the.locator('button[aria-haspopup="listbox"]').click()
+    pg.get_by_role("dialog", name="Chọn nhân viên").get_by_role("option").nth(i - 1).click()
 
 
 def so_luong(nut):
@@ -113,8 +122,7 @@ with sync_playwright() as pw:
     kiem(the1.get_by_text("16:30 – 19:30").is_visible(), "mặc định 3h → 16:30 – 19:30")
     pg.screenshot(path=str(ANH / "1_mac_dinh_3h.png"))
 
-    sel = the1.locator("select")
-    sel.select_option(index=1)
+    chon_nv(pg, the1, 1)
     may = the1.locator("div.max-h-\\[220px\\] div.grid button").first
     q3 = so_luong(may)
     may.click()
@@ -141,7 +149,7 @@ with sync_playwright() as pw:
 
     pg.get_by_role("button", name="+ Thêm nhân viên").click()
     the2 = pg.locator("div.rounded-xl", has=pg.get_by_text("Nhân viên 2", exact=True)).last
-    the2.locator("select").select_option(index=2)
+    chon_nv(pg, the2, 2)
     the2.locator("div.max-h-\\[220px\\] div.grid button").first.click()
     kiem(the2.get_by_text("16:30 – 19:30").is_visible(), "nhân viên 2 mặc định 3h")
     pg.screenshot(path=str(ANH / "4_hai_nguoi.png"), full_page=True)

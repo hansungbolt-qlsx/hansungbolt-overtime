@@ -7,6 +7,7 @@ import {
   dayTypeMismatch, isSundayISO, nextSundayISO, presetOf, presetText, type Shift,
 } from '@/lib/overtime-shift';
 import ShiftPicker from './ShiftPicker';
+import EmployeeSelect from './EmployeeSelect';
 
 type Employee = { id: string; full_name: string; order_no: number };
 
@@ -214,18 +215,11 @@ Vẫn gửi phiếu?`)) return;
                   <label className="block text-xs font-semibold text-brand-navy mb-1">
                     Tên nhân viên
                   </label>
-                  <select
+                  <EmployeeSelect
                     value={row.employeeId}
-                    onChange={(e) => updateEmployee(idx, e.target.value)}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-md text-brand-navy bg-white focus:outline-none focus:ring-2 focus:ring-brand-teal focus:border-transparent"
-                  >
-                    <option value="">— Chọn nhân viên —</option>
-                    {employees.map((e) => (
-                      <option key={e.id} value={e.id}>
-                        {e.order_no}. {toTitleCase(e.full_name)}
-                      </option>
-                    ))}
-                  </select>
+                    employees={employees}
+                    onChange={(v) => updateEmployee(idx, v)}
+                  />
                 </div>
 
                 <div>

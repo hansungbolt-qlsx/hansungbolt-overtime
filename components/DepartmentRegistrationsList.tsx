@@ -100,6 +100,18 @@ export default function DepartmentRegistrationsList({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
 
+  // Phiếu bị xóa từ khung cảnh báo trùng ca của form đăng ký → tải lại danh sách
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = (e: Event) => {
+      if ((e as CustomEvent<{ from?: string }>).detail?.from === 'list') return; // chính danh sách xóa, đã tải lại
+      loadRegs();
+    };
+    window.addEventListener('overtime:deleted', handler);
+    return () => window.removeEventListener('overtime:deleted', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date]);
+
   async function handleDelete(id: string) {
     if (!confirm('Xóa phiếu này? Thao tác không thể khôi phục.')) return;
     setDeletingId(id);
@@ -111,6 +123,8 @@ export default function DepartmentRegistrationsList({
         return;
       }
       await loadRegs();
+      // Báo form đăng ký: phiếu cũ đã xóa → bỏ cảnh báo trùng ca (anh Hữu 04/11/2026)
+      window.dispatchEvent(new CustomEvent('overtime:deleted', { detail: { id, from: 'list' } }));
     } finally {
       setDeletingId(null);
     }

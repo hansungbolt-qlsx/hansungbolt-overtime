@@ -12,8 +12,9 @@ import {
   qtyHoursOf, shiftLabel, type Shift,
 } from '@/lib/overtime-shift';
 import ShiftPicker from './ShiftPicker';
+import EmployeeSelect from './EmployeeSelect';
 import HoursPicker, {
-  DEFAULT_HOURS, HOURS_RULE_TEXT, choiceFromHours, hoursOf, type HoursChoice,
+  DEFAULT_HOURS, HOURS_RULE_TEXT, choiceFromHours, hoursOf, theoNhanVien1, type HoursChoice,
 } from './HoursPicker';
 import DateButton from './DateButton';
 
@@ -59,6 +60,8 @@ type EmployeeRow = {
   // Giờ đang lưu của người này lúc mở phiếu (số giờ + chữ 'HH:MM–HH:MM'); dòng mới = null
   initHours: number | null;
   initText: string | null;
+  // Ô mới thêm, tổ trưởng chưa tự bấm giờ → giờ đi theo Nhân viên 1 (anh Hữu 04/11/2026)
+  autoHours?: boolean;
 };
 
 const emptyRow = (): EmployeeRow => ({
@@ -358,15 +361,28 @@ export default function LeaderEditForm({
   function updateEmployee(rowIdx: number, employeeId: string) {
     setRows((prev) => {
       const next = [...prev];
-      next[rowIdx] = { ...next[rowIdx], employeeId };
+      const row = next[rowIdx];
+      // Ô mới thêm mà chọn trúng người ĐÃ có trên phiếu → lấy đúng giờ của người đó (một người một giờ),
+      // không lấy giờ mặc định theo Nhân viên 1
+      const cu = row.autoHours
+        ? prev.find((r, i) => i !== rowIdx && !r.autoHours && r.employeeId === employeeId)
+        : undefined;
+      next[rowIdx] = cu
+        ? { ...row, employeeId, hours: cu.hours, initHours: cu.initHours, initText: cu.initText, autoHours: false }
+        : { ...row, employeeId };
       return next;
     });
   }
 
   function updateHours(rowIdx: number, hours: HoursChoice) {
     setRows((prev) => {
+      if (rowIdx === 0) {
+        // Đổi giờ Nhân viên 1 → các ô mới thêm chưa tự bấm đi theo
+        const mau = theoNhanVien1(hours);
+        return prev.map((r, i) => (i === 0 ? { ...r, hours, autoHours: false } : r.autoHours ? { ...r, hours: mau } : r));
+      }
       const next = [...prev];
-      next[rowIdx] = { ...next[rowIdx], hours };
+      next[rowIdx] = { ...next[rowIdx], hours, autoHours: false };
       return next;
     });
   }
@@ -388,7 +404,11 @@ export default function LeaderEditForm({
   }
 
   function addRow() {
-    setRows((prev) => [...prev, emptyRow()]);
+    // Ô mới: giờ mặc định theo Nhân viên 1 (4h → 4h; 3h hoặc Khác → 3h)
+    setRows((prev) => [
+      ...prev,
+      { ...emptyRow(), hours: theoNhanVien1(prev[0] ? shownHours(prev[0]) : null), autoHours: true },
+    ]);
   }
 
   function removeRow(idx: number) {
@@ -580,7 +600,7 @@ Vẫn lưu phiếu?`)) return;
               </button>
             ))}
           </div>
-          {dayType === 'weekday' && <ShiftPicker value={shift} onChange={setShift} />}
+          {dayType === 'weekday' && <ShiftPicker value={shift} onChange={setShift} pmGioRieng />}
           <p className="text-xs text-brand-navy-soft mt-1.5">
             {dayType === 'sunday' && <>{timeLabel} · </>}
             {perPerson
@@ -676,18 +696,11 @@ Vẫn lưu phiếu?`)) return;
                     <label className="block text-xs font-semibold text-brand-navy mb-1">
                       Tên nhân viên
                     </label>
-                    <select
+                    <EmployeeSelect
                       value={row.employeeId}
-                      onChange={(e) => updateEmployee(idx, e.target.value)}
-                      className="w-full px-3 py-2.5 border border-gray-300 rounded-md text-brand-navy bg-white focus:outline-none focus:ring-2 focus:ring-brand-teal focus:border-transparent"
-                    >
-                      <option value="">— Chọn nhân viên —</option>
-                      {employees.map((e) => (
-                        <option key={e.id} value={e.id}>
-                          {e.order_no}. {toTitleCase(e.full_name)}
-                        </option>
-                      ))}
-                    </select>
+                      employees={employees}
+                      onChange={(v) => updateEmployee(idx, v)}
+                    />
                   </div>
 
                   <div>
@@ -782,7 +795,7 @@ Vẫn lưu phiếu?`)) return;
                                     placeholder={manualRpm ? "Gõ mã hàng — chọn gợi ý để tự điền RPM" : "Nhập mã hàng"}
                                   list={manualRpm ? CO_ITEMS_DATALIST_ID : undefined}
                                   autoComplete="off"
-                                    className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-brand-teal bg-white"
+                                    className="w-full px-2 py-1 text-base border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-brand-teal bg-white"
                                   />
                                 </div>
                               )}
@@ -796,7 +809,7 @@ Vẫn lưu phiếu?`)) return;
                                     value={row.machineRpm[machine.id] ?? ''}
                                     onChange={(e) => updateMachineRpm(idx, machine.id, e.target.value)}
                                     placeholder="Nhập RPM"
-                                    className="w-full px-2 py-1 text-xs border border-amber-300 rounded focus:outline-none focus:ring-1 focus:ring-amber-500 bg-amber-50"
+                                    className="w-full px-2 py-1 text-base border border-amber-300 rounded focus:outline-none focus:ring-1 focus:ring-amber-500 bg-amber-50"
                                   />
                                 </div>
                               )}
