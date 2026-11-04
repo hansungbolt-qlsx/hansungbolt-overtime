@@ -7,7 +7,7 @@
  4) Danh sách chọn tên: mỗi tên một dòng
  5) Nút PM ghi "Bắt đầu 16:30" (không ghi 16:30 – 19:30 (3h))
  6) Ô nhập "Khác" chữ 16px (iPhone không tự phóng to)
- 7) Mở / quay lại app → tự tải bản mới; đang nhập dở → chỉ hiện thanh báo
+ 7) Mở / quay lại app → có bản mới thì tự tải lại (không tải theo thời gian); đang nhập dở → chỉ hiện thanh báo
 
 🛑 KHÔNG ghi gì lên Supabase: mọi POST / PATCH / DELETE bị CHẶN NGAY TRONG TRÌNH DUYỆT (page.route).
    Danh sách "phiếu đã có" (GET /api/registrations/department) được GIẢ LẬP để thử cả có/không trùng ca;
@@ -273,16 +273,15 @@ with sync_playwright() as pw:
     kiem(tai["n"] == 1, f"7) cùng bản → không tự tải lại (lần tải {tai['n']})")
     an_hien(p7, "hidden"); p7.clock.fast_forward("02:00"); an_hien(p7, "visible"); p7.wait_for_timeout(2500)
     kiem(tai["n"] == 1, "7) rời app 2 phút, cùng bản → không tải lại")
-    an_hien(p7, "hidden"); p7.clock.fast_forward("11:00"); an_hien(p7, "visible")
-    p7.wait_for_timeout(4000)
-    kiem(tai["n"] == 2, f"7) rời app 11 phút → tự tải lại trang (lần tải {tai['n']})")
-    p7.get_by_role("button", name="Ngày thường").wait_for(timeout=120000)
+    an_hien(p7, "hidden"); p7.clock.fast_forward("02:00:00"); an_hien(p7, "visible")
+    p7.wait_for_timeout(3000)
+    kiem(tai["n"] == 1, f"7) rời app 2 giờ, cùng bản → KHÔNG tải lại (bỏ luật 10 phút) (lần tải {tai['n']})")
     TT["ban"] = "test-b"
     an_hien(p7, "hidden"); p7.clock.fast_forward("00:30"); an_hien(p7, "visible")
     p7.wait_for_timeout(5000)
-    kiem(tai["n"] == 3, f"7) có bản mới (test-b) → tự tải lại 1 lần (lần tải {tai['n']})")
+    kiem(tai["n"] == 2, f"7) có bản mới (test-b) → quay lại app là tự tải lại 1 lần (lần tải {tai['n']})")
     p7.wait_for_timeout(3000)
-    kiem(tai["n"] == 3 and p7.get_by_text(re.compile("Đã có bản mới của app")).is_visible(),
+    kiem(tai["n"] == 2 and p7.get_by_text(re.compile("Đã có bản mới của app")).is_visible(),
          "7) chống lặp: tải rồi mà máy chủ vẫn báo khác → không tải nữa, hiện thanh báo")
     p7.close()
 
@@ -300,7 +299,7 @@ with sync_playwright() as pw:
     TT["ban"] = "test-c"
     an_hien(p8, "hidden"); p8.clock.fast_forward("11:00"); an_hien(p8, "visible")
     p8.wait_for_timeout(4000)
-    kiem(tai8["n"] == 1, f"7) đang nhập dở + có bản mới + rời 11 phút → KHÔNG tự tải lại (lần tải {tai8['n']})")
+    kiem(tai8["n"] == 1, f"7) đang nhập dở + có bản mới → KHÔNG tự tải lại (lần tải {tai8['n']})")
     kiem(p8.get_by_text(re.compile("Đã có bản mới của app")).is_visible(), "7) đang nhập dở → hiện thanh báo + nút Tải lại")
     kiem(the_nv(p8, 1).locator('button[aria-haspopup="listbox"]').inner_text().strip() != "— Chọn nhân viên —",
          "7) dữ liệu đang nhập còn nguyên")
@@ -321,6 +320,10 @@ with sync_playwright() as pw:
     an_hien(p9, "hidden"); p9.clock.fast_forward("11:00"); an_hien(p9, "visible")
     p9.wait_for_timeout(3000)
     kiem(tai9["n"] == 1, "7) mất mạng (không hỏi được máy chủ) → không tải lại (tránh trang lỗi)")
+    TT["ban_loi"] = False; TT["ban"] = "test-d"
+    p9.evaluate("() => window.dispatchEvent(new PageTransitionEvent('pageshow', {persisted: true}))")
+    p9.wait_for_timeout(5000)
+    kiem(tai9["n"] == 2, f"7) trang khôi phục từ bộ nhớ (mở lại tab) + có bản mới → tự tải lại (lần tải {tai9['n']})")
     p9.close()
     TT["ban_loi"] = False
 

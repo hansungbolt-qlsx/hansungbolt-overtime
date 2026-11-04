@@ -9,15 +9,14 @@ import { coDangNhapDo } from '@/lib/dang-nhap-do';
 //
 // Cách làm: mỗi bản build mang mã phiên bản (NEXT_PUBLIC_BAN_DUNG, đặt trong next.config.ts);
 // /api/version trả mã của bản đang chạy trên máy chủ. Mở trang / quay lại app thì so hai mã:
-//   - Khác mã (có bản mới)            → tự tải lại trang.
-//   - Rời app ≥ 10 phút rồi quay lại   → tự tải lại trang (lấy luôn dữ liệu mới nhất).
+//   - Khác mã (có bản mới) → tự tải lại trang. Cùng mã → không làm gì (anh Hữu 04/11/2026: chỉ cần
+//     tải khi có bản mới, KHÔNG tải lại theo thời gian rời app).
 //   - Đang nhập dở phiếu (lib/dang-nhap-do) → KHÔNG tự tải lại (mất dữ liệu); có bản mới thì hiện
 //     thanh báo + nút "Tải lại" để tổ trưởng gửi/lưu xong rồi tự bấm.
 //   - Mất mạng / máy chủ lỗi → không làm gì (tải lại lúc mất mạng chỉ ra trang lỗi).
 // Chống lặp: đã tự tải lại vì mã X mà vẫn thấy khác X thì không tải nữa, chỉ hiện thanh báo.
 
 const BAN_DUNG = process.env.NEXT_PUBLIC_BAN_DUNG || 'local';
-const VANG_LAU_MS = 10 * 60 * 1000;
 const KHOA_CHONG_LAP = 'hsb-da-tai-ban';
 
 async function hoiMayChu(): Promise<{ ok: boolean; banMoi: string | null }> {
@@ -44,10 +43,9 @@ export default function TaiBanMoi() {
   const [coBanMoi, setCoBanMoi] = useState(false);
 
   useEffect(() => {
-    let anLuc: number | null = document.visibilityState === 'hidden' ? Date.now() : null;
     let dangKiem = false;
 
-    const kiem = async (vangLau: boolean) => {
+    const kiem = async () => {
       if (dangKiem) return;
       dangKiem = true;
       try {
@@ -61,23 +59,17 @@ export default function TaiBanMoi() {
           if (docKhoa() === banMoi) { setCoBanMoi(true); return; } // đã tải lại vì bản này rồi — chống lặp
           ghiKhoa(banMoi);
           window.location.reload();
-          return;
         }
-        if (vangLau) window.location.reload();
       } finally {
         dangKiem = false;
       }
     };
 
-    kiem(false);
+    kiem();
     // Trang được trình duyệt khôi phục nguyên từ bộ nhớ (bấm Quay lại / mở lại tab) = mở lại app
-    const khiHienLai = (e: PageTransitionEvent) => { if (e.persisted) kiem(true); };
-    const khiDoiTrangThai = () => {
-      if (document.visibilityState === 'hidden') { anLuc = Date.now(); return; }
-      const vangLau = anLuc != null && Date.now() - anLuc >= VANG_LAU_MS;
-      anLuc = null;
-      kiem(vangLau);
-    };
+    const khiHienLai = (e: PageTransitionEvent) => { if (e.persisted) kiem(); };
+    // Quay lại app (mở điện thoại, chuyển từ Zalo về...) → hỏi máy chủ có bản mới không
+    const khiDoiTrangThai = () => { if (document.visibilityState === 'visible') kiem(); };
     window.addEventListener('pageshow', khiHienLai);
     document.addEventListener('visibilitychange', khiDoiTrangThai);
     return () => {
