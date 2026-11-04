@@ -1,7 +1,11 @@
 // Kiểm tăng ca AM/PM (anh Hữu 21/10/2026) — CHỈ ĐỌC Supabase (service key ở .env.local), không ghi gì.
 //   npx tsx scripts/test/tang_ca_am_pm_verify.ts
-// 1) Hồi quy: luật giờ MỚI (MAX trong ca, cộng các ca) trên TOÀN BỘ phiếu thật phải ra
-//    y hệt luật CŨ (MAX cả ngày) — vì chưa ngày nào một người có 2 ca.
+// 1) Hồi quy trên TOÀN BỘ phiếu thật:
+//    a) hàm thật = luật tính lại ĐỘC LẬP ở đây (MAX trong từng ca → cộng các ca), mọi ô;
+//    b) ô người × ngày chỉ MỘT ca → phải y hệt luật CŨ (MAX cả ngày);
+//    c) ô có 2 ca (AM + PM) → liệt kê ra, giờ = tổng 2 ca.
+//    (Sửa 04/11/2026: bản cũ giả định "chưa ngày nào một người có 2 ca" — từ 21/10 đã có
+//     người làm cả AM + PM nên bài báo sai dù app đúng; anh Hữu đồng ý sửa bài.)
 // 2) Trang Tổng hợp giờ: bản mới (gọi lib) = bản cũ (luật chép riêng) cho từng tháng có dữ liệu.
 // 3) Ca kép giả lập: AM 1,5h + PM 3h = 4,5h …
 // 4) Hàm lib: giờ mặc định, giờ tính sản lượng, chồng giờ.
@@ -35,8 +39,34 @@ function oldHours(regs: R[], items: I[]) {
   }
   return m;
 }
+// ---- luật KỲ VỌNG (viết lại độc lập, không gọi lib): MAX theo người × ngày × ca → cộng các ca ----
+function shiftOf(r: R) { return r.day_type === 'sunday' ? 'PM' : (r.shift === 'AM' ? 'AM' : 'PM'); }
+function expHours(regs: R[], items: I[]) {
+  const regMap = new Map(regs.map((r) => [r.id, r]));
+  const perShift = new Map<string, Map<string, Map<string, number>>>();   // emp → date → ca → MAX
+  for (const it of items) {
+    const reg = regMap.get(it.registration_id);
+    if (!reg) continue;
+    const h = Number(it.duration_hours ?? reg.duration_hours ?? (reg.day_type === 'sunday' ? 8 : 3));
+    if (!perShift.has(it.employee_id)) perShift.set(it.employee_id, new Map());
+    const dm = perShift.get(it.employee_id)!;
+    if (!dm.has(reg.overtime_date)) dm.set(reg.overtime_date, new Map());
+    const sm = dm.get(reg.overtime_date)!;
+    const ca = shiftOf(reg);
+    if (h > (sm.get(ca) ?? 0)) sm.set(ca, h);
+    else if (!sm.has(ca)) sm.set(ca, h);
+  }
+  const tong = new Map<string, Map<string, number>>();
+  for (const [emp, dm] of perShift) {
+    const out = new Map<string, number>();
+    for (const [d, sm] of dm) out.set(d, [...sm.values()].reduce((a, b) => a + b, 0));
+    tong.set(emp, out);
+  }
+  return { tong, perShift };
+}
 // ---- trang Tổng hợp CŨ (chép nguyên bản HEAD app/api/registrations/summary/route.ts) ----
 function oldSummary(regs: R[], items: I[]) {
+  const ky = expHours(regs, items).tong;   // giờ mỗi ô theo luật kỳ vọng (AM + PM cộng)
   const regMap = new Map(regs.map((r) => [r.id, { date: r.overtime_date, dayType: r.day_type, durationHours: Number(r.duration_hours ?? 0) }]));
   const edh = new Map<string, Map<string, { hours: number; dayType: string }>>();
   for (const it of items) {
@@ -54,8 +84,9 @@ function oldSummary(regs: R[], items: I[]) {
     const bd: Record<string, number> = {};
     for (const [d, v] of dm) {
       if (v.dayType === 'sunday') su++; else wk++;
-      tot += v.hours;
-      bd[d] = v.hours;
+      const h = ky.get(emp)!.get(d)!;
+      tot += h;
+      bd[d] = h;
     }
     out.set(emp, JSON.stringify({ wk, su, tot: Number(tot.toFixed(2)), bd: Object.fromEntries(Object.entries(bd).sort()) }));
   }
@@ -110,19 +141,36 @@ async function main() {
   }
   console.log(`   phiếu AM: ${regs.filter((r) => r.shift === 'AM').map((r) => `${r.overtime_date} ${r.department}`).join(', ') || '(không có)'}`);
   const oldM = oldHours(regs, items);
+  const { tong: expM, perShift } = expHours(regs, items);
   const { empDateMap: newM } = buildEmpDateHours(regs, items);
-  let cells = 0, diff = 0, sumOld = 0, sumNew = 0;
-  for (const [emp, dm] of oldM) for (const [d, h] of dm) {
-    cells++; sumOld += h;
+  // a) hàm thật = luật kỳ vọng, mọi ô
+  let cells = 0, diff = 0, sumExp = 0, sumNew = 0;
+  for (const [emp, dm] of expM) for (const [d, h] of dm) {
+    cells++; sumExp += h;
     const n = newM.get(emp)?.get(d);
-    if (n !== h) { diff++; console.log(`   lệch ${emp.slice(0, 8)} ${d}: cũ ${h} mới ${n}`); }
+    if (n !== h) { diff++; console.log(`   lệch ${emp.slice(0, 8)} ${d}: kỳ vọng ${h} hàm thật ${n}`); }
   }
   for (const [emp, dm] of newM) for (const [d, h] of dm) {
     sumNew += h;
-    if (!oldM.get(emp)?.has(d)) { diff++; console.log(`   ô MỚI thừa ${emp.slice(0, 8)} ${d} = ${h}`); }
+    if (!expM.get(emp)?.has(d)) { diff++; console.log(`   ô THỪA ${emp.slice(0, 8)} ${d} = ${h}`); }
   }
-  console.log(`   ${cells} ô người × ngày · tổng giờ cũ ${sumOld} · mới ${sumNew} · lệch ${diff}`);
-  ok(diff === 0 && sumOld === sumNew && cells > 0, 'luật mới phải ra y hệt luật cũ trên dữ liệu thật');
+  console.log(`   ${cells} ô người × ngày · tổng giờ kỳ vọng ${sumExp} · hàm thật ${sumNew} · lệch ${diff}`);
+  ok(diff === 0 && sumExp === sumNew && cells > 0, 'a) hàm thật = luật MAX trong ca → cộng ca, trên toàn bộ dữ liệu thật');
+  // b) ô một ca = luật cũ · c) ô hai ca liệt kê
+  let motCa = 0, lechMotCa = 0, haiCa = 0;
+  for (const [emp, dm] of perShift) for (const [d, sm] of dm) {
+    const n = newM.get(emp)?.get(d);
+    if (sm.size === 1) {
+      motCa++;
+      if (n !== oldM.get(emp)?.get(d)) { lechMotCa++; console.log(`   lệch 1 ca ${emp.slice(0, 8)} ${d}: cũ ${oldM.get(emp)?.get(d)} mới ${n}`); }
+    } else {
+      haiCa++;
+      console.log(`   2 ca: ${emp.slice(0, 8)} ${d} · ${[...sm].map(([c, h]) => `${c} ${h}h`).join(' + ')} = ${n}h`);
+      ok(n === [...sm.values()].reduce((a, b) => a + b, 0), `c) ô 2 ca ${d} = tổng 2 ca`);
+    }
+  }
+  console.log(`   ${motCa} ô một ca · ${haiCa} ô hai ca`);
+  ok(motCa > 0 && lechMotCa === 0, 'b) ô một ca: y hệt luật cũ (MAX cả ngày)');
 
   console.log('2) Trang Tổng hợp giờ theo từng tháng');
   const months = [...new Set(regs.map((r) => r.overtime_date.slice(0, 7)))].sort();
