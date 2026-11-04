@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
+import { buildEmpDateHours } from '@/lib/overtime-hours';
 
 export const runtime = 'nodejs';
 
@@ -8,6 +9,9 @@ type EmployeeRow = {
   employee_id: string;
   employee_name: string;
   order_no: number;
+  // Số giờ tăng ca của người này trong ngày (anh Hữu 04/11/2026: hiện "Tên (4h)").
+  // Tính bằng buildEmpDateHours — cùng luật với tổng hợp tháng / phiếu in / app chính.
+  hours: number | null;
   machines: Array<{ code: string; isOther: boolean; otherText?: string }>;
 };
 
@@ -34,7 +38,7 @@ export async function GET(req: Request) {
 
   let regQuery = supabaseAdmin
     .from('overtime_registrations')
-    .select('id, department')
+    .select('id, department, overtime_date, day_type, duration_hours, shift')
     .eq('overtime_date', date);
   if (restrictDept) regQuery = regQuery.eq('department', restrictDept);
   const { data: regs, error: regErr } = await regQuery;
@@ -53,9 +57,12 @@ export async function GET(req: Request) {
 
   const { data: items, error: itErr } = await supabaseAdmin
     .from('overtime_items')
-    .select('employee_id, equipment_id, item_code, registration_id')
+    .select('employee_id, equipment_id, item_code, registration_id, duration_hours')
     .in('registration_id', regIds);
   if (itErr) return NextResponse.json({ error: itErr.message }, { status: 500 });
+
+  // Giờ người × ngày: MAX trong từng ca → cộng các ca (vd. sáng 1,5h + chiều 4h = 5,5h)
+  const { empDateMap } = buildEmpDateHours(regs, items ?? []);
 
   const empIds = Array.from(new Set((items ?? []).map((i) => i.employee_id)));
   const eqIds = Array.from(new Set((items ?? []).map((i) => i.equipment_id)));
@@ -91,6 +98,7 @@ export async function GET(req: Request) {
         employee_id: emp.id,
         employee_name: emp.full_name,
         order_no: emp.order_no ?? 9999,
+        hours: empDateMap.get(emp.id)?.get(date) ?? null,
         machines: [],
       });
     }

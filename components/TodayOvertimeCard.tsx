@@ -2,14 +2,22 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { toTitleCase } from '@/lib/format';
+import { hoursText } from '@/lib/overtime-shift';
 
 type Machine = { code: string; isOther: boolean; otherText?: string };
 type EmpRow = {
   employee_id: string;
   employee_name: string;
   order_no: number;
+  hours?: number | null;   // giờ tăng ca trong ngày (API cũ chưa có → không hiện)
   machines: Machine[];
 };
+
+// "Nguyễn Văn Tùng (4h)" — anh Hữu 04/11/2026
+function tenKemGio(emp: EmpRow): string {
+  const ten = toTitleCase(emp.employee_name);
+  return emp.hours != null && emp.hours > 0 ? `${ten} (${hoursText(emp.hours)}h)` : ten;
+}
 type Summary = {
   date: string;
   restrictDept?: 'HD' | 'RL' | 'CO' | null;
@@ -376,7 +384,7 @@ function ShareDept({
               lineHeight: 1.35,
             }}
           >
-            {i + 1}. {toTitleCase(emp.employee_name)}
+            {i + 1}. {tenKemGio(emp)}
           </div>
           <div
             style={{
@@ -478,7 +486,7 @@ function DeptSection({
                 {idx + 1}.
               </span>
               <span className="font-bold text-brand-navy">
-                {toTitleCase(emp.employee_name)}
+                {tenKemGio(emp)}
               </span>
             </div>
             <div className="ml-5 text-brand-navy break-words">
