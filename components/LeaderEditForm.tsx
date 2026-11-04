@@ -8,9 +8,13 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toTitleCase } from '@/lib/format';
 import {
-  dayTypeMismatch, isSundayISO, nextSundayISO, presetOf, presetText, qtyHoursOf, shiftLabel, type Shift,
+  dayTypeMismatch, hasPerPersonHours, isSundayISO, isValidPmHours, nextSundayISO, presetOf, presetText,
+  qtyHoursOf, shiftLabel, type Shift,
 } from '@/lib/overtime-shift';
 import ShiftPicker from './ShiftPicker';
+import HoursPicker, {
+  DEFAULT_HOURS, HOURS_RULE_TEXT, choiceFromHours, hoursOf, type HoursChoice,
+} from './HoursPicker';
 import DateButton from './DateButton';
 
 type Employee = { id: string; full_name: string; order_no: number };
@@ -30,7 +34,14 @@ type InitialItem = {
   equipment_id: string;
   item_code: string;
   planned_quantity?: number | null;   // để suy RPM tay đã nhập (CO)
+  // Giờ riêng của dòng (null = theo giờ đầu phiếu) — để hiện đúng 3h/4h/Khác đang lưu
+  time_from?: string | null;
+  time_to?: string | null;
+  duration_hours?: number | null;
 };
+
+// Giờ đầu phiếu — dòng chưa có giờ riêng thì lấy giờ này (giống phiếu in)
+type HeaderTime = { time_from: string; time_to: string; duration_hours: number };
 
 type EmployeeRow = {
   employeeId: string;
@@ -43,6 +54,11 @@ type EmployeeRow = {
   useOther: boolean;
   otherTask: string;
   otherItemId: string | null;
+  // Số giờ ca chiều (anh Hữu 04/11/2026). null = tổ trưởng CHƯA bấm đổi → không gửi, máy chủ giữ giờ cũ.
+  hours: HoursChoice | null;
+  // Giờ đang lưu của người này lúc mở phiếu (số giờ + chữ 'HH:MM–HH:MM'); dòng mới = null
+  initHours: number | null;
+  initText: string | null;
 };
 
 const emptyRow = (): EmployeeRow => ({
@@ -54,6 +70,9 @@ const emptyRow = (): EmployeeRow => ({
   useOther: false,
   otherTask: '',
   otherItemId: null,
+  hours: null,
+  initHours: null,
+  initText: null,
 });
 
 function machineCodeColor(code: string): string {
@@ -73,7 +92,18 @@ function itemsToRows(
   items: InitialItem[],
   otherEquipmentIds: Set<string>,
   qtyHours: number,
+  header: HeaderTime,
 ): EmployeeRow[] {
+  // Giờ đang lưu của một người = giờ dòng đầu tiên của người đó (phiếu in cũng lấy như vậy)
+  const hm = (t: string) => t.slice(0, 5);
+  const initOf = (it: InitialItem) => {
+    const from = it.time_from ?? header.time_from;
+    const to = it.time_to ?? header.time_to;
+    return {
+      initHours: Number(it.duration_hours ?? header.duration_hours),
+      initText: `${hm(from)}–${hm(to)}`,
+    };
+  };
   const byEmp = new Map<string, InitialItem[]>();
   for (const it of items) {
     if (!byEmp.has(it.employee_id)) byEmp.set(it.employee_id, []);
@@ -104,6 +134,8 @@ function itemsToRows(
         useOther: false,
         otherTask: '',
         otherItemId: null,
+        hours: null,
+        ...initOf(empItems[0]),
       });
     }
     if (otherItem) {
@@ -116,6 +148,8 @@ function itemsToRows(
         useOther: true,
         otherTask: otherItem.item_code,
         otherItemId: otherItem.id,
+        hours: null,
+        ...initOf(empItems[0]),
       });
     }
   }
@@ -132,6 +166,7 @@ export default function LeaderEditForm({
   initialDayType,
   initialShift,
   initialItems,
+  initialHeader,
   equipments,
   backHref,
 }: {
@@ -141,6 +176,7 @@ export default function LeaderEditForm({
   initialDayType: 'weekday' | 'sunday';
   initialShift: Shift;
   initialItems: InitialItem[];
+  initialHeader: HeaderTime;
   equipments: Equipment[];
   backHref: string;
 }) {
@@ -175,6 +211,28 @@ export default function LeaderEditForm({
   const calcHours = qtyHoursFor(dayType, shift);
   const manualRpm = deptNeedsManualRpm(department);
   const timeLabel = presetText(presetOf(dayType, shift));
+  // Ca chiều ngày thường: chọn số giờ từng người (anh Hữu 04/11/2026)
+  const perPerson = hasPerPersonHours(dayType, shift);
+  // Đổi loại ngày/ca so với lúc mở phiếu → máy chủ đặt lại giờ mặc định, giờ cũ không còn giá trị
+  const caDoi = dayType !== initialDayType || (dayType === 'weekday' && shift !== initialShift);
+  // Giờ đang lưu còn hiện bằng nút được không: bắt đầu 16:30 + số giờ hợp lệ → nút; khác → "Đang lưu: …"
+  const keptOf = (row: EmployeeRow): string | null =>
+    row.hours == null && !caDoi && row.initHours != null &&
+    !(row.initText?.startsWith('16:30') && isValidPmHours(row.initHours))
+      ? row.initText
+      : null;
+  const shownHours = (row: EmployeeRow): HoursChoice =>
+    row.hours ?? (!caDoi && row.initHours != null && isValidPmHours(row.initHours)
+      ? choiceFromHours(row.initHours)
+      : DEFAULT_HOURS);
+  // Giờ tính SL dự kiến hiện trên ô máy (máy chủ tự tính lại khi lưu)
+  const calcHoursOf = (row: EmployeeRow): number => {
+    if (!perPerson) return calcHours;
+    const h = row.hours != null ? hoursOf(row.hours)
+      : !caDoi && row.initHours != null ? row.initHours
+      : 3;
+    return qtyHoursOf(h ?? 0, 'PM');
+  };
   const totalItems = rows.reduce(
     (sum, row) => sum + row.checkedMachineIds.length + (row.useOther ? 1 : 0),
     0,
@@ -200,7 +258,7 @@ export default function LeaderEditForm({
         setMachines(d.machines ?? []);
         setPlanDateUsed(d.plan_date_used ?? null);
         if (!rowsInit) {
-          const initRows = itemsToRows(initialItems, otherEquipmentIds, qtyHoursFor(initialDayType, initialShift));
+          const initRows = itemsToRows(initialItems, otherEquipmentIds, qtyHoursFor(initialDayType, initialShift), initialHeader);
           setRows(initRows.length > 0 ? initRows : [emptyRow()]);
           setRowsInit(true);
         } else {
@@ -305,6 +363,14 @@ export default function LeaderEditForm({
     });
   }
 
+  function updateHours(rowIdx: number, hours: HoursChoice) {
+    setRows((prev) => {
+      const next = [...prev];
+      next[rowIdx] = { ...next[rowIdx], hours };
+      return next;
+    });
+  }
+
   function updateMachineRpm(rowIdx: number, machineId: string, value: string) {
     setRows((prev) => {
       const next = [...prev];
@@ -329,8 +395,8 @@ export default function LeaderEditForm({
     setRows((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
   }
 
-  function plannedQty(rpm: number) {
-    return Math.round(rpm * 60 * calcHours);
+  function plannedQty(rpm: number, row: EmployeeRow) {
+    return Math.round(rpm * 60 * calcHoursOf(row));
   }
 
   async function submit() {
@@ -339,6 +405,8 @@ export default function LeaderEditForm({
       const r = rows[i];
       if (!r.employeeId)
         return setError(`Nhân viên ${i + 1}: chưa chọn tên`);
+      if (perPerson && r.hours != null && hoursOf(r.hours) == null)
+        return setError(`Nhân viên ${i + 1}: số giờ "Khác" chưa đúng (${HOURS_RULE_TEXT})`);
       if (r.useOther) {
         if (!r.otherTask.trim())
           return setError(
@@ -367,10 +435,30 @@ export default function LeaderEditForm({
       }
     }
 
+    // Số giờ gửi lên theo NGƯỜI: người nào có ô đã bấm đổi → gửi cho mọi ô của người đó
+    // (máy + Công việc khác cùng một giờ). Người không đổi → không gửi, máy chủ giữ giờ cũ.
+    const gioMoi = new Map<string, number>();
+    if (perPerson) {
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        if (r.hours == null) continue;
+        const h = hoursOf(r.hours)!;
+        const truoc = gioMoi.get(r.employeeId);
+        if (truoc != null && truoc !== h) {
+          const ten = employees.find((e) => e.id === r.employeeId)?.full_name ?? '';
+          return setError(`Nhân viên ${i + 1} (${toTitleCase(ten)}): chọn số giờ khác với ô trước của cùng người — chọn lại cho giống nhau`);
+        }
+        gioMoi.set(r.employeeId, h);
+      }
+    }
+    const hoursField = (empId: string) =>
+      gioMoi.has(empId) ? { duration_hours: gioMoi.get(empId)! } : {};
+
     // Build PATCH items[]
     const items: Array<{
       id?: string;
       employee_id: string;
+      duration_hours?: number;
       equipment_id?: string;
       item_code?: string;
       item_name?: string | null;
@@ -384,6 +472,7 @@ export default function LeaderEditForm({
         items.push({
           id: row.otherItemId ?? undefined,
           employee_id: row.employeeId,
+          ...hoursField(row.employeeId),
           is_other: true,
           other_description: row.otherTask.trim(),
         });
@@ -398,6 +487,7 @@ export default function LeaderEditForm({
         items.push({
           id: row.existingItemIds[machineId] ?? undefined,
           employee_id: row.employeeId,
+          ...hoursField(row.employeeId),
           equipment_id: machineId,
           item_code: itemCode,
           item_name: planItem?.item_name ?? null,
@@ -493,7 +583,9 @@ Vẫn lưu phiếu?`)) return;
           {dayType === 'weekday' && <ShiftPicker value={shift} onChange={setShift} />}
           <p className="text-xs text-brand-navy-soft mt-1.5">
             {dayType === 'sunday' && <>{timeLabel} · </>}
-            Giờ mặc định — chỉ admin sửa được giờ thực tế.
+            {perPerson
+              ? 'Ca chiều: chọn số giờ từng người ở ô bên phải "Nhân viên".'
+              : 'Giờ mặc định — chỉ admin sửa được giờ thực tế.'}
           </p>
           {lechNgay && (
             <p className="text-sm mt-1.5 text-red-700 bg-red-50 border border-red-200 rounded-md p-2 font-medium">
@@ -555,18 +647,28 @@ Vẫn lưu phiếu?`)) return;
                   key={idx}
                   className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-4 space-y-4"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-brand-navy-soft uppercase tracking-wide">
-                      Nhân viên {idx + 1}
-                    </span>
-                    {rows.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeRow(idx)}
-                        className="text-xs text-red-600 hover:text-red-700 font-medium"
-                      >
-                        Xóa
-                      </button>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3 pt-1">
+                      <span className="text-xs font-semibold text-brand-navy-soft uppercase tracking-wide">
+                        Nhân viên {idx + 1}
+                      </span>
+                      {rows.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeRow(idx)}
+                          className="text-xs text-red-600 hover:text-red-700 font-medium"
+                        >
+                          Xóa
+                        </button>
+                      )}
+                    </div>
+                    {/* Số giờ tăng ca chiều của người này (anh Hữu 04/11/2026) */}
+                    {perPerson && (
+                      <HoursPicker
+                        value={shownHours(row)}
+                        kept={keptOf(row)}
+                        onChange={(v) => updateHours(idx, v)}
+                      />
                     )}
                   </div>
 
@@ -611,7 +713,7 @@ Vẫn lưu phiếu?`)) return;
                           const planItem = machine.items[0];
                           const needsManualCode = !planItem;
                           const itemCodeLabel = planItem?.item_code ?? '—';
-                          const qty = plannedQty(rpmOf(row, machine));
+                          const qty = plannedQty(rpmOf(row, machine), row);
                           return (
                             <div
                               key={machine.id}

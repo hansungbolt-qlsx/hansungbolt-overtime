@@ -7,9 +7,10 @@ import { deptNeedsManualRpm } from '@/lib/departments';
 import { CO_ITEMS_DATALIST_ID, findCoItem } from '@/lib/co-items';
 import { CoItemsDatalist } from './CoCodes';
 import {
-  dayTypeMismatch, isSundayISO, nextSundayISO, presetOf, presetText, qtyHoursOf, type Shift,
+  dayTypeMismatch, hasPerPersonHours, isSundayISO, nextSundayISO, presetOf, presetText, qtyHoursOf, type Shift,
 } from '@/lib/overtime-shift';
 import ShiftPicker from './ShiftPicker';
+import HoursPicker, { DEFAULT_HOURS, HOURS_RULE_TEXT, hoursOf, type HoursChoice } from './HoursPicker';
 
 type Employee = { id: string; full_name: string; order_no: number };
 type PlanItem = { item_code: string; item_name: string | null };
@@ -24,6 +25,8 @@ type EmployeeRow = {
   machineRpm: Record<string, string>;
   useOther: boolean;
   otherTask: string;
+  // Số giờ tăng ca chiều của người này (anh Hữu 04/11/2026) — chỉ dùng khi ngày thường + PM
+  hours: HoursChoice;
 };
 
 const todayISO = () => {
@@ -41,6 +44,7 @@ const emptyRow = (): EmployeeRow => ({
   machineRpm: {},
   useOther: false,
   otherTask: '',
+  hours: DEFAULT_HOURS,
 });
 
 // Màu chữ mã máy theo nhóm prefix — giúp dễ phân biệt RL/SM/CT/HD
@@ -82,6 +86,11 @@ export default function OvertimeForm({ department }: { department: string }) {
   const preset = dayType ? presetOf(dayType, shift) : null;
   const calcHours = preset ? qtyHoursOf(preset.duration_hours, dayType === 'sunday' ? 'PM' : shift) : 0;
   const manualRpm = deptNeedsManualRpm(department);
+  // Ngày thường + ca chiều: mỗi người chọn 3h / 4h / Khác (anh Hữu 04/11/2026)
+  const perPerson = hasPerPersonHours(dayType, shift);
+  // Giờ tính sản lượng của MỘT người: ca chiều theo số giờ người đó chọn (vẫn trừ 0,5h nghỉ)
+  const calcHoursOf = (row: EmployeeRow) =>
+    perPerson ? qtyHoursOf(hoursOf(row.hours) ?? 0, 'PM') : calcHours;
   const totalItems = rows.reduce(
     (sum, row) => sum + row.checkedMachineIds.length + (row.useOther ? 1 : 0),
     0,
@@ -172,6 +181,14 @@ export default function OvertimeForm({ department }: { department: string }) {
     });
   }
 
+  function updateHours(rowIdx: number, hours: HoursChoice) {
+    setRows((prev) => {
+      const next = [...prev];
+      next[rowIdx] = { ...next[rowIdx], hours };
+      return next;
+    });
+  }
+
   function updateMachineRpm(rowIdx: number, machineId: string, value: string) {
     setRows((prev) => {
       const next = [...prev];
@@ -193,8 +210,8 @@ export default function OvertimeForm({ department }: { department: string }) {
     setRows((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
   }
 
-  function plannedQty(rpm: number) {
-    return Math.round(rpm * 60 * calcHours);
+  function plannedQty(rpm: number, row: EmployeeRow) {
+    return Math.round(rpm * 60 * calcHoursOf(row));
   }
 
   async function submit() {
@@ -203,6 +220,8 @@ export default function OvertimeForm({ department }: { department: string }) {
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i];
       if (!r.employeeId) return setError(`Nhân viên ${i + 1}: chưa chọn tên`);
+      if (perPerson && hoursOf(r.hours) == null)
+        return setError(`Nhân viên ${i + 1}: số giờ "Khác" chưa đúng (${HOURS_RULE_TEXT})`);
       if (r.useOther) {
         if (!r.otherTask.trim())
           return setError(`Nhân viên ${i + 1}: chưa nhập nội dung Công việc khác`);
@@ -221,8 +240,22 @@ export default function OvertimeForm({ department }: { department: string }) {
         }
       }
     }
+    // Một người nằm ở 2 ô (máy + Công việc khác) thì phải cùng số giờ — phiếu in một người một giờ
+    if (perPerson) {
+      const gioCuaNguoi = new Map<string, number>();
+      for (let i = 0; i < rows.length; i++) {
+        const h = hoursOf(rows[i].hours)!;
+        const truoc = gioCuaNguoi.get(rows[i].employeeId);
+        if (truoc != null && truoc !== h) {
+          const ten = employees.find((e) => e.id === rows[i].employeeId)?.full_name ?? '';
+          return setError(`Nhân viên ${i + 1} (${toTitleCase(ten)}): chọn số giờ khác với ô trước của cùng người — chọn lại cho giống nhau`);
+        }
+        gioCuaNguoi.set(rows[i].employeeId, h);
+      }
+    }
     const items: Array<{
       employee_id: string;
+      duration_hours?: number;
       equipment_id?: string;
       item_code?: string;
       item_name?: string | null;
@@ -234,6 +267,7 @@ export default function OvertimeForm({ department }: { department: string }) {
       if (row.useOther) {
         items.push({
           employee_id: row.employeeId,
+          ...(perPerson ? { duration_hours: hoursOf(row.hours)! } : {}),
           is_other: true,
           other_description: row.otherTask.trim(),
         });
@@ -247,10 +281,11 @@ export default function OvertimeForm({ department }: { department: string }) {
         if (!itemCode) continue;
         items.push({
           employee_id: row.employeeId,
+          ...(perPerson ? { duration_hours: hoursOf(row.hours)! } : {}),
           equipment_id: machineId,
           item_code: itemCode,
           item_name: planItem?.item_name ?? null,
-          planned_quantity: plannedQty(rpmOf(row, machine)),
+          planned_quantity: plannedQty(rpmOf(row, machine), row),
         });
       }
     }
@@ -404,18 +439,24 @@ Vẫn gửi phiếu?`)) return;
                 className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-4 space-y-4"
               >
                 {/* Row header */}
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-brand-navy-soft uppercase tracking-wide">
-                    Nhân viên {idx + 1}
-                  </span>
-                  {rows.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeRow(idx)}
-                      className="text-xs text-red-600 hover:text-red-700 font-medium"
-                    >
-                      Xóa
-                    </button>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-3 pt-1">
+                    <span className="text-xs font-semibold text-brand-navy-soft uppercase tracking-wide">
+                      Nhân viên {idx + 1}
+                    </span>
+                    {rows.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeRow(idx)}
+                        className="text-xs text-red-600 hover:text-red-700 font-medium"
+                      >
+                        Xóa
+                      </button>
+                    )}
+                  </div>
+                  {/* Số giờ tăng ca chiều của người này (anh Hữu 04/11/2026) */}
+                  {perPerson && (
+                    <HoursPicker value={row.hours} onChange={(v) => updateHours(idx, v)} />
                   )}
                 </div>
 
@@ -460,7 +501,7 @@ Vẫn gửi phiếu?`)) return;
                         const planItem = machine.items[0];
                         const needsManualCode = !planItem;
                         const itemCodeLabel = planItem?.item_code ?? '—';
-                        const qty = plannedQty(rpmOf(row, machine));
+                        const qty = plannedQty(rpmOf(row, machine), row);
                         return (
                           <div
                             key={machine.id}

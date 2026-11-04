@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
-import { isISODate, normShift, presetOf, qtyHoursOf } from '@/lib/overtime-shift';
+import {
+  hasPerPersonHours, isISODate, isValidPmHours, normShift, pmPresetFor, presetOf, qtyHoursOf,
+} from '@/lib/overtime-shift';
 import { duplicateShiftError, overlapError } from '@/lib/overtime-guard';
 
 export const runtime = 'nodejs';
@@ -22,6 +24,9 @@ type PatchItem = {
   other_description?: string;
   time_from?: string;
   time_to?: string;
+  // Số giờ tăng ca chiều tổ trưởng chọn (3h / 4h / Khác, anh Hữu 04/11/2026) — bắt đầu 16:30.
+  // Chỉ gửi khi tổ trưởng BẤM ĐỔI; không gửi → giữ giờ cũ của dòng.
+  duration_hours?: number;
 };
 
 type PatchBody = {
@@ -90,7 +95,8 @@ export async function PATCH(
     );
   }
 
-  // Chỉ admin sửa giờ từng dòng (anh Hữu 21/10/2026) — tổ trưởng gửi giờ lên cũng bỏ qua
+  // Chỉ admin sửa giờ từng dòng (anh Hữu 21/10/2026) — tổ trưởng gửi giờ lên cũng bỏ qua.
+  // Ngoại lệ 04/11/2026: tổ trưởng gửi được SỐ GIỜ ca chiều (duration_hours), giờ bắt đầu khoá 16:30.
   if (session.role !== 'admin') {
     for (const it of items) {
       delete it.time_from;
@@ -106,6 +112,11 @@ export async function PATCH(
   const caDoi = effectiveDayType !== reg.day_type || effectiveShift !== oldShift;
   const effectiveDate: string = body.overtime_date ?? reg.overtime_date;
   const ngayDoi = effectiveDate !== reg.overtime_date;
+  // Ca chiều ngày thường → nhận số giờ riêng từng người; ca khác → bỏ qua số giờ gửi lên
+  const perPerson = hasPerPersonHours(effectiveDayType, effectiveShift);
+  if (!perPerson) {
+    for (const it of items) delete it.duration_hours;
+  }
 
   if (caDoi || ngayDoi) {
     const dupErr = await duplicateShiftError(effectiveDate, reg.department, effectiveShift, id);
@@ -135,6 +146,12 @@ export async function PATCH(
           { status: 400 },
         );
       }
+    }
+    if (it.duration_hours !== undefined && !isValidPmHours(it.duration_hours)) {
+      return NextResponse.json(
+        { error: `Dòng ${i + 1}: số giờ tăng ca không hợp lệ (từ 0,5 đến 7 giờ, bước 0,5 giờ)` },
+        { status: 400 },
+      );
     }
     // Nếu có per-row time thì validate
     if (it.time_from || it.time_to) {
@@ -206,7 +223,7 @@ export async function PATCH(
   // Load existing item ids for diff
   const { data: existingItems, error: loadItemsErr } = await supabaseAdmin
     .from('overtime_items')
-    .select('id, time_from, time_to')
+    .select('id, employee_id, time_from, time_to')
     .eq('registration_id', id);
   if (loadItemsErr)
     return NextResponse.json({ error: loadItemsErr.message }, { status: 500 });
@@ -219,6 +236,13 @@ export async function PATCH(
       .filter((i) => i.time_from && i.time_to)
       .map((i) => [i.id, { from: i.time_from as string, to: i.time_to as string }]),
   );
+  // Dòng MỚI của một người đã có tên trên phiếu (vd. thêm máy) → theo giờ cũ của chính người đó,
+  // không rơi về 3h mặc định (người đang 4h thêm máy vẫn 4h — anh Hữu 04/11/2026)
+  const keptTimeByEmp = new Map<string, { from: string; to: string }>();
+  for (const i of existingItems ?? []) {
+    const k = keptTime.get(i.id);
+    if (k && !keptTimeByEmp.has(i.employee_id)) keptTimeByEmp.set(i.employee_id, k);
+  }
   const submittedIds = new Set(
     items.map((it) => it.id).filter(Boolean) as string[],
   );
@@ -228,7 +252,12 @@ export async function PATCH(
     if (it.time_from && it.time_to) {
       return { tFrom: toSqlTime(it.time_from), tTo: toSqlTime(it.time_to), d: diffHours(it.time_from, it.time_to) };
     }
-    const kept = it.id ? keptTime.get(it.id) : undefined;
+    if (it.duration_hours !== undefined) {
+      const t = pmPresetFor(it.duration_hours);
+      return { tFrom: t.time_from, tTo: t.time_to, d: t.duration_hours };
+    }
+    const kept = (it.id ? keptTime.get(it.id) : undefined)
+      ?? (!it.id || !existingIds.has(it.id) ? keptTimeByEmp.get(it.employee_id) : undefined);
     if (kept) return { tFrom: kept.from, tTo: kept.to, d: diffHours(kept.from, kept.to) };
     return { tFrom: preset.time_from, tTo: preset.time_to, d: preset.duration_hours };
   };

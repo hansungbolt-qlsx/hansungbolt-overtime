@@ -10,6 +10,8 @@
 //   - Giờ tính sản lượng: AM tính đủ giờ (không trừ nghỉ); PM + Chủ nhật trừ
 //     0,5h nghỉ (3h → 2,5h · 8h → 7,5h) — y như trước.
 //   - Chỉ admin sửa giờ từng dòng; tổ trưởng chỉ đăng ký giờ mặc định.
+//     NGOẠI LỆ 04/11/2026: ca chiều ngày thường tổ trưởng chọn được số giờ
+//     từng người (3h / 4h / Khác), bắt đầu luôn 16:30 — xem pmPresetFor().
 // =============================================================================
 
 export type DayType = 'weekday' | 'sunday';
@@ -52,6 +54,52 @@ export function shiftLabel(dayType: string, shift: unknown): string {
 export function presetText(p: Preset): string {
   const hm = (t: string) => t.slice(0, 5);
   return `${hm(p.time_from)} – ${hm(p.time_to)} (${String(p.duration_hours).replace('.', ',')}h)`;
+}
+
+// -----------------------------------------------------------------------------
+// GIỜ RIÊNG TỪNG NGƯỜI — CA CHIỀU NGÀY THƯỜNG (anh Hữu 04/11/2026)
+// Tổ trưởng chọn 3h / 4h / Khác cho từng nhân viên. Giờ bắt đầu cố định 16:30,
+// giờ kết thúc = 16:30 + số giờ. "Khác": bước 0,5h, từ 0,5h đến 7h (muộn nhất 23:30).
+// Ca sáng và Chủ nhật giữ giờ cố định như cũ — không có lựa chọn này.
+// -----------------------------------------------------------------------------
+
+export const PM_HOURS_MIN = 0.5;
+export const PM_HOURS_MAX = 7;
+/** Hai nút chọn nhanh; còn lại là "Khác". */
+export const PM_HOURS_QUICK = [3, 4] as const;
+
+/** Phiếu này có cho chọn giờ riêng từng người không: chỉ ngày thường + ca chiều. */
+export function hasPerPersonHours(dayType: string | null | undefined, shift: unknown): boolean {
+  return dayType === 'weekday' && normShift(dayType, shift) === 'PM';
+}
+
+/** Số giờ hợp lệ: số, bội 0,5, trong [0,5 ; 7]. */
+export function isValidPmHours(h: unknown): h is number {
+  return (
+    typeof h === 'number' && Number.isFinite(h) &&
+    h >= PM_HOURS_MIN && h <= PM_HOURS_MAX && Number.isInteger(h * 2)
+  );
+}
+
+/** Chuỗi tổ trưởng gõ ('3,5' | '3.5' | ' 4 ') → số; không phải số → null. */
+export function parseHoursInput(s: string): number | null {
+  const t = s.trim().replace(',', '.');
+  if (!/^\d+(\.\d+)?$/.test(t)) return null;
+  return Number(t);
+}
+
+/** Giờ ca chiều theo số giờ: 16:30 → 16:30 + h. Không kiểm hợp lệ — gọi isValidPmHours trước. */
+export function pmPresetFor(hours: number): Preset {
+  const start = PRESETS.weekday.PM.time_from;            // '16:30:00'
+  const end = toMinutes(start) + Math.round(hours * 60);
+  const hh = String(Math.floor(end / 60)).padStart(2, '0');
+  const mm = String(end % 60).padStart(2, '0');
+  return { time_from: start, time_to: `${hh}:${mm}:00`, duration_hours: hours };
+}
+
+/** 3.5 → '3,5' */
+export function hoursText(h: number): string {
+  return String(h).replace('.', ',');
 }
 
 /** Phút trong ngày của 'HH:MM[:SS]'. */

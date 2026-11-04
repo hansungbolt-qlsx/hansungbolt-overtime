@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
-import { normShift, presetOf } from '@/lib/overtime-shift';
+import { hasPerPersonHours, isValidPmHours, normShift, pmPresetFor, presetOf } from '@/lib/overtime-shift';
 import { duplicateShiftError, overlapError } from '@/lib/overtime-guard';
 
 export const runtime = 'nodejs';
 
 type ItemInput = {
   employee_id: string;
+  // Số giờ riêng của người này — chỉ nhận khi ngày thường + ca chiều (anh Hữu 04/11/2026)
+  duration_hours?: number;
   equipment_id?: string;
   item_code?: string;
   item_name?: string | null;
@@ -66,11 +68,41 @@ export async function POST(req: Request) {
   const shift = normShift(day_type, (body as { shift?: unknown }).shift);
   const preset = presetOf(day_type, shift);
 
+  // Ca chiều ngày thường: mỗi người một số giờ, bắt đầu 16:30 (anh Hữu 04/11/2026).
+  // Ca sáng / Chủ nhật: bỏ qua số giờ gửi lên, giữ giờ cố định của ca.
+  const perPerson = hasPerPersonHours(day_type, shift);
+  if (perPerson) {
+    const gioCuaNguoi = new Map<string, number>();
+    for (const it of items) {
+      if (it.duration_hours === undefined) continue;
+      if (!isValidPmHours(it.duration_hours)) {
+        return NextResponse.json(
+          { error: 'Số giờ tăng ca không hợp lệ (từ 0,5 đến 7 giờ, bước 0,5 giờ)' },
+          { status: 400 },
+        );
+      }
+      const truoc = gioCuaNguoi.get(it.employee_id);
+      if (truoc !== undefined && truoc !== it.duration_hours) {
+        return NextResponse.json(
+          { error: 'Một nhân viên có 2 số giờ khác nhau trong cùng phiếu' },
+          { status: 400 },
+        );
+      }
+      gioCuaNguoi.set(it.employee_id, it.duration_hours);
+    }
+  }
+  const rowPreset = (it: ItemInput) =>
+    perPerson && it.duration_hours !== undefined ? pmPresetFor(it.duration_hours) : preset;
+  const rowTimes = items.map(rowPreset);
+
   const dupErr = await duplicateShiftError(overtime_date, session.department, shift);
   if (dupErr) return NextResponse.json({ error: dupErr }, { status: 409 });
   const ovErr = await overlapError(
     overtime_date,
-    items.map((it) => ({ employee_id: it.employee_id, time_from: preset.time_from, time_to: preset.time_to })),
+    items.map((it) => {
+      const t = rowPreset(it);
+      return { employee_id: it.employee_id, time_from: t.time_from, time_to: t.time_to };
+    }),
   );
   if (ovErr) return NextResponse.json({ error: ovErr }, { status: 409 });
 
@@ -115,9 +147,11 @@ export async function POST(req: Request) {
       overtime_date,
       day_type,
       shift,
-      time_from: preset.time_from,
-      time_to: preset.time_to,
-      duration_hours: preset.duration_hours,
+      // Đầu phiếu = giờ bắt đầu sớm nhất / kết thúc muộn nhất / số giờ lớn nhất của các dòng
+      // (giống PATCH). Phiếu không chọn giờ riêng → y như cũ = giờ mặc định của ca.
+      time_from: rowTimes.map((t) => t.time_from).reduce((a, b) => (b < a ? b : a)),
+      time_to: rowTimes.map((t) => t.time_to).reduce((a, b) => (b > a ? b : a)),
+      duration_hours: Math.max(...rowTimes.map((t) => t.duration_hours)),
       status: 'pending',
     })
     .select('id')
@@ -130,6 +164,14 @@ export async function POST(req: Request) {
     );
   }
 
+  // Giờ riêng từng dòng: chỉ ghi khi phiếu cho chọn giờ riêng (ca chiều ngày thường).
+  // Ca sáng / Chủ nhật để trống như cũ → các nơi đọc tự lấy giờ đầu phiếu.
+  const timeCols = (it: ItemInput) => {
+    if (!perPerson || it.duration_hours === undefined) return {};
+    const t = pmPresetFor(it.duration_hours);
+    return { time_from: t.time_from, time_to: t.time_to, duration_hours: t.duration_hours };
+  };
+
   const itemRows = items.map((it) => {
     if (it.is_other) {
       return {
@@ -139,6 +181,7 @@ export async function POST(req: Request) {
         item_code: it.other_description!.trim(),
         item_name: 'Công việc khác',
         planned_quantity: null,
+        ...timeCols(it),
       };
     }
     return {
@@ -148,6 +191,7 @@ export async function POST(req: Request) {
       item_code: it.item_code!,
       item_name: it.item_name ?? null,
       planned_quantity: it.planned_quantity ?? null,
+      ...timeCols(it),
     };
   });
 

@@ -79,7 +79,15 @@ export default async function EditRegistrationPage({
               equipment_id: i.equipment_id,
               item_code: i.item_code,
               planned_quantity: i.planned_quantity,
+              time_from: i.time_from,
+              time_to: i.time_to,
+              duration_hours: i.duration_hours,
             }))}
+            initialHeader={{
+              time_from: reg.time_from,
+              time_to: reg.time_to,
+              duration_hours: Number(reg.duration_hours),
+            }}
             equipments={(equipments ?? []).map((e) => ({
               id: e.id,
               code: e.code,
