@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth-server';
 import { supabaseAdmin } from '@/lib/supabase';
 import DashboardHeader from '@/components/DashboardHeader';
 import QlsxOvertimeForm from '@/components/QlsxOvertimeForm';
+import TaiBanMoi from '@/components/TaiBanMoi';
 
 export default async function QlsxOvertimePage() {
   const session = await getSession();
@@ -21,6 +22,8 @@ export default async function QlsxOvertimePage() {
 
   return (
     <main className="min-h-screen bg-brand-pattern p-4 md:p-8">
+      {/* Mở / quay lại trang → có bản mới thì tự tải lại (giống trang tổ trưởng, anh Hữu 04/11/2026) */}
+      <TaiBanMoi />
       <div className="max-w-2xl mx-auto">
         <DashboardHeader fullName={session.fullName} username={session.username} active="qlsx" />
 
