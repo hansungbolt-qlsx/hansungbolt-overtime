@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth-server';
+import { carryForward, followSource, isoVN } from '@/lib/stop-carry';
 
 export const runtime = 'nodejs';
 
@@ -36,6 +37,16 @@ export async function GET(req: Request) {
   const date = (url.searchParams.get('date') || todayVN()).slice(0, 10);
   // all=1 (poller app chinh): tra ca ban ghi da bo (dismissed) de go nhan TV
   const includeAll = url.searchParams.get('all') === '1';
+
+  // RL (anh Hữu 06/11/2026): xem danh sách HÔM NAY → tự chép máy dừng ngày trước sang
+  // (chỉ máy chưa có dòng hôm nay). Lỗi chép không được chặn việc xem.
+  if (date === todayVN()) {
+    try {
+      await carryForward(date);
+    } catch (e) {
+      console.error('stop-reasons: tự chép danh sách RL lỗi', e);
+    }
+  }
 
   let q = supabaseAdmin
     .from('machine_stop_reasons')
@@ -113,6 +124,7 @@ export async function POST(req: Request) {
       .eq('stop_date', date)
       .eq('machine_code', machine);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await followToday(date, machine, null);
     return NextResponse.json({ ok: true, deleted: true });
   }
 
@@ -156,7 +168,24 @@ export async function POST(req: Request) {
     { onConflict: 'stop_date,machine_code' },
   );
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  await followToday(date, machine, { code, text: code === 'ETC' ? text : text || null });
   return NextResponse.json({ ok: true });
+}
+
+// Sửa/bỏ máy ở ngày trước (ngày nguồn) → dòng tự chép hôm nay của máy đó đi theo
+// (anh Hữu 06/11/2026). Lỗi chỉ ghi log — việc lưu chính đã xong.
+async function followToday(
+  date: string,
+  machine: string,
+  reason: { code: string; text: string | null } | null,
+) {
+  const today = isoVN();
+  if (date >= today) return;
+  try {
+    await followSource(date, machine, today, reason);
+  } catch (e) {
+    console.error('stop-reasons: cập nhật dòng tự chép hôm nay lỗi', e);
+  }
 }
 
 // PUT /api/stop-reasons — PREFILL từ KHSX app chính (user 20/7, chỉ admin/poller):

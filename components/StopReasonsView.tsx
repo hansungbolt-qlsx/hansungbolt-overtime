@@ -4,6 +4,7 @@
 // CẢ NGÀY không sản xuất — 1 lý do / máy / ngày. App chính poll về điền TV Kết
 // quả ngày (người tổng hợp TV vẫn là người chốt cuối, sửa đè được).
 import { useCallback, useEffect, useState } from 'react';
+import { isCarryName } from '@/lib/stop-carry-shared';
 
 // Nhãn kèm VIẾT TẮT đồng bộ chip TV (user 20/7) + lý do ST Setting mới
 const REASONS: Array<{ code: string; label: string }> = [
@@ -50,6 +51,12 @@ function machineSortKey(code: string): [number, number, number, string] {
   return [rank, 0, parseInt(m[2], 10), m[3] || ''];
 }
 
+// Nhóm máy theo tiền tố (HD / RL / SM / CT) — tổ trưởng RL thấy 3 nhóm có tiêu đề (anh Hữu 06/11/2026)
+function groupOf(code: string): string {
+  const m = code.match(/^([A-Z]+)-/i);
+  return m ? m[1].toUpperCase() : 'Khác';
+}
+
 function sortMachines(codes: string[]): string[] {
   return [...codes].sort((a, b) => {
     const ka = machineSortKey(a);
@@ -61,7 +68,14 @@ function sortMachines(codes: string[]): string[] {
 }
 
 // readOnly (user 24/7): tài khoản QLSX chỉ XEM máy dừng — ghi/sửa vẫn là tổ trưởng
-export default function StopReasonsView({ readOnly = false }: { readOnly?: boolean }) {
+// department: bộ phận tổ trưởng ('RL' → lời hướng dẫn tự chép danh sách hôm trước)
+export default function StopReasonsView({
+  readOnly = false,
+  department,
+}: {
+  readOnly?: boolean;
+  department?: string;
+}) {
   const [date, setDate] = useState(todayISO());
   const [machines, setMachines] = useState<string[]>([]);
   const [saved, setSaved] = useState<Record<string, StopReason>>({});
@@ -134,6 +148,14 @@ export default function StopReasonsView({ readOnly = false }: { readOnly?: boole
   };
 
   const nSaved = Object.keys(saved).length;
+  // Nhóm theo tiền tố, giữ thứ tự máy đã sắp
+  const groups: Array<[string, string[]]> = [];
+  for (const m of machines) {
+    const g = groupOf(m);
+    const last = groups[groups.length - 1];
+    if (last && last[0] === g) last[1].push(m);
+    else groups.push([g, [m]]);
+  }
 
   return (
     <div className="bg-white rounded-2xl shadow-md p-4">
@@ -169,8 +191,19 @@ export default function StopReasonsView({ readOnly = false }: { readOnly?: boole
       {loading ? (
         <p className="text-sm text-slate-400 py-6 text-center">Đang tải…</p>
       ) : (
+        <div className="space-y-3">
+          {groups.map(([g, list]) => (
+            <div key={g}>
+              {groups.length > 1 && (
+                <div className="text-xs font-bold text-brand-navy mb-1.5">
+                  Máy {g}{' '}
+                  <span className="font-normal text-slate-500">
+                    · {list.length} máy · đang dừng {list.filter((x) => saved[x]).length}
+                  </span>
+                </div>
+              )}
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-          {machines.map((m) => {
+          {list.map((m) => {
             const cur = saved[m];
             const isEditing = editing === m;
             return (
@@ -190,6 +223,9 @@ export default function StopReasonsView({ readOnly = false }: { readOnly?: boole
                       <div className="text-[11px] leading-tight text-red-600 font-semibold">
                         {LABEL[cur.reason_code] ?? cur.reason_code}
                         {cur.reason_code === 'ETC' && cur.reason_text ? `: ${cur.reason_text}` : ''}
+                        {isCarryName(cur.created_by_name) && (
+                          <div className="font-normal italic text-teal-700">↻ từ hôm trước</div>
+                        )}
                       </div>
                     ) : (
                       <div className="text-[11px] text-slate-400">Đang chạy</div>
@@ -258,6 +294,9 @@ export default function StopReasonsView({ readOnly = false }: { readOnly?: boole
             );
           })}
         </div>
+            </div>
+          ))}
+        </div>
       )}
       {/* Bảng ĐỐI CHIẾU (user 20/7): tổ trưởng rà lại 1 lượt trước khi rời tay */}
       {nSaved > 0 && (
@@ -277,6 +316,7 @@ export default function StopReasonsView({ readOnly = false }: { readOnly?: boole
               {sortMachines(Object.keys(saved)).map((mc) => {
                 const r = saved[mc];
                 const auto = r.created_by_name === 'KHSX tự động';
+                const carried = isCarryName(r.created_by_name);
                 return (
                   <tr key={mc} className="border-t border-slate-100">
                     <td className="px-3 py-1.5 font-bold text-brand-navy whitespace-nowrap">{mc}</td>
@@ -286,8 +326,9 @@ export default function StopReasonsView({ readOnly = false }: { readOnly?: boole
                         <span className="text-slate-500"> — {r.reason_text}</span>
                       ) : null}
                     </td>
-                    <td className={`px-3 py-1.5 whitespace-nowrap ${auto ? 'italic text-teal-700' : 'text-slate-500'}`}>
-                      {auto ? '⚙ KHSX tự động' : r.created_by_name} {fmtTimeVN(r.updated_at)}
+                    <td className={`px-3 py-1.5 whitespace-nowrap ${auto || carried ? 'italic text-teal-700' : 'text-slate-500'}`}>
+                      {auto ? '⚙ KHSX tự động' : carried ? `↻ ${r.created_by_name}` : r.created_by_name}{' '}
+                      {carried ? '' : fmtTimeVN(r.updated_at)}
                     </td>
                   </tr>
                 );
@@ -297,12 +338,21 @@ export default function StopReasonsView({ readOnly = false }: { readOnly?: boole
         </div>
       )}
 
+      {department === 'RL' ? (
+      <p className="mt-3 text-[11px] text-slate-400">
+        Máy đang dừng của <b>ngày làm việc trước</b> được <b>tự chép sang hôm nay</b> (giữ
+        nguyên lý do). Máy nào <b>chạy lại</b> thì bấm máy → “Máy có chạy — bỏ”; máy mới dừng
+        thì bấm máy → chọn lý do. Lý do tự cập nhật sang app chính, hôm sau đối chiếu với sản
+        lượng ERP.
+      </p>
+      ) : (
       <p className="mt-3 text-[11px] text-slate-400">
         Máy ngưng có nguyên nhân rõ trên KHSX (Hết NVL, Hết kế hoạch, Hư máy…) được{' '}
         <b>điền sẵn tự động</b> — tổ trưởng chỉ rà lại, sai thì bấm máy sửa hoặc “Máy có
         chạy — bỏ”. Lý do sẽ tự cập nhật vào Kết quả ngày trên app chính; người tổng hợp
         TV vẫn là bản chốt cuối.
       </p>
+      )}
     </div>
   );
 }

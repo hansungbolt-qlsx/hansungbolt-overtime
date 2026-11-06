@@ -15,6 +15,25 @@ import CoDccdCard from './CoDccdCard';
 import CoProdSummaryView from './CoProdSummaryView';
 import NvlCanhBaoCard from './NvlCanhBaoCard';
 import { chanNeuChuaLuu } from '@/lib/nvl-slips';
+import { REMIND_DEADLINE, isoVN, remindDue } from '@/lib/stop-carry-shared';
+
+// Nhắc tổ trưởng RL kiểm tra máy dừng (anh Hữu 06/11/2026): đã mở tab Máy dừng hôm nay
+// thì ghi nhớ ngày vào máy (localStorage) — bị chặn/không có thì coi như chưa mở.
+const STOP_SEEN_KEY = 'may-dung-da-kiem-tra';
+function stopSeenToday(): boolean {
+  try {
+    return window.localStorage.getItem(STOP_SEEN_KEY) === isoVN();
+  } catch {
+    return false;
+  }
+}
+function markStopSeen() {
+  try {
+    window.localStorage.setItem(STOP_SEEN_KEY, isoVN());
+  } catch {
+    /* trình duyệt chặn lưu → lần sau vẫn nhắc, không sao */
+  }
+}
 
 const todayISO = () => {
   const d = new Date();
@@ -116,6 +135,17 @@ export default function RegisterLayout({
    * Nên cờ phải chạy ngược lên đây thì mới chặn được ĐÚNG LÚC — trước khi đổi tab.
    */
   const [khoChuaLuu, setKhoChuaLuu] = useState('');
+  // Nhắc máy dừng: chỉ tổ trưởng RL; tính lại mỗi phút (qua 15:30 tự hiện)
+  const remindOn = isLeader && department === 'RL' && showStopsTab;
+  const [stopRemind, setStopRemind] = useState(false);
+  useEffect(() => {
+    if (!remindOn) return;
+    if (activeTab === 'stops') markStopSeen();
+    const tinh = () => setStopRemind(remindDue() && !stopSeenToday());
+    tinh();
+    const id = window.setInterval(tinh, 60 * 1000);
+    return () => window.clearInterval(id);
+  }, [remindOn, activeTab]);
   // Phiếu kho còn dòng chưa lưu → TaiBanMoi không tự tải lại trang (anh Hữu 04/11/2026)
   useEffect(() => {
     datDangNhapDo('phieu-kho', khoChuaLuu !== '');
@@ -135,6 +165,11 @@ export default function RegisterLayout({
     tabs.push({ key: 'prod_sum', label: 'Tổng hợp sản lượng', color: 'green' });
   }
   if (showStopsTab) tabs.push({ key: 'stops', label: 'Máy dừng hôm nay', color: 'red' });
+  const moTabMayDung = () => {
+    if (activeTab === 'stops') return;
+    if (!chanNeuChuaLuu(khoChuaLuu)) return;
+    setActiveTab('stops');
+  };
   if (showWarehouseTabs) {
     tabs.push({ key: 'wh_out', label: '📤 Xuất kho', color: 'teal' });
     tabs.push({ key: 'wh_in', label: '📥 Trả kho', color: 'green' });
@@ -170,6 +205,16 @@ export default function RegisterLayout({
     <>
       {/* Cảnh báo nhầm NVL theo KHSX hôm nay — mọi user HD; chỉ tổ trưởng chia sẻ Zalo (anh Hữu 30/10/2026) */}
       {isHD && <NvlCanhBaoCard canShare={isLeader} />}
+      {stopRemind && (
+        <button
+          type="button"
+          onClick={moTabMayDung}
+          className="w-full mb-3 rounded-xl bg-red-600 text-white text-sm font-bold px-4 py-3 text-left shadow-md shadow-red-600/30 animate-pulse"
+        >
+          ⏸ Chưa kiểm tra danh sách máy dừng hôm nay — hạn {REMIND_DEADLINE}. Bấm vào đây để kiểm
+          tra.
+        </button>
+      )}
       <div className={`grid ${cols} gap-2 mb-5`}>
         {tabs.map((t) => {
           const active = activeTab === t.key;
@@ -205,6 +250,12 @@ export default function RegisterLayout({
               }`}
             >
               {t.label}
+              {t.key === 'stops' && stopRemind && (
+                <span
+                  className="ml-1.5 inline-block w-2.5 h-2.5 rounded-full bg-red-600 ring-2 ring-white align-middle"
+                  aria-label="Chưa kiểm tra"
+                />
+              )}
             </button>
           );
         })}
@@ -238,7 +289,7 @@ export default function RegisterLayout({
       {activeTab === 'ab_day' && <CoDailyView key="84" stage="84" canSend={isLeader} currentUserFullName={currentUserFullName} />}
       {activeTab === 'prod_sum' && <CoProdSummaryView />}
 
-      {activeTab === 'stops' && <StopReasonsView readOnly={isQlsx} />}
+      {activeTab === 'stops' && <StopReasonsView readOnly={isQlsx} department={department} />}
 
       {activeTab === 'wh_out' && <WarehouseSlipView kind="issue" onChuaLuu={setKhoChuaLuu} />}
       {activeTab === 'wh_in' && <WarehouseSlipView kind="return" onChuaLuu={setKhoChuaLuu} />}
