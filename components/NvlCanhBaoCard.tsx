@@ -88,7 +88,7 @@ function NoiDung({ a, b, gio, gon = false }: { a: NvlNhomA[]; b: NvlDongB[]; gio
 function NoiDungGon({ a, b }: { a: NvlNhomA[]; b: NvlDongB[] }) {
   return (
     <>
-      <div style={{ fontWeight: 800, fontSize: 13.5, lineHeight: 1.35 }}>
+      <div style={{ fontWeight: 800, fontSize: 13.5, lineHeight: 1.5 }}>
         A. Nhiều máy chạy cùng size nhưng khác loại — NVL chờ ở LINE dễ lấy nhầm
       </div>
       {a.length === 0 && <div style={{ marginLeft: 6 }}>• Hôm nay không có</div>}
@@ -106,7 +106,7 @@ function NoiDungGon({ a, b }: { a: NvlNhomA[]; b: NvlDongB[] }) {
         </div>
       ))}
 
-      <div style={{ fontWeight: 800, fontSize: 13.5, lineHeight: 1.35, marginTop: 6 }}>
+      <div style={{ fontWeight: 800, fontSize: 13.5, lineHeight: 1.5, marginTop: 6 }}>
         B. Máy đổi mã, cùng size khác loại NVL — kiểm và thay cuộn trước khi Setting
       </div>
       {b.length === 0 && <div style={{ marginLeft: 6 }}>• Hôm nay không có</div>}
@@ -242,7 +242,8 @@ export default function NvlCanhBaoCard({ canShare }: { canShare: boolean }) {
           </button>
         )}
       </div>
-      <div style={{ fontFamily: SHARE_FONT, fontSize: 14, lineHeight: 1.45, color: '#141414', padding: '4px 12px 8px' }}>
+      {/* Giãn dòng +10% (anh Hữu 07/11/2026): 1,45 → 1,6 · tiêu đề A/B 1,35 → 1,5 */}
+      <div style={{ fontFamily: SHARE_FONT, fontSize: 14, lineHeight: 1.6, color: '#141414', padding: '4px 12px 8px' }}>
         <NoiDung a={a} b={b} gio={gio} gon />
       </div>
 
