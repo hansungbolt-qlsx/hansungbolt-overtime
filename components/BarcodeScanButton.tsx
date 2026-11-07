@@ -1,30 +1,79 @@
 'use client';
 
-// Quét barcode tem cuộn NVL (user chốt 25/7, cải tiến 28/7 sau khi thử thật).
+// Quét mã vạch tem cuộn NVL / phiếu di chuyển (dùng ở Xuất kho NVL, CO quét LOT, Gia công).
 //
-// ⚠ BẮT BUỘC dùng thư viện BUNDLE trong app (html5-qrcode) — KHÔNG dựa vào
-// `BarcodeDetector` của trình duyệt: iOS Safari không có, mà kho dùng cả Android
-// lẫn iPhone. (Vẫn BẬT dùng nó khi máy có — Android nhanh hơn nhiều — nhưng chỉ
-// như bộ tăng tốc, ZXing trong thư viện là đường chính.)
+// 🔴 VIẾT LẠI 07/11/2026 (anh Hữu duyệt) — html5-qrcode cũ "hầu như không ăn" mã 1D:
+//   · đo thật trên 5 tem mẫu NCC: html5-qrcode quét trực tiếp mã 1D 0/8; zxing-wasm 10/10.
+//   · nguyên nhân: html5-qrcode thu nhỏ khung về ~640 px + bộ giải mã ZXing-js yếu với 1D.
+// Cách làm mới:
+//   1. Bộ đọc zxing-wasm (lib/barcode-reader.ts) — chạy cả iPhone lẫn Android. Android có
+//      BarcodeDetector của hệ điều hành thì chạy SONG SONG, bên nào ra trước lấy bên đó.
+//   2. Camera xin 1920×1080, Android bật lấy nét liên tục; nút 🔦 đèn; Android có thanh zoom
+//      (iPhone Safari không cho web zoom camera).
+//   3. KHUNG CHỮ NHẬT dẹt kiểu mã vạch (12:5): video hiển thị cắt đúng phần giữa, và CHỈ
+//      giải mã đúng phần đang thấy, ở độ phân giải gốc (không thu nhỏ) ⇒ thấy gì đọc nấy.
+//      Cứ 5 khung thì đọc cả khung hình 1 lần để bắt QR Vĩnh Thành (vuông) nằm lệch khung.
+//      2 cách tách đen/trắng xen kẽ từng khung (xem lib/barcode-reader.ts).
+//   4. Code39 (Nhuận Thái, phiếu di chuyển) không có số kiểm tra ⇒ đọc trùng 2 lần mới nhận.
+//   5. Đọc được: rung (Android) + tiếng bíp.
+//   6. Vẫn giữ "📸 Chụp ảnh tem" (camera gốc của máy) — giải mã ảnh bằng zxing-wasm.
 //
-// 🔴 BÀI HỌC 28/7 — quét LIVE trên iPhone gần như không đọc được mã vạch 1D:
-// Code128/Code39 có ~100 vạch mảnh, luồng video mặc định 640×480 lại còn bị crop
-// vào khung nhỏ ⇒ mỗi vạch dưới 1 pixel; thêm nữa Safari iOS không lấy nét macro
-// qua getUserMedia nên ảnh hơi nhoè. Vì vậy:
-//   1. xin luồng 1920×1080 thay vì mặc định
-//   2. khung quét rộng gần hết chiều ngang (mã vạch nằm ngang, dài)
-//   3. LUÔN có đường "📸 Chụp ảnh tem" — dùng CAMERA GỐC của máy (nét + phân giải
-//      đầy đủ + có đèn flash) rồi giải mã từ ảnh. Trên iPhone đây là đường ăn chắc.
+// ⚠ Bố cục CHỐNG VỠ (bài học 28/7): khung cố định cả màn hình, đầu (Đóng) và chân (nút) không
+// co ⇒ nút thoát luôn nhìn thấy.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ConfirmGate,
+  NATIVE_FORMATS,
+  loadZxing,
+  nativeFormatName,
+  readFrame,
+  readPhotoPart,
+  type ScanHit,
+} from '@/lib/barcode-reader';
 
-const BOX_ID = 'nvl-barcode-box';
-const FILE_BOX_ID = 'nvl-barcode-file-box';
+// Tỉ lệ khung quét (rộng : cao). Dẹt kiểu mã vạch nhưng vẫn đủ cao cho QR khi đứng xa ~20 cm.
+const BOX_W = 12;
+const BOX_H = 5;
+// Cạnh dài tối đa của ảnh đưa vào bộ đọc (giữ nét, không để khung 4K làm chậm máy yếu)
+const MAX_SIDE = 1920;
+// Cứ N khung thì đọc cả khung hình (bắt QR nằm ngoài khung chữ nhật)
+const FULL_EVERY = 5;
+
+type Caps = {
+  torch: boolean;
+  zoom: { min: number; max: number; step: number } | null;
+};
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function fmtOf(r: any): string | undefined {
-  const f = r?.result?.format?.formatName ?? r?.result?.format?.format;
-  return f ? String(f) : undefined;
+type AnyTrack = MediaStreamTrack & { getCapabilities?: () => any };
+
+function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return (
+    /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  );
+}
+
+// Vùng video ĐANG HIỂN THỊ trong khung (video object-cover) — tính theo pixel gốc của video.
+function visibleRect(vw: number, vh: number, boxW: number, boxH: number) {
+  const scale = Math.max(boxW / vw, boxH / vh);
+  const sw = Math.min(vw, boxW / scale);
+  const sh = Math.min(vh, boxH / scale);
+  return { sx: (vw - sw) / 2, sy: (vh - sh) / 2, sw, sh };
+}
+
+function errText(e: unknown): string {
+  const name = e instanceof DOMException || e instanceof Error ? e.name : '';
+  if (name === 'NotAllowedError' || name === 'SecurityError')
+    return 'Chưa cho phép dùng camera — vào cài đặt trình duyệt cho phép Camera với trang này rồi thử lại.';
+  if (name === 'NotFoundError' || name === 'OverconstrainedError')
+    return 'Không tìm thấy camera sau của máy.';
+  if (name === 'NotReadableError')
+    return 'Camera đang bị ứng dụng khác dùng — tắt ứng dụng camera khác rồi thử lại.';
+  const msg = e instanceof Error ? e.message : typeof e === 'string' ? e : '';
+  return `Không mở được camera — ${msg || name || 'không rõ nguyên nhân'}`;
 }
 
 export default function BarcodeScanButton({
@@ -36,35 +85,78 @@ export default function BarcodeScanButton({
 }) {
   const [open, setOpen] = useState(false);
   const [err, setErr] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [ready, setReady] = useState(false); // camera + bộ đọc đã sẵn sàng
+  const [busy, setBusy] = useState(false); // đang đọc ảnh chụp
+  const [step, setStep] = useState('');
   const [secs, setSecs] = useState(0);
-  const [step, setStep] = useState('');   // tiến trình đọc ảnh
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const scannerRef = useRef<any>(null);
-  const fileRef = useRef<HTMLInputElement | null>(null);
+  const [caps, setCaps] = useState<Caps>({ torch: false, zoom: null });
+  const [torchOn, setTorchOn] = useState(false);
+  const [torchMsg, setTorchMsg] = useState('');
+  const [zoom, setZoom] = useState(1);
 
-  const stop = useCallback(async () => {
-    const s = scannerRef.current;
-    scannerRef.current = null;
-    if (s) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const boxRef = useRef<HTMLDivElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const audioRef = useRef<AudioContext | null>(null);
+  // Giữ onScan mới nhất mà không khởi động lại camera mỗi lần trang cha vẽ lại
+  const onScanRef = useRef(onScan);
+  useEffect(() => {
+    onScanRef.current = onScan;
+  }, [onScan]);
+
+  const stopCamera = useCallback(() => {
+    const s = streamRef.current;
+    streamRef.current = null;
+    s?.getTracks().forEach((t) => {
       try {
-        await s.stop();
+        t.stop();
       } catch {
         /* đã dừng */
       }
-      try {
-        s.clear();
-      } catch {
-        /* ignore */
-      }
-    }
+    });
+    if (videoRef.current) videoRef.current.srcObject = null;
   }, []);
 
   const close = useCallback(() => {
-    void stop();
+    stopCamera();
     setOpen(false);
     setSecs(0);
-  }, [stop]);
+  }, [stopCamera]);
+
+  // Báo hiệu đọc được: rung (Android; iPhone không hỗ trợ) + bíp ngắn
+  const signal = useCallback(() => {
+    try {
+      navigator.vibrate?.(120);
+    } catch {
+      /* ignore */
+    }
+    const ctx = audioRef.current;
+    if (!ctx) return;
+    try {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'square';
+      o.frequency.value = 1800;
+      g.gain.value = 0.08;
+      o.connect(g).connect(ctx.destination);
+      o.start();
+      o.stop(ctx.currentTime + 0.12);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const finish = useCallback(
+    (hit: ScanHit) => {
+      stopCamera();
+      signal();
+      setOpen(false);
+      setSecs(0);
+      onScanRef.current(hit.text, hit.format);
+    },
+    [signal, stopCamera],
+  );
 
   // Đồng hồ đếm giây — để người dùng biết máy đang thử, không phải treo
   useEffect(() => {
@@ -73,210 +165,233 @@ export default function BarcodeScanButton({
     return () => clearInterval(t);
   }, [open]);
 
+  // Mở camera + vòng đọc khung
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
     (async () => {
       try {
-        const mod = await import('html5-qrcode');
-        if (cancelled) return;
-        const { Html5Qrcode, Html5QrcodeSupportedFormats } = mod;
-        const scanner = new Html5Qrcode(BOX_ID, {
-          // Chỉ 3 định dạng có thật trên tem — chống đọc bừa (xem ghi chú ở onFile)
-          formatsToSupport: [
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.QR_CODE,
-          ],
-          // Android/Chrome có bộ giải mã của hệ điều hành → nhanh và khoẻ hơn.
-          // iOS không có thì thư viện tự dùng ZXing như cũ.
-          experimentalFeatures: { useBarCodeDetectorIfSupported: true },
-          verbose: false,
+        const zx = loadZxing(); // tải wasm song song với lúc xin camera
+        if (!navigator.mediaDevices?.getUserMedia) throw new Error('trình duyệt không hỗ trợ camera');
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
         });
-        scannerRef.current = scanner;
-        await scanner.start(
-          // ⚠ Tham số này BẮT BUỘC chỉ có ĐÚNG 1 KHOÁ (html5-qrcode
-          // html5-qrcode.ts:1261 — `keys.length !== 1` là throw). Truyền thêm
-          // width/height vào đây là "Không mở được camera" ngay (đã dính 28/7).
-          { facingMode: 'environment' },
-          {
-            fps: 12,
-            // KHÔNG đặt qrbox → quét TOÀN KHUNG. Lợi 2 điều: (1) mã vạch 1D dài
-            // nên càng nhiều pixel ngang càng dễ đọc, (2) không có lớp phủ khung
-            // nào để lệch khi CSS co video lại cho vừa modal (bug 28/7: video
-            // phình to, "chia 2 phân vùng", đẩy nút Đóng ra khỏi màn hình).
-            // ĐÂY mới là chỗ xin luồng phân giải cao — 1280×720 là mức vừa đủ
-            // tốt cho mã vạch mà không làm phần tử video quá khổ.
-            videoConstraints: {
-              facingMode: 'environment',
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-            },
-          },
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (text: string, result: any) => {
-            void stop();
-            setOpen(false);
-            onScan(String(text).trim(), fmtOf(result));
-          },
-          () => {
-            /* mỗi khung không đọc được — im lặng */
-          },
-        );
-      } catch (e) {
-        if (!cancelled) {
-          // ⚠ html5-qrcode ném CHUỖI, không phải Error → `e instanceof Error`
-          // là false và thông báo mất luôn nguyên nhân (đã dính 28/7: chỉ thấy
-          // "Không mở được camera", phải đi đọc mã nguồn thư viện mới ra).
-          const detail =
-            e instanceof Error ? e.message : typeof e === 'string' ? e : JSON.stringify(e);
-          setErr(`Không mở được camera — ${detail || 'không rõ nguyên nhân'}`);
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
         }
+        streamRef.current = stream;
+        const video = videoRef.current;
+        if (!video) return;
+        video.srcObject = stream;
+        await video.play().catch(() => {});
+
+        const track = stream.getVideoTracks()[0] as AnyTrack | undefined;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let c: any = {};
+        try {
+          c = track?.getCapabilities?.() ?? {};
+        } catch {
+          c = {};
+        }
+        // Android: lấy nét liên tục (mặc định nhiều máy để "single shot" → nhoè khi đưa gần)
+        if (Array.isArray(c.focusMode) && c.focusMode.includes('continuous')) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await track?.applyConstraints({ advanced: [{ focusMode: 'continuous' } as any] }).catch(() => {});
+        }
+        const z =
+          c.zoom && typeof c.zoom.max === 'number' && c.zoom.max > (c.zoom.min ?? 1)
+            ? {
+                min: c.zoom.min ?? 1,
+                max: Math.min(c.zoom.max, 5),
+                step: c.zoom.step > 0 ? c.zoom.step : 0.1,
+              }
+            : null;
+        if (!cancelled) {
+          // iPhone: getCapabilities không phải lúc nào cũng báo torch dù bật được ⇒ vẫn hiện nút
+          setCaps({ torch: !!c.torch || isIOS(), zoom: z });
+          if (z) setZoom(Math.max(z.min, 1));
+        }
+
+        await zx;
+        if (cancelled) return;
+        setReady(true);
+
+        // BarcodeDetector của hệ điều hành (Android Chrome) — chạy song song với zxing
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let native: any = null;
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const BD = (window as any).BarcodeDetector;
+          if (BD) {
+            const sup: string[] = await BD.getSupportedFormats();
+            const fm = NATIVE_FORMATS.filter((f) => sup.includes(f));
+            if (fm.length === NATIVE_FORMATS.length) native = new BD({ formats: fm });
+          }
+        } catch {
+          native = null;
+        }
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const gate = new ConfirmGate();
+        let n = 0;
+
+        const tick = async () => {
+          if (cancelled || !streamRef.current) return;
+          const vw = video.videoWidth;
+          const vh = video.videoHeight;
+          const box = boxRef.current;
+          if (ctx && vw && vh && box && video.readyState >= 2) {
+            n++;
+            const full = n % FULL_EVERY === 0;
+            const r = full
+              ? { sx: 0, sy: 0, sw: vw, sh: vh }
+              : visibleRect(vw, vh, box.clientWidth, box.clientHeight);
+            const k = Math.min(1, MAX_SIDE / Math.max(r.sw, r.sh));
+            const cw = Math.max(1, Math.round(r.sw * k));
+            const ch = Math.max(1, Math.round(r.sh * k));
+            if (canvas.width !== cw) canvas.width = cw;
+            if (canvas.height !== ch) canvas.height = ch;
+            ctx.drawImage(video, r.sx, r.sy, r.sw, r.sh, 0, 0, cw, ch);
+            const img = ctx.getImageData(0, 0, cw, ch);
+            const [a, b] = await Promise.all([
+              readFrame(img, full || n % 2 === 0 ? 'LocalAverage' : 'FixedThreshold').catch(() => null),
+              native
+                ? native
+                    .detect(canvas)
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    .then((rs: any[]) => {
+                      const x = rs.find((q) => q.rawValue && String(q.rawValue).trim());
+                      return x
+                        ? ({ text: String(x.rawValue).trim(), format: nativeFormatName(x.format) } as ScanHit)
+                        : null;
+                    })
+                    .catch(() => null)
+                : Promise.resolve(null),
+            ]);
+            if (cancelled) return;
+            const hit = a ?? b;
+            if (hit && gate.accept(hit)) {
+              finish(hit);
+              return;
+            }
+          }
+          timer = setTimeout(() => void tick(), 40);
+        };
+        void tick();
+      } catch (e) {
+        if (!cancelled) setErr(errText(e));
       }
     })();
 
     return () => {
       cancelled = true;
-      void stop();
+      if (timer) clearTimeout(timer);
+      stopCamera();
+      setReady(false);
+      setTorchOn(false);
+      setTorchMsg('');
+      setCaps({ torch: false, zoom: null });
     };
-  }, [open, onScan, stop]);
+  }, [open, finish, stopCamera]);
 
-  /** Giải mã từ ẢNH chụp bằng camera gốc của máy.
-   *
-   * 🔴 NGUYÊN NHÂN GỐC tìm được 28/7 (giải mã thử 5 tem mẫu bằng chính ZXing):
-   * bộ đọc mã 1D của ZXing CHỈ dò một số DÒNG NGANG QUANH GIỮA ảnh. Mã vạch trên
-   * tem cuộn NVL luôn nằm ở ĐÁY tem (Daeho, KOS, Nhuận Thái, Thái Lan, Vĩnh
-   * Thành — cả 5 đều vậy) nên không bao giờ được dò tới ⇒ ảnh nguyên tấm LUÔN
-   * thất bại, dù ảnh nét. Cắt thành dải ngang + phóng to lên thì cả 5 đọc được
-   * ngay (CODE_128 ×3, CODE_39 ×1, QR ×1).
-   *
-   * Vì vậy: thử ảnh nguyên trước (nhanh, bắt QR), rồi TRƯỢT 6 DẢI NGANG từ trên
-   * xuống, mỗi dải cao 30% ảnh và phóng về tối thiểu ~1.400 px ngang.
+  const toggleTorch = useCallback(async () => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    const next = !torchOn;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await track.applyConstraints({ advanced: [{ torch: next } as any] });
+      setTorchOn(next);
+      setTorchMsg('');
+    } catch {
+      setTorchMsg('Máy này không bật được đèn khi quét — dùng “📸 Chụp ảnh tem” (có đèn flash).');
+      setCaps((c) => ({ ...c, torch: false }));
+    }
+  }, [torchOn]);
+
+  const changeZoom = useCallback(async (v: number) => {
+    setZoom(v);
+    const track = streamRef.current?.getVideoTracks()[0];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await track?.applyConstraints({ advanced: [{ zoom: v } as any] }).catch(() => {});
+  }, []);
+
+  /** Giải mã từ ẢNH chụp bằng camera gốc của máy (nét + phân giải đầy đủ + có flash).
+   * 1) cả ảnh (thư viện tự xoay/thu nhỏ nhiều mức)
+   * 2) ảnh đã xoay đúng chiều EXIF, thu về cạnh dài ≤ 2400 px
+   * 3) trượt DẢI NGANG từ đáy lên (mã vạch trên tem 5 NCC đều nằm ở đáy tem)
    */
   const onFile = useCallback(
     async (file: File | undefined) => {
       if (!file) return;
       setBusy(true);
       setErr('');
-      setStep('');
-      await stop();
+      setStep('đang đọc ảnh…');
+      stopCamera();
       try {
-        const mod = await import('html5-qrcode');
-        const { Html5Qrcode, Html5QrcodeSupportedFormats } = mod;
-        const s = new Html5Qrcode(FILE_BOX_ID, {
-          // ⚠ CHỈ 3 định dạng CÓ THẬT trên tem 5 NCC. Thử nghiệm 28/7: để rộng
-          // thêm EAN/ITF/CODE_93 thì có ca đọc BỪA thành EAN_8 "21558788" trong
-          // khi giá trị đúng là CODE_39 "RP00226031324" → tick SAI CUỘN.
-          // Thu hẹp danh sách là cách chống đọc sai rẻ nhất. ĐỪNG nới lại.
-          formatsToSupport: [
-            Html5QrcodeSupportedFormats.CODE_128,   // Daeho · KOS · POS-SEAH
-            Html5QrcodeSupportedFormats.CODE_39,    // Nhuận Thái
-            Html5QrcodeSupportedFormats.QR_CODE,    // Vĩnh Thành
-          ],
-          verbose: false,
-        });
+        let hit: ScanHit | null = await readPhotoPart(file).catch(() => null);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const anyS = s as any;
-        const scanOne = async (f: File) => {
-          if (typeof anyS.scanFileV2 === 'function') {
-            const res = await anyS.scanFileV2(f, false);
-            return { text: String(res.decodedText).trim(), fmt: fmtOf(res) };
-          }
-          const text = await s.scanFile(f, false);
-          return { text: String(text).trim(), fmt: undefined };
-        };
+        if (!hit) {
+          const bmp = await createImageBitmap(file);
+          const k = Math.min(1, 2400 / Math.max(bmp.width, bmp.height));
+          const W = Math.round(bmp.width * k);
+          const H = Math.round(bmp.height * k);
+          const cv = document.createElement('canvas');
+          const ctx = cv.getContext('2d', { willReadFrequently: true });
+          if (ctx) {
+            cv.width = W;
+            cv.height = H;
+            ctx.drawImage(bmp, 0, 0, W, H);
+            setStep('đang dò…');
+            hit = await readPhotoPart(ctx.getImageData(0, 0, W, H)).catch(() => null);
 
-        let hit: { text: string; fmt?: string } | null = null;
-        try {
-          // 1) Ảnh nguyên tấm — bắt QR rất nhanh
-          setStep('đang đọc ảnh…');
-          try {
-            hit = await scanOne(file);
-          } catch {
-            /* sang bước cắt dải */
-          }
-
-          // 2) Trượt dải ngang — cách DUY NHẤT đọc được mã 1D ở đáy tem.
-          //
-          // Công thức dưới đây là kết quả ĐO THẬT 28/7 trên 4 tem mẫu, mô phỏng
-          // ảnh chụp điện thoại ở nhiều mức xa/mờ (xem docs mục 4.2):
-          //   · DẢI HẸP 12% cao, chồng nhau 50% → mọi ca thành công đều rơi vào
-          //     mức này, dải 25-30% thì trượt
-          //   · dò TỪ DƯỚI LÊN — mã vạch luôn ở đáy tem nên ra rất nhanh
-          //   · NHỊ PHÂN HOÁ (đen/trắng theo ngưỡng trung bình) là biến thể cứu
-          //     được tem Daeho (nền vàng, bọc nilon bóng) mà ảnh thường thất bại
-          if (!hit) {
-            const bmp = await createImageBitmap(file);
-            const W = bmp.width;
-            const H = bmp.height;
-            const bandH = Math.max(48, Math.round(H * 0.12));
-            const stepPx = Math.max(24, Math.round(bandH / 2));
-            const tops: number[] = [];
-            for (let top = H - bandH; top >= 0; top -= stepPx) tops.push(top);
-            if (tops[tops.length - 1] !== 0) tops.push(0);
-
-            const scale = Math.min(3, Math.max(1.5, 1600 / W));
-            const cv = document.createElement('canvas');
-            const ctx = cv.getContext('2d', { willReadFrequently: true });
-            cv.width = Math.round(W * scale);
-            cv.height = Math.round(bandH * scale);
-
-            const toFile = async (name: string) => {
-              const blob: Blob | null = await new Promise((res) =>
-                cv.toBlob((b) => res(b), 'image/png'),
-              );
-              return blob ? new File([blob], name, { type: 'image/png' }) : null;
-            };
-
-            // Nhị phân hoá theo ngưỡng TRUNG BÌNH của chính dải đó — tự thích ứng
-            // với tem sáng/tối, tốt hơn ngưỡng cố định.
-            const binarize = () => {
-              if (!ctx) return;
-              const im = ctx.getImageData(0, 0, cv.width, cv.height);
-              const d = im.data;
-              let sum = 0;
-              for (let i = 0; i < d.length; i += 4) {
-                sum += d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
-              }
-              const mean = sum / (d.length / 4);
-              for (let i = 0; i < d.length; i += 4) {
-                const v = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114 > mean ? 255 : 0;
-                d[i] = d[i + 1] = d[i + 2] = v;
-              }
-              ctx.putImageData(im, 0, 0);
-            };
-
-            for (let k = 0; k < tops.length && !hit; k++) {
-              setStep(`đang dò ${k + 1}/${tops.length}…`);
-              // lượt 1: ảnh thường · lượt 2: nhị phân hoá (cứu tem nền vàng/bóng)
-              for (const bin of [false, true]) {
-                ctx?.drawImage(bmp, 0, tops[k], W, bandH, 0, 0, cv.width, cv.height);
-                if (bin) binarize();
-                const f = await toFile(`b${k}${bin ? 'x' : ''}.png`);
-                if (!f) continue;
-                try {
-                  hit = await scanOne(f);
-                  break;
-                } catch {
-                  /* thử biến thể / dải kế tiếp */
-                }
+            if (!hit) {
+              const bandH = Math.max(64, Math.round(H * 0.2));
+              const stepPx = Math.max(32, Math.round(bandH / 2));
+              const tops: number[] = [];
+              for (let top = H - bandH; top > 0; top -= stepPx) tops.push(top);
+              tops.push(0);
+              for (let i = 0; i < tops.length && !hit; i++) {
+                setStep(`đang dò ${i + 1}/${tops.length}…`);
+                const band = ctx.getImageData(0, tops[i], W, Math.min(bandH, H - tops[i]));
+                hit =
+                  (await readFrame(band, 'FixedThreshold').catch(() => null)) ??
+                  (await readFrame(band, 'LocalAverage').catch(() => null));
               }
             }
-            bmp.close?.();
           }
-        } finally {
-          try {
-            s.clear();
-          } catch {
-            /* ignore */
+          // 4) Lượt cuối: ảnh GỐC chưa thu nhỏ (mã chụp xa, vạch quá mảnh). Đo 07/11:
+          //    cứu thêm ca Nhuận Thái chụp xa mà bản 2400 px không đọc được.
+          if (!hit && Math.max(bmp.width, bmp.height) > 2400) {
+            setStep('đang dò ảnh gốc…');
+            const cv2 = document.createElement('canvas');
+            const c2 = cv2.getContext('2d', { willReadFrequently: true });
+            if (c2) {
+              cv2.width = bmp.width;
+              cv2.height = bmp.height;
+              c2.drawImage(bmp, 0, 0);
+              hit = await readFrame(c2.getImageData(0, 0, bmp.width, bmp.height), 'FixedThreshold').catch(
+                () => null,
+              );
+              cv2.width = cv2.height = 0; // trả bộ nhớ sớm (máy yếu)
+            }
           }
+          bmp.close?.();
         }
 
         if (!hit) throw new Error('no-code');
-        onScan(hit.text, hit.fmt || 'ảnh');
+        signal();
         setOpen(false);
+        onScanRef.current(hit.text, hit.format);
       } catch {
         setErr(
           'Chưa đọc được mã vạch trong ảnh. Chụp lại sao cho MÃ VẠCH nằm ngang, ' +
@@ -288,7 +403,7 @@ export default function BarcodeScanButton({
         if (fileRef.current) fileRef.current.value = '';
       }
     },
-    [onScan, stop],
+    [signal, stopCamera],
   );
 
   return (
@@ -296,6 +411,17 @@ export default function BarcodeScanButton({
       <button
         type="button"
         onClick={() => {
+          // Tạo AudioContext ngay trong lần chạm (iPhone chỉ cho phát tiếng khi do người bấm)
+          try {
+            if (!audioRef.current) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const AC = window.AudioContext || (window as any).webkitAudioContext;
+              if (AC) audioRef.current = new AC();
+            }
+            void audioRef.current?.resume();
+          } catch {
+            /* không có tiếng cũng không sao */
+          }
           setErr('');
           setSecs(0);
           setOpen(true);
@@ -305,18 +431,11 @@ export default function BarcodeScanButton({
         {label}
       </button>
 
-      {/* Vùng ẩn cho html5-qrcode giải mã từ file */}
-      <div id={FILE_BOX_ID} className="hidden" />
-
       {open && (
-        // Bố cục CHỐNG VỠ: khung cố định cả màn hình, chia 3 tầng —
-        // đầu (Đóng) và chân (2 nút) KHÔNG co, chỉ vùng video co giãn. Nhờ vậy
-        // nút thoát luôn nhìn thấy kể cả khi video bị thư viện đặt sai kích cỡ
-        // (bug 28/7: nút Đóng bị đẩy ra khỏi màn hình, không huỷ được lệnh quét).
-        <div className="fixed inset-0 z-50 bg-black/85 flex flex-col p-3">
+        <div className="fixed inset-0 z-50 bg-black/85 flex flex-col p-3" data-testid="scan-modal">
           <div className="bg-white rounded-xl p-3 w-full max-w-md mx-auto my-auto flex flex-col max-h-full overflow-hidden">
             <div className="flex items-center justify-between mb-2 shrink-0">
-              <span className="font-bold text-brand-navy">Quét tem cuộn</span>
+              <span className="font-bold text-brand-navy">Quét mã vạch</span>
               <button
                 type="button"
                 onClick={close}
@@ -326,29 +445,84 @@ export default function BarcodeScanButton({
               </button>
             </div>
 
+            {/* KHUNG CHỮ NHẬT kiểu mã vạch — chỉ phần thấy trong khung mới được giải mã */}
             <div
-              id={BOX_ID}
-              className="w-full rounded-lg overflow-hidden bg-black shrink-0"
-            />
+              ref={boxRef}
+              className="relative w-full rounded-lg overflow-hidden bg-black shrink-0"
+              style={{ aspectRatio: `${BOX_W} / ${BOX_H}` }}
+            >
+              <video
+                ref={videoRef}
+                playsInline
+                muted
+                autoPlay
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+              {/* 4 góc khung + vạch đỏ ngắm */}
+              <div className="pointer-events-none absolute inset-2">
+                <span className="absolute left-0 top-0 w-6 h-6 border-l-4 border-t-4 border-white rounded-tl" />
+                <span className="absolute right-0 top-0 w-6 h-6 border-r-4 border-t-4 border-white rounded-tr" />
+                <span className="absolute left-0 bottom-0 w-6 h-6 border-l-4 border-b-4 border-white rounded-bl" />
+                <span className="absolute right-0 bottom-0 w-6 h-6 border-r-4 border-b-4 border-white rounded-br" />
+                <span className="absolute left-3 right-3 top-1/2 h-0.5 -translate-y-1/2 bg-red-500 shadow-[0_0_6px_rgba(239,68,68,.9)]" />
+              </div>
+              {!ready && !err && (
+                <div className="absolute inset-0 flex items-center justify-center text-white text-sm">
+                  Đang mở camera…
+                </div>
+              )}
+            </div>
+
+            {/* Đèn + zoom */}
+            {(caps.torch || caps.zoom) && (
+              <div className="mt-2 flex items-center gap-2 shrink-0">
+                {caps.torch && (
+                  <button
+                    type="button"
+                    onClick={() => void toggleTorch()}
+                    aria-pressed={torchOn}
+                    className={`px-3 py-2 rounded-lg text-sm font-bold border-2 whitespace-nowrap ${
+                      torchOn ? 'bg-amber-400 border-amber-500 text-black' : 'bg-white border-brand-navy/30 text-brand-navy'
+                    }`}
+                  >
+                    🔦 {torchOn ? 'Tắt đèn' : 'Bật đèn'}
+                  </button>
+                )}
+                {caps.zoom && (
+                  <label className="flex-1 flex items-center gap-2 text-sm font-semibold text-brand-navy">
+                    <span className="whitespace-nowrap tabular-nums w-12">{zoom.toFixed(1)}×</span>
+                    <input
+                      type="range"
+                      min={caps.zoom.min}
+                      max={caps.zoom.max}
+                      step={caps.zoom.step}
+                      value={zoom}
+                      onChange={(e) => void changeZoom(Number(e.target.value))}
+                      className="flex-1 accent-brand-teal"
+                      aria-label="Phóng to camera"
+                    />
+                  </label>
+                )}
+              </div>
+            )}
 
             <div className="mt-2 overflow-auto min-h-0">
               {err ? (
                 <p className="text-sm text-red-600 font-semibold break-words">{err}</p>
               ) : (
-                <p className="text-xs text-brand-navy-soft">
-                  Đưa mã vạch nằm NGANG, chiếm gần hết chiều ngang khung. Giữ máy yên
-                  khoảng 2 giây.
-                  {secs >= 8 && (
+                <p className="text-xs text-brand-navy-soft leading-relaxed">
+                  Cách tem khoảng <b>15–20 cm</b>, mã vạch nằm <b>ngang trong khung</b>, vạch đỏ cắt
+                  ngang mã. Chỗ tối thì bật 🔦; tem bị chói thì nghiêng máy một chút.
+                  {torchMsg && <span className="block mt-1 text-amber-700 font-semibold">{torchMsg}</span>}
+                  {secs >= 10 && (
                     <span className="block mt-1 text-amber-700 font-semibold">
-                      Đã thử {secs}s mà chưa đọc được — bấm “📸 Chụp ảnh tem” bên dưới,
-                      camera gốc của máy nét hơn nhiều.
+                      Đã thử {secs}s mà chưa đọc được — bấm “📸 Chụp ảnh tem” bên dưới.
                     </span>
                   )}
                 </p>
               )}
             </div>
 
-            {/* Đường ăn chắc trên iPhone: chụp bằng camera gốc rồi giải mã từ ảnh */}
             <input
               ref={fileRef}
               type="file"
@@ -364,9 +538,8 @@ export default function BarcodeScanButton({
                 onClick={() => fileRef.current?.click()}
                 className="w-full py-3 rounded-xl bg-brand-teal text-white font-bold disabled:opacity-50"
               >
-                {busy ? (step || 'Đang đọc ảnh…') : '📸 Chụp ảnh tem (nét hơn)'}
+                {busy ? step || 'Đang đọc ảnh…' : '📸 Chụp ảnh tem'}
               </button>
-              {/* Nút huỷ thứ 2 ở chân — ngón tay ở dưới màn hình dễ với hơn */}
               <button
                 type="button"
                 onClick={close}
