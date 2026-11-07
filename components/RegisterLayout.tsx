@@ -208,6 +208,9 @@ export default function RegisterLayout({
           tra.
         </button>
       )}
+      {/* Nút menu (anh Hữu 07/11/2026: chữ không được tràn viền): cho XUỐNG DÒNG cân đối, mọi nút cao
+          bằng nhau 44px (= 2 dòng) — iPhone/Android chữ tiếng Việt rộng hơn máy tính (font Geist không có
+          dấu tiếng Việt, máy tự mượn font khác) nên KHÔNG ép 1 dòng (whitespace-nowrap). */}
       <div className={`grid ${cols} gap-1.5 mb-3`}>
         {tabs.map((t) => {
           const active = activeTab === t.key;
@@ -238,7 +241,7 @@ export default function RegisterLayout({
                 if (!chanNeuChuaLuu(khoChuaLuu)) return;
                 setActiveTab(t.key);
               }}
-              className={`px-0.5 py-2 rounded-xl text-[12.5px] leading-tight tracking-tight whitespace-nowrap font-semibold transition border ${
+              className={`min-h-[44px] px-1 py-1 rounded-xl text-[12.5px] leading-tight tracking-tight text-center [text-wrap:balance] flex items-center justify-center font-semibold transition border ${
                 active ? activeCls : inactiveCls
               }`}
             >

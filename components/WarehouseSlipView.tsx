@@ -1355,7 +1355,7 @@ export default function WarehouseSlipView(
               value={q}
               onChange={(e) => { setQ(e.target.value); setPickedCode(''); }}
               placeholder={isNvl ? 'Gõ mã / tên / size…' : 'Gõ mã / tên / quy cách…'}
-              className="flex-1 px-3 py-2.5 border border-gray-300 rounded-md text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal"
+              className="flex-1 min-w-0 px-3 py-2.5 border border-gray-300 rounded-md text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal"
             />
             {isNvl && <BarcodeScanButton onScan={onScan} />}
           </div>
