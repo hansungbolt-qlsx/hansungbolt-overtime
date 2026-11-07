@@ -92,16 +92,19 @@ function NoiDungGon({ a, b }: { a: NvlNhomA[]; b: NvlDongB[] }) {
         A. Nhiều máy chạy cùng size nhưng khác loại — NVL chờ ở LINE dễ lấy nhầm
       </div>
       {a.length === 0 && <div style={{ marginLeft: 6 }}>• Hôm nay không có</div>}
+      {/* Size NVL 1 dòng trên; mỗi loại NVL → máy 1 dòng riêng bên dưới (anh Hữu 07/11/2026) */}
       {a.map((g) => (
-        <div key={`${g.nhom}-${g.size}`} style={{ marginTop: 3, marginLeft: 6 }}>
-          • <SizeTag size={g.size} />{' '}
+        <div key={`${g.nhom}-${g.size}`} style={{ marginTop: 4, marginLeft: 6 }}>
+          <div>
+            • <SizeTag size={g.size} />
+          </div>
           {g.mac.map((m, i) => (
-            <span key={m.mac} style={{ marginLeft: 6, display: 'inline-block' }}>
+            <div key={m.mac} style={{ marginLeft: 20, marginTop: 2 }}>
               <b style={{ color: MAU_MAC[i % MAU_MAC.length], whiteSpace: 'nowrap' }}>{m.mac} →</b>{' '}
               {m.may.map((x) => (
                 <Chip key={x} text={x} />
               ))}
-            </span>
+            </div>
           ))}
         </div>
       ))}
