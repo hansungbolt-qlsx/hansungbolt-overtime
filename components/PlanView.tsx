@@ -3,6 +3,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { DCCD_GJ_ALL, DCCD_GJ_BY_DEPT } from '@/lib/departments';
 import PrintJobButton from './PrintJobButton';
+import { dateLabel } from '@/lib/date-label';
+
+/** Giờ đồng bộ "08:48" (khác ngày thì "08:48 06/11") — giờ máy người dùng (VN). */
+function gioDongBo(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const p = (n: number) => String(n).padStart(2, '0');
+  const gio = `${p(d.getHours())}:${p(d.getMinutes())}`;
+  const now = new Date();
+  return d.toDateString() === now.toDateString() ? gio : `${gio} ${p(d.getDate())}/${p(d.getMonth() + 1)}`;
+}
 
 type SheetData = {
   rows: (string | null)[][];
@@ -243,14 +254,13 @@ export function DccdCard({ options, onlyCodes }: { options: [string, string][]; 
 
   return (
     <div className="bg-white rounded-lg border border-brand-surface-alt p-3 mb-3">
-      <div className="text-sm font-bold text-brand-navy mb-2">🖨 In phiếu DCCD</div>
+      <div className="text-sm font-bold text-brand-navy mb-1.5">🖨 In phiếu DCCD</div>
       <div className="flex flex-wrap items-end gap-2">
-        {/* CO (byGj): ô gõ chiếm trọn 1 dòng, các ô còn lại xuống dòng dưới — vừa màn điện thoại (anh Hữu 22/10/2026) */}
-        <div className={byGj ? 'basis-full min-w-0' : 'flex-1 min-w-[180px]'}>
-          <label className="block text-[11px] text-brand-navy-soft mb-0.5">
-            Mã hàng (gợi ý chỉ thị đang mở) — hoặc gõ thẳng số chỉ thị
-          </label>
+        {/* CO (byGj): ô gõ chiếm trọn 1 dòng, các ô còn lại xuống dòng dưới — vừa màn điện thoại (anh Hữu 22/10/2026).
+            Bỏ nhãn trên ô gõ — chữ mẫu trong ô đã đủ hướng dẫn (anh Hữu 07/11/2026). */}
+        <div className="basis-full min-w-0">
           <input
+            aria-label="Mã hàng hoặc số chỉ thị"
             type="text"
             value={sel ? `${sel.code} · ${fmtSaeji(sel)}` : q}
             onChange={(e) => { setSel(null); setQ(e.target.value); }}
@@ -400,15 +410,12 @@ export default function PlanView({
 
   return (
     <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden">
-      <div className="px-5 py-4 border-b border-brand-surface-alt flex flex-wrap items-center justify-between gap-3">
+      <div className="px-3 py-2.5 border-b border-brand-surface-alt flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-lg font-semibold text-brand-navy">Kế hoạch sản xuất</h2>
+          <h2 className="text-base font-semibold text-brand-navy">Kế hoạch sản xuất</h2>
           {data && (
             <p className="text-xs text-brand-navy-soft mt-0.5">
-              Ngày {data.planDate} — đồng bộ từ app chính lúc{' '}
-              {new Date(data.uploadedAt).toLocaleString('vi-VN', {
-                hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit',
-              })}
+              Ngày {dateLabel(data.planDate)} — đồng bộ từ app chính lúc {gioDongBo(data.uploadedAt)}
             </p>
           )}
         </div>

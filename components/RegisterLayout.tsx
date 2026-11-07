@@ -14,6 +14,7 @@ import CoDailyView from './CoDailyView';
 import CoDccdCard from './CoDccdCard';
 import CoProdSummaryView from './CoProdSummaryView';
 import NvlCanhBaoCard from './NvlCanhBaoCard';
+import DateButton from './DateButton';
 import { chanNeuChuaLuu } from '@/lib/nvl-slips';
 import { REMIND_DEADLINE, isoVN, remindDue } from '@/lib/stop-carry-shared';
 
@@ -47,7 +48,7 @@ type Tab = 'overtime' | 'labels' | 'summary' | 'today' | 'plan' | 'dccd' | 'co_d
 
 function OvertimeView({ department, isLeader }: { department: string; isLeader: boolean }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {isLeader && <OvertimeForm department={department} />}
       <DepartmentRegistrationsList canEdit={isLeader} />
       <OvertimeSummaryCard />
@@ -65,17 +66,11 @@ function LabelsView({
   currentUserFullName?: string | null;
 }) {
   return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-4">
-        <label className="block text-sm font-semibold text-brand-navy mb-1.5">
-          Ngày chụp tem
-        </label>
-        <input
-          type="date"
-          value={labelsDate}
-          onChange={(e) => setLabelsDate(e.target.value)}
-          className="w-full px-3 py-2.5 border border-gray-300 rounded-md text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal focus:border-transparent"
-        />
+    <div className="space-y-3">
+      {/* Nhãn + ô ngày cùng 1 hàng (anh Hữu 07/11/2026) */}
+      <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt px-3 py-2 flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-brand-navy">Ngày chụp tem</span>
+        <DateButton value={labelsDate} onChange={(v) => v && setLabelsDate(v)} />
       </div>
       <MaterialLabelsUpload date={labelsDate} currentUserFullName={currentUserFullName} />
     </div>
@@ -197,9 +192,7 @@ export default function RegisterLayout({
         ? 'grid-cols-3'
         : tabs.length === 4
           ? 'grid-cols-2 sm:grid-cols-4'
-          : tabs.length === 5
-            ? 'grid-cols-2 sm:grid-cols-5'
-            : 'grid-cols-2 sm:grid-cols-3';
+          : 'grid-cols-3'; // ≥5 tab: 3 cột mọi khổ (trang chỉ rộng max-w-lg) — chữ không tràn
 
   return (
     <>
@@ -215,7 +208,7 @@ export default function RegisterLayout({
           tra.
         </button>
       )}
-      <div className={`grid ${cols} gap-2 mb-5`}>
+      <div className={`grid ${cols} gap-1.5 mb-3`}>
         {tabs.map((t) => {
           const active = activeTab === t.key;
           const activeCls =
@@ -245,7 +238,7 @@ export default function RegisterLayout({
                 if (!chanNeuChuaLuu(khoChuaLuu)) return;
                 setActiveTab(t.key);
               }}
-              className={`py-2.5 rounded-xl text-sm font-semibold transition border ${
+              className={`px-0.5 py-2 rounded-xl text-[12.5px] leading-tight tracking-tight whitespace-nowrap font-semibold transition border ${
                 active ? activeCls : inactiveCls
               }`}
             >

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { dateLabel } from '@/lib/date-label';
 
 type Photo = { id: string; url: string | null; employee_name: string | null };
 
@@ -97,7 +98,7 @@ export default function PrintClient({
 
       <div className="no-print">
         <span>
-          Tem NVL ngày {date} — {photos.length} ảnh — {sheets.length} tờ
+          Tem NVL ngày {dateLabel(date)} — {photos.length} ảnh — {sheets.length} tờ
         </span>
         <button onClick={() => window.print()}>In ngay</button>
         <button className="btn-close" onClick={() => window.close()} title="Đóng">✕</button>

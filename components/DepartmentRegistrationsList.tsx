@@ -43,12 +43,6 @@ function formatDateTime(iso: string) {
   return `${hh}:${mm} ${dd}/${mo}`;
 }
 
-// "2026-07-11" → "11-07-2026"
-function formatDateShort(iso: string): string {
-  const [y, m, d] = iso.split('-');
-  return `${d}-${m}-${y}`;
-}
-
 export default function DepartmentRegistrationsList({
   canEdit = false,
 }: {
@@ -132,12 +126,13 @@ export default function DepartmentRegistrationsList({
 
   return (
     <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden">
-      <div className="px-4 py-3.5 border-b border-brand-surface-alt flex flex-col gap-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+      {/* Ngày chỉ nằm ở ô lịch — tiêu đề không lặp ngày (anh Hữu 07/11/2026) */}
+      <div className="px-3 py-2.5 border-b border-brand-surface-alt flex flex-col gap-1">
+        <div className="flex items-center justify-between gap-2">
           <h2 className="text-base font-semibold text-brand-navy leading-tight">
-            Danh sách phiếu tăng ca {formatDateShort(date)}
+            Danh sách phiếu tăng ca
           </h2>
-          <DateButton value={date} onChange={setDate} compact />
+          <DateButton value={date} onChange={(v) => v && setDate(v)} compact />
         </div>
         <p className="text-xs text-brand-navy-soft">
           {loading ? 'Đang tải...' : regs.length === 0 ? 'Chưa có phiếu nào.' : `${regs.length} phiếu`}
@@ -149,7 +144,7 @@ export default function DepartmentRegistrationsList({
           {regs.map((r) => {
             const isDeleting = deletingId === r.id;
             return (
-              <li key={r.id} className="p-4 space-y-2.5">
+              <li key={r.id} className="p-3 space-y-2">
                 <div className="flex items-baseline justify-between gap-2">
                   <div className="min-w-0">
                     <div className="text-sm font-bold text-brand-navy">

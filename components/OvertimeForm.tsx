@@ -417,19 +417,18 @@ Vẫn gửi phiếu?`)) return;
   }
 
   return (
-    <div className="space-y-5">
-      {/* Date & day type */}
-      <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-4 space-y-4">
-        <div>
-          <label className="block text-sm font-semibold text-brand-navy mb-1.5">Ngày tăng ca</label>
+    <div className="space-y-3">
+      {/* Date & day type — nhãn + ô ngày cùng 1 hàng (anh Hữu 07/11/2026) */}
+      <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-3 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-semibold text-brand-navy">Ngày tăng ca</span>
           <DateButton
             value={date}
             onChange={(v) => { if (v) { setDate(v); setDateBeforeSunday(null); } }}
-            className="w-full justify-start"
           />
         </div>
         <div>
-          <span className="block text-sm font-semibold text-brand-navy mb-1.5">Loại ngày</span>
+          <span className="block text-sm font-semibold text-brand-navy mb-1">Loại ngày</span>
           <div className="grid grid-cols-2 gap-2">
             {(['weekday', 'sunday'] as const).map((type) => {
               const isActive = dayType === type;
@@ -569,7 +568,7 @@ Vẫn gửi phiếu?`)) return;
               return (
               <div
                 key={idx}
-                className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-4 space-y-4"
+                className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-3 space-y-3"
               >
                 {/* Row header */}
                 <div className="flex items-start justify-between gap-2">

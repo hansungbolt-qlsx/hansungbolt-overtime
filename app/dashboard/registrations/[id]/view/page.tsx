@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth-server';
 import { supabaseAdmin } from '@/lib/supabase';
 import PrintControls from '@/components/PrintControls';
 import MobileFitScale from '@/components/MobileFitScale';
+import { dateLabel } from '@/lib/date-label';
 import OvertimeSheetArticle, { OT_PRINT_CSS } from '@/components/OvertimeSheetArticle';
 
 // Thân phiếu + CSS in tách sang components/OvertimeSheetArticle.tsx (dùng chung
@@ -51,7 +52,7 @@ export default async function PrintViewPage({
         <div className="flex justify-between items-center mb-4 print:hidden">
           <div>
             <p className="text-sm text-brand-navy-soft">
-              Phiếu ngày {reg.overtime_date} • Bộ phận {reg.department}
+              Phiếu ngày {dateLabel(reg.overtime_date)} • Bộ phận {reg.department}
             </p>
           </div>
           <PrintControls id={id} autoprint={autoprint} />

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toTitleCase } from '@/lib/format';
 import PrintJobButton from './PrintJobButton';
+import DateButton from './DateButton';
 
 type Dept = 'HD' | 'RL' | 'CO' | 'QLSX';
 type ActiveTab = 'all' | Dept;
@@ -112,20 +113,10 @@ export default function OvertimeSummaryCard({ isAdmin = false }: { isAdmin?: boo
 
   return (
     <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden">
-      <div className="px-5 py-4 border-b border-brand-surface-alt flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-brand-navy">Tổng hợp giờ tăng ca</h2>
-          <p className="text-xs text-brand-navy-soft mt-0.5">
-            Tổng giờ = tổng giờ thực tế từng phiếu (admin sửa được per-người)
-          </p>
-        </div>
+      <div className="px-3 py-2.5 border-b border-brand-surface-alt flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-base font-semibold text-brand-navy">Tổng hợp giờ tăng ca</h2>
         <div className="flex items-center gap-2 flex-wrap">
-          <input
-            type="month"
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
-            className="px-3 py-1.5 border border-gray-300 rounded-md text-brand-navy text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal"
-          />
+          <DateButton mode="month" value={month} onChange={(v) => v && setMonth(v)} compact />
           {displayRows.length > 0 && (
             <>
               <PrintJobButton
@@ -159,7 +150,7 @@ export default function OvertimeSummaryCard({ isAdmin = false }: { isAdmin?: boo
         </div>
       </div>
 
-      <div className="flex gap-2 px-5 pt-3 bg-white">
+      <div className="flex gap-2 px-3 pt-2 bg-white">
         {([['sum', 'Tổng hợp'], ['day', 'Chi tiết theo ngày']] as [View, string][]).map(([v, label]) => (
           <button
             key={v}
@@ -215,7 +206,7 @@ export default function OvertimeSummaryCard({ isAdmin = false }: { isAdmin?: boo
         </div>
       )}
 
-      <div className="p-4 bg-[#f0f5ff] min-h-[80px]">
+      <div className="p-2 sm:p-4 bg-[#f0f5ff] min-h-[80px]">
         {loading && (
           <p className="text-sm text-brand-navy-soft text-center py-4">Đang tải...</p>
         )}
@@ -311,19 +302,19 @@ export default function OvertimeSummaryCard({ isAdmin = false }: { isAdmin?: boo
               <thead className="bg-[#dce8fa] text-[#063882]">
                 <tr>
                   {showDeptColumn && (
-                    <th className="text-left px-4 py-2.5 font-semibold w-20">Bộ phận</th>
+                    <th className="text-left px-2 sm:px-4 py-2 font-semibold w-16">Bộ phận</th>
                   )}
-                  <th className="text-left px-4 py-2.5 font-semibold">Nhân viên</th>
-                  <th className="text-right px-4 py-2.5 font-semibold">Ngày thường</th>
-                  <th className="text-right px-4 py-2.5 font-semibold">Chủ nhật</th>
-                  <th className="text-right px-4 py-2.5 font-semibold">Tổng giờ</th>
+                  <th className="text-left px-2 sm:px-4 py-2 font-semibold">Nhân viên</th>
+                  <th className="text-right px-2 sm:px-4 py-2 font-semibold leading-tight">Ngày thường</th>
+                  <th className="text-right px-2 sm:px-4 py-2 font-semibold leading-tight">Chủ nhật</th>
+                  <th className="text-right px-2 sm:px-4 py-2 font-semibold leading-tight">Tổng giờ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#e8f0fb]">
                 {displayRows.map((r) => (
                   <tr key={r.employee_id} className="hover:bg-[#f0f5ff]">
                     {showDeptColumn && (
-                      <td className="px-4 py-2.5">
+                      <td className="px-2 sm:px-4 py-1.5">
                         {r.employee_department && (
                           <span
                             className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded ${DEPT_BADGE[r.employee_department]}`}
@@ -333,14 +324,14 @@ export default function OvertimeSummaryCard({ isAdmin = false }: { isAdmin?: boo
                         )}
                       </td>
                     )}
-                    <td className="px-4 py-2.5 font-semibold text-brand-navy">{toTitleCase(r.employee_name)}</td>
-                    <td className="px-4 py-2.5 text-right text-brand-navy-soft">
+                    <td className="px-2 sm:px-4 py-1.5 font-semibold text-brand-navy whitespace-nowrap">{toTitleCase(r.employee_name)}</td>
+                    <td className="px-2 sm:px-4 py-1.5 text-right text-brand-navy-soft whitespace-nowrap">
                       {r.weekday_count > 0 ? `${r.weekday_count} ngày` : '—'}
                     </td>
-                    <td className="px-4 py-2.5 text-right text-brand-navy-soft">
+                    <td className="px-2 sm:px-4 py-1.5 text-right text-brand-navy-soft whitespace-nowrap">
                       {r.sunday_count > 0 ? `${r.sunday_count} ngày` : '—'}
                     </td>
-                    <td className="px-4 py-2.5 text-right font-bold text-[#063882]">
+                    <td className="px-2 sm:px-4 py-1.5 text-right font-bold text-[#063882] whitespace-nowrap">
                       {r.total_hours}h
                     </td>
                   </tr>
@@ -350,11 +341,11 @@ export default function OvertimeSummaryCard({ isAdmin = false }: { isAdmin?: boo
                 <tr>
                   <td
                     colSpan={showDeptColumn ? 4 : 3}
-                    className="px-4 py-2.5 font-bold text-[#063882] text-right"
+                    className="px-2 sm:px-4 py-2 font-bold text-[#063882] text-right"
                   >
                     Tổng cộng
                   </td>
-                  <td className="px-4 py-2.5 font-bold text-[#063882] text-right">
+                  <td className="px-2 sm:px-4 py-2 font-bold text-[#063882] text-right whitespace-nowrap">
                     {Number(totalHours.toFixed(2))}h
                   </td>
                 </tr>

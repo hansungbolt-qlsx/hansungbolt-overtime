@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import DateButton from './DateButton';
 import {
   defaultDepartment, matchAux, matchNvl,
   type Branch, type Department, type SlipLine, type StockAux, type StockCoil,
@@ -625,16 +626,16 @@ export default function TempSlipPanel({
                     );
                   })()}
                   <div className="grid grid-cols-2 gap-2">
-                    <label className="text-xs text-brand-navy-soft">
+                    <div className="text-xs text-brand-navy-soft">
                       Ngày xuất thực tế
-                      <input
-                        type="date"
+                      <DateButton
                         value={realDate}
                         max={todayVN()}
-                        onChange={(e) => setRealDate(e.target.value || todayVN())}
-                        className="w-full mt-0.5 px-2 py-1.5 border border-gray-300 rounded-md text-sm"
+                        onChange={(v) => setRealDate(v || todayVN())}
+                        compact
+                        className="w-full justify-center mt-0.5"
                       />
-                    </label>
+                    </div>
                     <label className="text-xs text-brand-navy-soft">
                       Bộ phận
                       <select

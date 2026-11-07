@@ -542,8 +542,6 @@ Vẫn lưu phiếu?`)) return;
 
   const noPlan = !loadingOpts && machines.length === 0;
   const lechNgay = dayTypeMismatch(date, dayType);
-  const [yy, mm, dd] = date.split('-');
-  const dateLabel = `${dd}/${mm}/${yy}`;
 
   return (
     <div className="space-y-5">
@@ -554,7 +552,7 @@ Vẫn lưu phiếu?`)) return;
             Sửa phiếu — Bộ phận {department}
           </h1>
           <p className="text-xs text-brand-navy-soft mt-0.5">
-            Ngày {dateLabel} • {shiftLabel(dayType, shift)}
+            {shiftLabel(dayType, shift)}
           </p>
         </div>
         <Link
@@ -566,14 +564,15 @@ Vẫn lưu phiếu?`)) return;
       </div>
 
       {/* Ngày + loại ngày (chuyển giữa weekday/sunday) */}
-      <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-4 space-y-4">
+      <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-3 space-y-3">
         <div>
-          <label className="block text-sm font-semibold text-brand-navy mb-1.5">Ngày tăng ca</label>
-          <DateButton
-            value={date}
-            onChange={(v) => { if (v) { setDate(v); setDateBeforeSunday(null); } }}
-            className="w-full justify-start"
-          />
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-semibold text-brand-navy">Ngày tăng ca</span>
+            <DateButton
+              value={date}
+              onChange={(v) => { if (v) { setDate(v); setDateBeforeSunday(null); } }}
+            />
+          </div>
           {date !== initialDate && (
             <p className="text-xs mt-1.5 text-amber-700 font-medium">
               Đổi từ ngày {fmtDateVN(initialDate)} — bấm Lưu phiếu để áp dụng.
@@ -581,7 +580,7 @@ Vẫn lưu phiếu?`)) return;
           )}
         </div>
         <div>
-          <span className="block text-sm font-semibold text-brand-navy mb-1.5">
+          <span className="block text-sm font-semibold text-brand-navy mb-1">
             Loại ngày
           </span>
           <div className="grid grid-cols-2 gap-2">

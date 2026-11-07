@@ -10,6 +10,7 @@ import {
 } from '@/lib/overtime-shift';
 import { datDangNhapDo } from '@/lib/dang-nhap-do';
 import ShiftPicker from './ShiftPicker';
+import DateButton from './DateButton';
 import EmployeeSelect from './EmployeeSelect';
 import HoursPicker, {
   DEFAULT_HOURS, HOURS_RULE_TEXT, hoursOf, theoNhanVien1, type HoursChoice,
@@ -231,21 +232,18 @@ Vẫn gửi phiếu?`)) return;
   }
 
   return (
-    <div className="space-y-5">
-      <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-4 space-y-4">
-        <div>
-          <label className="block text-sm font-semibold text-brand-navy mb-1.5">
-            Ngày tăng ca
-          </label>
-          <input
-            type="date"
+    <div className="space-y-3">
+      {/* Nhãn + ô ngày cùng 1 hàng (anh Hữu 07/11/2026) — đồng bộ form tổ trưởng */}
+      <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-3 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-semibold text-brand-navy">Ngày tăng ca</span>
+          <DateButton
             value={date}
-            onChange={(e) => { if (e.target.value) { setDate(e.target.value); setDateBeforeSunday(null); } }}
-            className="w-full px-3 py-2.5 border border-gray-300 rounded-md text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal focus:border-transparent"
+            onChange={(v) => { if (v) { setDate(v); setDateBeforeSunday(null); } }}
           />
         </div>
         <div>
-          <span className="block text-sm font-semibold text-brand-navy mb-1.5">
+          <span className="block text-sm font-semibold text-brand-navy mb-1">
             Loại ngày
           </span>
           <div className="grid grid-cols-2 gap-2">

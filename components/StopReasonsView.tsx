@@ -5,6 +5,7 @@
 // quả ngày (người tổng hợp TV vẫn là người chốt cuối, sửa đè được).
 import { useCallback, useEffect, useState } from 'react';
 import { isCarryName } from '@/lib/stop-carry-shared';
+import DateButton from './DateButton';
 
 // Nhãn kèm VIẾT TẮT đồng bộ chip TV (user 20/7) + lý do ST Setting mới
 const REASONS: Array<{ code: string; label: string }> = [
@@ -16,6 +17,10 @@ const REASONS: Array<{ code: string; label: string }> = [
   { code: 'ST', label: 'Setting (ST)' },
   { code: 'ETC', label: 'Khác — ghi rõ (Etc)' },
 ];
+// Nhãn NGẮN trên ô máy (lưới 5 cột, anh Hữu 07/11/2026) — lý do đầy đủ nằm ở bảng Đối chiếu
+const SHORT: Record<string, string> = {
+  NW: 'Không người', NM: 'Không khuôn', NP: 'Không KH', NR: 'Không NVL', MT: 'Hư máy', ST: 'Setting', ETC: 'Khác',
+};
 const LABEL: Record<string, string> = Object.fromEntries(
   REASONS.map((r) => [r.code, r.label]),
 );
@@ -158,17 +163,12 @@ export default function StopReasonsView({
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-md p-4">
+    <div className="bg-white rounded-2xl shadow-md p-3">
       <div className="flex items-center justify-between gap-2 mb-1">
         <h2 className="text-base font-bold text-brand-navy">⏸ Máy dừng hôm nay</h2>
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="border border-slate-300 rounded-lg px-2 py-1 text-sm"
-        />
+        <DateButton value={date} onChange={(v) => v && setDate(v)} compact />
       </div>
-      <p className="text-xs text-slate-500 mb-3">
+      <p className="text-xs text-slate-500 mb-2">
         Chỉ ghi máy <b>cả ngày không sản xuất</b> — chọn máy rồi chọn lý do. Đã ghi:{' '}
         <b className="text-brand-navy">{nSaved}</b> máy.
       </p>
@@ -202,33 +202,31 @@ export default function StopReasonsView({
                   </span>
                 </div>
               )}
-        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+        <div className="grid grid-cols-5 sm:grid-cols-6 gap-1">
           {list.map((m) => {
             const cur = saved[m];
             const isEditing = editing === m;
             return (
-              <div key={m} className={isEditing ? 'col-span-3 sm:col-span-4' : ''}>
+              <div key={m} className={isEditing ? 'col-span-5 sm:col-span-6' : ''}>
                 {!isEditing ? (
                   <button
                     type="button"
                     onClick={() => openEdit(m)}
-                    className={`w-full rounded-xl border px-2 py-2 text-left transition active:scale-95 ${
+                    title={cur ? `${LABEL[cur.reason_code] ?? cur.reason_code}${cur.reason_text ? ` — ${cur.reason_text}` : ''}` : 'Đang chạy'}
+                    className={`w-full h-full rounded-lg border px-0.5 py-1 text-center transition active:scale-95 ${
                       cur
                         ? 'bg-red-50 border-red-400'
                         : 'bg-white border-slate-200 hover:border-brand-teal'
                     }`}
                   >
-                    <div className="text-sm font-bold text-brand-navy">{m}</div>
+                    <div className="text-[13px] font-bold leading-tight text-brand-navy whitespace-nowrap">{m}</div>
                     {cur ? (
-                      <div className="text-[11px] leading-tight text-red-600 font-semibold">
-                        {LABEL[cur.reason_code] ?? cur.reason_code}
-                        {cur.reason_code === 'ETC' && cur.reason_text ? `: ${cur.reason_text}` : ''}
-                        {isCarryName(cur.created_by_name) && (
-                          <div className="font-normal italic text-teal-700">↻ từ hôm trước</div>
-                        )}
+                      <div className="text-[10px] leading-tight text-red-600 font-semibold">
+                        {isCarryName(cur.created_by_name) && <span className="text-teal-700">↻ </span>}
+                        {SHORT[cur.reason_code] ?? cur.reason_code}
                       </div>
                     ) : (
-                      <div className="text-[11px] text-slate-400">Đang chạy</div>
+                      <div className="text-[10px] leading-tight text-slate-400">chạy</div>
                     )}
                   </button>
                 ) : (
@@ -300,7 +298,7 @@ export default function StopReasonsView({
       )}
       {/* Bảng ĐỐI CHIẾU (user 20/7): tổ trưởng rà lại 1 lượt trước khi rời tay */}
       {nSaved > 0 && (
-        <div className="mt-4 rounded-xl border-2 border-brand-navy/20 overflow-hidden">
+        <div className="mt-3 rounded-xl border-2 border-brand-navy/20 overflow-hidden">
           <div className="bg-brand-navy/5 px-3 py-2 text-sm font-bold text-brand-navy">
             📋 Đối chiếu — {nSaved} máy dừng đã ghi
           </div>
@@ -338,21 +336,24 @@ export default function StopReasonsView({
         </div>
       )}
 
+      <details className="mt-2 text-[11px] text-slate-400">
+      <summary className="cursor-pointer select-none font-semibold text-slate-500">ℹ Cách ghi máy dừng</summary>
       {department === 'RL' ? (
-      <p className="mt-3 text-[11px] text-slate-400">
+      <p className="mt-1">
         Máy đang dừng của <b>ngày làm việc trước</b> được <b>tự chép sang hôm nay</b> (giữ
         nguyên lý do). Máy nào <b>chạy lại</b> thì bấm máy → “Máy có chạy — bỏ”; máy mới dừng
         thì bấm máy → chọn lý do. Lý do tự cập nhật sang app chính, hôm sau đối chiếu với sản
         lượng ERP.
       </p>
       ) : (
-      <p className="mt-3 text-[11px] text-slate-400">
+      <p className="mt-1">
         Máy ngưng có nguyên nhân rõ trên KHSX (Hết NVL, Hết kế hoạch, Hư máy…) được{' '}
         <b>điền sẵn tự động</b> — tổ trưởng chỉ rà lại, sai thì bấm máy sửa hoặc “Máy có
         chạy — bỏ”. Lý do sẽ tự cập nhật vào Kết quả ngày trên app chính; người tổng hợp
         TV vẫn là bản chốt cuối.
       </p>
       )}
+      </details>
     </div>
   );
 }

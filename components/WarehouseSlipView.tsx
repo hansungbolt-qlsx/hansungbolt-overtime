@@ -12,6 +12,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import BarcodeScanButton from './BarcodeScanButton';
 import TempSlipPanel from './TempSlipPanel';
+import { dateLabel } from '@/lib/date-label';
+import DateButton from './DateButton';
 import {
   BRANCH_LABEL, DEPARTMENTS, KIND_LABEL, RETURN_REASONS, RETURN_REASON_DEFAULT,
   RETURN_REASON_OTHER, canhBaoChuaLuu, chanNeuChuaLuu, defaultDepartment,
@@ -1025,18 +1027,16 @@ export default function WarehouseSlipView(
 
       {/* Chọn ngày — xem lại phiếu hôm trước. Ngày khác hôm nay thì CHỈ ĐỌC. */}
       <div className="flex items-center gap-2 flex-wrap">
-        <label className="text-sm font-semibold text-brand-navy">Ngày</label>
-        <input
-          type="date"
+        <span className="text-sm font-semibold text-brand-navy">Ngày</span>
+        <DateButton
           value={viewDate}
           max={todayVN()}
-          onChange={(e) => {
-            const d = e.target.value || todayVN();
+          onChange={(v) => {
+            const d = v || todayVN();
             if (d === viewDate) return;
             if (!roiDiDuoc()) return;
             setViewDate(d); xoaBoiCanh(); resetForm(); setMsg(''); setErr('');
           }}
-          className="px-3 py-2 border border-gray-300 rounded-md text-brand-navy"
         />
         {/* 🚫 NÚT "↩ Về hôm nay" ĐÃ BỎ — anh Hữu chốt 19/08/2026: bớt một cửa
             đổi bối cảnh thì bớt một chỗ có thể sai. Muốn về hôm nay thì chọn
@@ -1215,7 +1215,7 @@ export default function WarehouseSlipView(
         <div className={`rounded-xl border p-3 text-sm ${st.cls}`}>
           <div className="font-bold">{st.label}</div>
           <div className="text-xs mt-0.5">
-            {KIND_LABEL[kind]} {BRANCH_LABEL[branch].toLowerCase()} · {slip.slip_date}
+            {KIND_LABEL[kind]} {BRANCH_LABEL[branch].toLowerCase()} · {dateLabel(slip.slip_date)}
             {slip.seq > 1 && ` · phiếu #${slip.seq}`}
             {slip.created_by_name && ` · ${slip.created_by_name}`}
           </div>

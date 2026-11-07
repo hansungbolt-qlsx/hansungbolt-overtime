@@ -9,6 +9,8 @@ import OvertimeSummaryCard from '@/components/OvertimeSummaryCard';
 import DeleteRegistrationButton from '@/components/DeleteRegistrationButton';
 import TodayOvertimeCard from '@/components/TodayOvertimeCard';
 import PlanFilesList from '@/components/PlanFilesList';
+import DateFormField from '@/components/DateFormField';
+import { dateLabel } from '@/lib/date-label';
 import { toTitleCase } from '@/lib/format';
 import { shiftLabel } from '@/lib/overtime-shift';
 
@@ -109,11 +111,11 @@ export default async function DashboardPage({
               Kế hoạch sản xuất
             </h2>
             <p className="text-sm text-brand-navy-soft mb-1">
-              Ngày {selectedDate}: <strong className="text-brand-navy">{planCountRes.count ?? 0}</strong> dòng kế hoạch
+              Ngày {dateLabel(selectedDate)}: <strong className="text-brand-navy">{planCountRes.count ?? 0}</strong> dòng kế hoạch
             </p>
             {latestPlanRes.data && (
               <p className="text-xs text-brand-navy-soft mb-3">
-                Upload gần nhất: ngày {latestPlanRes.data.plan_date}
+                Upload gần nhất: ngày {dateLabel(latestPlanRes.data.plan_date)}
               </p>
             )}
             <Link
@@ -133,12 +135,7 @@ export default async function DashboardPage({
               Lọc phiếu theo ngày
             </h2>
             <form method="get" className="flex flex-col gap-2">
-              <input
-                type="date"
-                name="date"
-                defaultValue={selectedDate}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-brand-navy focus:outline-none focus:ring-2 focus:ring-brand-teal focus:border-transparent"
-              />
+              <DateFormField name="date" defaultValue={selectedDate} className="w-full justify-center" />
               <button
                 type="submit"
                 className="w-full px-4 py-2 bg-brand-navy hover:bg-brand-navy-soft text-white text-sm font-semibold rounded-md transition"
@@ -147,7 +144,7 @@ export default async function DashboardPage({
               </button>
             </form>
             <p className="text-xs text-brand-navy-soft mt-2">
-              Đang xem phiếu ngày <strong>{selectedDate}</strong>
+              Đang xem phiếu ngày <strong>{dateLabel(selectedDate)}</strong>
             </p>
           </section>
         </div>
@@ -160,7 +157,7 @@ export default async function DashboardPage({
           <div className="p-5 border-b border-brand-surface-alt flex items-start justify-between gap-3 flex-wrap">
             <div>
               <h2 className="text-lg font-semibold text-brand-navy">
-                Phiếu tăng ca ngày {selectedDate}
+                Phiếu tăng ca ngày {dateLabel(selectedDate)}
               </h2>
               <p className="text-sm text-brand-navy-soft mt-0.5">
                 {regs.length === 0 ? 'Chưa có phiếu nào.' : `Tổng: ${regs.length} phiếu`}

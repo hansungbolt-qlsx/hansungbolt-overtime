@@ -189,7 +189,7 @@ Vẫn lưu phiếu?`)) return;
         <div>
           <h1 className="text-xl font-bold text-brand-navy">Sửa phiếu tăng ca</h1>
           <p className="text-sm text-brand-navy-soft">
-            Ngày {reg.overtime_date} • Bộ phận {reg.department} •{' '}
+            Bộ phận {reg.department} •{' '}
             {shiftLabel(reg.day_type, reg.shift)}
           </p>
         </div>
@@ -201,9 +201,11 @@ Vẫn lưu phiếu?`)) return;
         </Link>
       </div>
 
-      <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-5 space-y-2">
-        <label className="block text-sm font-semibold text-brand-navy">Ngày tăng ca</label>
-        <DateButton value={date} onChange={(v) => v && setDate(v)} />
+      <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-3 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-semibold text-brand-navy">Ngày tăng ca</span>
+          <DateButton value={date} onChange={(v) => v && setDate(v)} />
+        </div>
         {date !== reg.overtime_date && (
           <p className="text-xs text-amber-700 font-medium">
             Đổi từ ngày {reg.overtime_date.split('-').reverse().join('/')} — bấm Lưu thay đổi để áp dụng.

@@ -2,6 +2,7 @@
 
 import { useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } from 'react';
 import Link from 'next/link';
+import DateButton from '@/components/DateButton';
 
 type UploadResult = {
   inserted: number;
@@ -178,14 +179,10 @@ export default function UploadPlanPage() {
         )}
 
         <div>
-          <label className="block text-sm font-medium mb-1">Ngày kế hoạch</label>
-          <input
-            type="date"
-            value={planDate}
-            onChange={(e) => setPlanDate(e.target.value)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-            required
-          />
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-medium">Ngày kế hoạch</span>
+            <DateButton value={planDate} onChange={(v) => v && setPlanDate(v)} />
+          </div>
         </div>
 
         {error && (

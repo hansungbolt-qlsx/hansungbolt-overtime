@@ -60,8 +60,8 @@ export default function CoProdSummaryView() {
   const nav = 'px-3 py-2 rounded-lg border border-brand-surface-alt bg-white text-brand-navy font-bold active:scale-95';
 
   return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-4 space-y-2">
+    <div className="space-y-3">
+      <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-3 space-y-2">
         <div className="text-sm font-bold text-brand-navy">📊 Tổng hợp sản lượng {isToday ? 'hôm nay' : 'theo ngày'}</div>
         <div className="flex items-center gap-2">
           <button type="button" className={nav} onClick={() => setDate(shift(date, -1))} aria-label="Ngày trước">←</button>

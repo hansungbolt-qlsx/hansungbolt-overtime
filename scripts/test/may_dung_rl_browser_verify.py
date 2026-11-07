@@ -128,10 +128,12 @@ with sync_playwright() as pw:
     kiem(tieu_de == ["RL", "SM", "CT"], f"3 nhóm theo thứ tự RL → SM → CT: {tieu_de}")
     kiem(pg.get_by_text(re.compile(r"Máy RL\s*· 3 máy · đang dừng 1")).count() == 1, "đếm nhóm RL: 3 máy, dừng 1")
     o24 = pg.get_by_role("button", name=re.compile("^RL-24"))
-    kiem("↻ từ hôm trước" in o24.inner_text(), "ô RL-24 ghi ↻ từ hôm trước")
-    kiem("↻ từ hôm trước" not in pg.get_by_role("button", name=re.compile("^SM-06")).inner_text(), "ô SM-06 (tổ trưởng ghi) không có nhãn")
+    # 07/11/2026: ô máy gọn (lưới 5 cột) — tự chép hiện "↻ <lý do ngắn>", đầy đủ ở bảng Đối chiếu
+    kiem(o24.inner_text().splitlines()[-1].strip() == "↻ Không KH", "ô RL-24 ghi ↻ Không KH", o24.inner_text())
+    kiem("↻" not in pg.get_by_role("button", name=re.compile("^SM-06")).inner_text(), "ô SM-06 (tổ trưởng ghi) không có ↻")
     bang = pg.locator("table").inner_text()
     kiem("↻ Tự động từ 06/11" in bang and "Tổ trưởng RL" in bang, "bảng đối chiếu: ↻ Tự động từ 06/11 / Tổ trưởng RL")
+    pg.get_by_text("ℹ Cách ghi máy dừng").click()  # 07/11/2026: lời hướng dẫn gập lại
     kiem(pg.get_by_text(re.compile("tự chép sang hôm nay")).is_visible(), "lời hướng dẫn RL")
     kiem(pg.get_by_text(re.compile("điền sẵn tự động")).count() == 0, "không hiện lời KHSX của HD")
     pg.screenshot(path=str(ANH / "rl_may_dung.png"), full_page=True)
@@ -187,6 +189,7 @@ with sync_playwright() as pw:
     pg.get_by_role("button", name=re.compile("Máy dừng hôm nay")).click()
     pg.get_by_role("button", name=re.compile("^HD-01")).wait_for(timeout=30000)
     kiem(pg.get_by_text(re.compile(r"^Máy HD")).count() == 0, "không tiêu đề nhóm")
+    pg.get_by_text("ℹ Cách ghi máy dừng").click()
     kiem(pg.get_by_text(re.compile("điền sẵn tự động")).is_visible(), "lời KHSX của HD")
     ctx.close()
     br.close()

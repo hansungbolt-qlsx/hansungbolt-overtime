@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { dateLabel } from '@/lib/date-label';
 
 type Photo = {
   id: string;
@@ -115,7 +116,7 @@ export default function MaterialLabelsAdminCard() {
     <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden">
       <div className="px-5 py-4 border-b border-brand-surface-alt">
         <h2 className="text-base font-bold text-[#063882] leading-tight">Tem NVL</h2>
-        <div className="text-sm font-semibold text-[#063882] mt-0.5">Ngày {day}</div>
+        <div className="text-sm font-semibold text-[#063882] mt-0.5">Ngày {dateLabel(day)}</div>
 
         {/* Chọn nhanh 1 trong 3 ngày đang được giữ */}
         <div className="flex gap-2 mt-2">

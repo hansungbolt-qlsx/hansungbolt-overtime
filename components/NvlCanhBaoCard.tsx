@@ -33,8 +33,11 @@ function SizeTag({ size }: { size: string }) {
   );
 }
 
-// Nội dung dùng chung: thẻ trên màn hình + khung ẩn 480px để tạo ảnh chia sẻ
-function NoiDung({ a, b, gio }: { a: NvlNhomA[]; b: NvlDongB[]; gio: string }) {
+// Nội dung dùng chung: thẻ trên màn hình + khung ẩn 480px để tạo ảnh chia sẻ.
+// gon = MÀN HÌNH (anh Hữu 07/11/2026 — tiết kiệm diện tích): size + máy cùng 1 dòng, mã cũ → mã mới
+// 1 dòng, tiêu đề do thẻ ngoài vẽ (kèm nút Zalo). Ảnh Zalo (gon=false) giữ nguyên bố cục cũ.
+function NoiDung({ a, b, gio, gon = false }: { a: NvlNhomA[]; b: NvlDongB[]; gio: string; gon?: boolean }) {
+  if (gon) return <NoiDungGon a={a} b={b} />;
   return (
     <>
       <div style={{ color: '#d20000', fontWeight: 800, fontSize: 17, lineHeight: 1.3 }}>
@@ -82,6 +85,47 @@ function NoiDung({ a, b, gio }: { a: NvlNhomA[]; b: NvlDongB[]; gio: string }) {
   );
 }
 
+function NoiDungGon({ a, b }: { a: NvlNhomA[]; b: NvlDongB[] }) {
+  return (
+    <>
+      <div style={{ fontWeight: 800, fontSize: 13.5, lineHeight: 1.35 }}>
+        A. Nhiều máy chạy cùng size nhưng khác loại — NVL chờ ở LINE dễ lấy nhầm
+      </div>
+      {a.length === 0 && <div style={{ marginLeft: 6 }}>• Hôm nay không có</div>}
+      {a.map((g) => (
+        <div key={`${g.nhom}-${g.size}`} style={{ marginTop: 3, marginLeft: 6 }}>
+          • <SizeTag size={g.size} />{' '}
+          {g.mac.map((m, i) => (
+            <span key={m.mac} style={{ marginLeft: 6, display: 'inline-block' }}>
+              <b style={{ color: MAU_MAC[i % MAU_MAC.length], whiteSpace: 'nowrap' }}>{m.mac} →</b>{' '}
+              {m.may.map((x) => (
+                <Chip key={x} text={x} />
+              ))}
+            </span>
+          ))}
+        </div>
+      ))}
+
+      <div style={{ fontWeight: 800, fontSize: 13.5, lineHeight: 1.35, marginTop: 6 }}>
+        B. Máy đổi mã, cùng size khác loại NVL — kiểm và thay cuộn trước khi Setting
+      </div>
+      {b.length === 0 && <div style={{ marginLeft: 6 }}>• Hôm nay không có</div>}
+      {b.map((x, i) => (
+        <div key={`${x.may}-${i}`} style={{ marginLeft: 6, marginTop: 3 }}>
+          • <Chip text={x.may} /> <SizeTag size={x.size} />{' '}
+          <span style={{ display: 'inline-block' }}>
+            {x.tu.ma} <b style={{ color: MAU_MAC[0] }}>{x.tu.mac}</b>
+            {x.tu.ngay ? <span style={{ color: '#64748b', fontSize: 12 }}> (cuối {x.tu.ngay})</span> : null}
+          </span>{' '}
+          <span style={{ display: 'inline-block' }}>
+            → {x.sang.ma} <b style={{ color: MAU_MAC[1] }}>{x.sang.mac}</b>
+          </span>
+        </div>
+      ))}
+    </>
+  );
+}
+
 function gioVN(iso: string): string {
   // built_at app chính gửi dạng 2026-10-30T08:30:35+07:00 → hiện 30/10/2026 08:30 (giờ VN)
   const d = new Date(new Date(iso).getTime() + 7 * 3600 * 1000);
@@ -119,7 +163,7 @@ export default function NvlCanhBaoCard({ canShare }: { canShare: boolean }) {
   // Chưa có cho hôm nay / app chính tính lỗi → báo, KHÔNG hiện danh sách cũ
   if (!row || !data || data.loi || failed) {
     return (
-      <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+      <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
         ⚠ Chưa có cảnh báo nhầm nguyên liệu cho KHSX hôm nay — báo văn phòng đồng bộ lại KHSX.
       </div>
     );
@@ -181,9 +225,25 @@ export default function NvlCanhBaoCard({ canShare }: { canShare: boolean }) {
   }
 
   return (
-    <section className="mb-4 rounded-xl border-2 border-red-300 bg-white shadow-sm overflow-hidden">
-      <div style={{ fontFamily: SHARE_FONT, fontSize: 15, lineHeight: 1.6, color: '#141414', padding: '12px 14px' }}>
-        <NoiDung a={a} b={b} gio={gio} />
+    <section className="mb-3 rounded-xl border-2 border-red-300 bg-white shadow-sm overflow-hidden">
+      <div className="flex items-start justify-between gap-2 px-3 pt-2">
+        <div className="min-w-0">
+          <div className="text-[14px] font-extrabold leading-tight text-[#d20000]">⚠ CHÚ Ý TRÁNH NHẦM NGUYÊN LIỆU</div>
+          <div className="text-xs text-slate-500">KHSX {gio}</div>
+        </div>
+        {canShare && coViec && (
+          <button
+            type="button"
+            onClick={handleShare}
+            disabled={sharing}
+            className="shrink-0 px-2.5 py-1 rounded-lg bg-[#0068ff] hover:bg-[#0055d4] active:scale-95 disabled:opacity-60 disabled:cursor-wait text-white text-xs font-bold shadow-sm transition whitespace-nowrap"
+          >
+            {sharing ? 'Đang tạo...' : '📤 Zalo'}
+          </button>
+        )}
+      </div>
+      <div style={{ fontFamily: SHARE_FONT, fontSize: 14, lineHeight: 1.45, color: '#141414', padding: '4px 12px 8px' }}>
+        <NoiDung a={a} b={b} gio={gio} gon />
       </div>
 
       {canShare && coViec && (
@@ -197,16 +257,6 @@ export default function NvlCanhBaoCard({ canShare }: { canShare: boolean }) {
             >
               <NoiDung a={a} b={b} gio={gio} />
             </div>
-          </div>
-          <div className="px-4 pb-3">
-            <button
-              type="button"
-              onClick={handleShare}
-              disabled={sharing}
-              className="w-full py-2.5 rounded-lg bg-[#0068ff] hover:bg-[#0055d4] active:scale-95 disabled:opacity-60 disabled:cursor-wait text-white text-sm font-bold shadow-sm transition"
-            >
-              {sharing ? 'Đang tạo ảnh...' : '📤 Chia sẻ Zalo'}
-            </button>
           </div>
         </>
       )}

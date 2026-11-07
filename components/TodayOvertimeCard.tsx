@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { toTitleCase } from '@/lib/format';
 import { hoursText } from '@/lib/overtime-shift';
+import DateButton from './DateButton';
 
 type Machine = { code: string; isOther: boolean; otherText?: string };
 type EmpRow = {
@@ -158,19 +159,15 @@ export default function TodayOvertimeCard({
   return (
     <>
       <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden">
-        <div className="px-5 py-4 border-b border-brand-surface-alt flex flex-wrap items-center justify-between gap-3">
+        <div className="px-3 py-2.5 border-b border-brand-surface-alt flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="text-lg font-semibold text-brand-navy">Tăng ca hôm nay</h2>
-            <p className="text-xs text-brand-navy-soft mt-0.5">Ngày {dateLabel}</p>
+            <h2 className="text-base font-semibold text-brand-navy">Tăng ca hôm nay</h2>
+            {/* Có ô lịch thì không lặp ngày ở tiêu đề (anh Hữu 07/11/2026) */}
+            {hideDatePicker && <p className="text-xs text-brand-navy-soft mt-0.5">{dateLabel}</p>}
           </div>
           <div className="flex items-center gap-2">
             {!hideDatePicker && (
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="px-3 py-1.5 border border-gray-300 rounded-md text-brand-navy text-sm focus:outline-none focus:ring-2 focus:ring-brand-teal"
-              />
+              <DateButton value={date} onChange={(v) => v && setDate(v)} compact />
             )}
             {hasData && (
               <button

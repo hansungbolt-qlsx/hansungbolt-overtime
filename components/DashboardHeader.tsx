@@ -48,7 +48,7 @@ export default function DashboardHeader({
             </p>
           </div>
         </div>
-        <div className="flex flex-col gap-1.5 flex-shrink-0">
+        <div className="flex flex-col gap-0.5 flex-shrink-0">
           <LogoutButton />
           <ChangePasswordButton />
         </div>

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { HD_EMPLOYEES } from '@/lib/hd-employees';
 import PrintJobButton from './PrintJobButton';
+import { dateLabel } from '@/lib/date-label';
 import { compressImage } from '@/lib/image-compress';
 
 // fetch không báo % lúc GỬI → dùng XMLHttpRequest. status 0 = mất kết nối / hết giờ.
@@ -137,7 +138,7 @@ export default function MaterialLabelsUpload({
   }
 
   async function handleDeleteAll() {
-    if (!confirm(`Xóa toàn bộ ${photos.length} ảnh ngày ${date}?`)) return;
+    if (!confirm(`Xóa toàn bộ ${photos.length} ảnh ngày ${dateLabel(date)}?`)) return;
     setDeletingAll(true);
     try {
       const res = await fetch(`/api/labels?date=${date}`, { method: 'DELETE' });
@@ -174,7 +175,7 @@ export default function MaterialLabelsUpload({
   // Step 1: Name selector
   if (!employeeName) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden mt-6">
+      <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden">
         <div className="bg-[#063882] px-5 py-4">
           <h2 className="text-base font-bold text-white">Chọn tên của bạn</h2>
           <p className="text-xs text-blue-200 mt-0.5">Tên sẽ hiển thị trên tem khi in ra</p>
@@ -200,13 +201,12 @@ export default function MaterialLabelsUpload({
 
   // Step 2: Upload form
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden mt-6">
+    <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt overflow-hidden">
       {/* Header */}
-      <div className="bg-[#063882] px-5 py-4 flex items-start justify-between gap-3">
+      <div className="bg-[#063882] px-4 py-2.5 flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h2 className="text-base font-bold text-white leading-tight">Tem NVL</h2>
-          <div className="text-sm font-semibold text-white mt-0.5">Ngày {date}</div>
-          <p className="text-xs text-blue-200 mt-1">
+          <p className="text-xs text-blue-200 mt-0.5">
             Đang upload với tên:{' '}
             <span className="font-bold text-white">{employeeName}</span>
           </p>

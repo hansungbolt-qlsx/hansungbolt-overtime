@@ -19,11 +19,11 @@ export default async function RegisterPage() {
   const isQlsx = session.role === 'qlsx';
 
   return (
-    <main className="min-h-screen bg-brand-pattern p-4">
+    <main className="min-h-screen bg-brand-pattern p-3 sm:p-4">
       {/* Mở / quay lại app → tự tải bản mới nhất (anh Hữu 04/11/2026) */}
       <TaiBanMoi />
       <div className="max-w-lg mx-auto">
-        <header className="flex justify-between items-center mb-5 gap-3">
+        <header className="flex justify-between items-center mb-3 gap-3">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <Link
               href="/register"
@@ -50,7 +50,7 @@ export default async function RegisterPage() {
               </p>
             </div>
           </div>
-          <div className="flex flex-col gap-1.5 flex-shrink-0">
+          <div className="flex flex-col gap-0.5 flex-shrink-0">
             <LogoutButton />
             <ChangePasswordButton />
           </div>

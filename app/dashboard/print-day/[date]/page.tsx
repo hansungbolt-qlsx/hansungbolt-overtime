@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getSession } from '@/lib/auth-server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { dateLabel } from '@/lib/date-label';
 import PrintDayControls from '@/components/PrintDayControls';
 import OvertimeSheetArticle, { OT_PRINT_CSS } from '@/components/OvertimeSheetArticle';
 
@@ -42,7 +43,7 @@ export default async function PrintDayPage({
   if (!regs || regs.length === 0) {
     return (
       <main className="min-h-screen p-8">
-        <p className="text-brand-navy">Ngày {date} chưa có phiếu tăng ca nào.</p>
+        <p className="text-brand-navy">Ngày {dateLabel(date)} chưa có phiếu tăng ca nào.</p>
       </main>
     );
   }
@@ -54,7 +55,7 @@ export default async function PrintDayPage({
       <div className="max-w-5xl mx-auto print:max-w-none">
         <div className="flex justify-between items-center mb-4 print:hidden">
           <p className="text-sm text-brand-navy-soft">
-            In gộp phiếu tăng ca ngày <strong>{date}</strong> — {regs.length} phiếu ({depts}),
+            In gộp phiếu tăng ca ngày <strong>{dateLabel(date)}</strong> — {regs.length} phiếu ({depts}),
             mỗi phiếu 1 trang
           </p>
           <PrintDayControls count={regs.length} autoprint={autoprint} />

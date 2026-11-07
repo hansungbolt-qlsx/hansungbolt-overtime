@@ -262,11 +262,11 @@ export default function CoDailyView({ currentUserFullName, stage = '86', canSend
   const inp = 'w-full px-3 py-2.5 border border-gray-300 rounded-md text-brand-navy bg-white focus:outline-none focus:ring-2 focus:ring-brand-teal';
 
   return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-4 space-y-3">
+    <div className="space-y-3">
+      <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-3 space-y-3">
         <div className="flex items-center justify-between gap-2">
           <div className="text-sm font-bold text-brand-navy">{stage === '84' ? '🔩' : '🎨'} {cfg.title} hàng ngày</div>
-          <DateButton value={date} onChange={(v) => { setDate(v); setD(emptyDraft(d.machine, d.employeeId)); }} />
+          <DateButton value={date} onChange={(v) => { if (!v) return; setDate(v); setD(emptyDraft(d.machine, d.employeeId)); }} />
         </div>
         {slip && (
           <div className={`text-xs border rounded-md px-3 py-2 ${STATUS[slip.status].c}`}>
@@ -360,7 +360,7 @@ export default function CoDailyView({ currentUserFullName, stage = '86', canSend
       {/* ── Danh sách dòng trong ngày ── */}
       <div className="bg-white rounded-xl shadow-sm border border-brand-surface-alt">
         <div className="flex items-center justify-between px-4 py-3 border-b border-brand-surface-alt">
-          <div className="text-sm font-bold text-brand-navy">Kết quả ngày {date.split('-').reverse().join('/')}</div>
+          <div className="text-sm font-bold text-brand-navy">Kết quả trong ngày</div>
           <div className="text-xs text-brand-navy-soft">{lines.length} LOT · <b className="text-brand-navy">{fmtKg(total)} Kg</b></div>
         </div>
         {lines.length === 0 ? (

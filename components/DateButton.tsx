@@ -1,20 +1,35 @@
 'use client';
 
-// Nút hiển thị "Ngày DD/MM/YYYY" bằng tiếng Việt (chữ N viết hoa).
-// Ô <input type="date"> trong suốt phủ kín nút ⇒ chạm vào đâu cũng chạm đúng ô date thật.
+import { dateLabel } from '@/lib/date-label';
+
+export { dateLabel };
+
+// Ô chọn ngày / tháng DÙNG CHUNG toàn app (anh Hữu chốt 07/11/2026):
+//   · chỉ ghi ngắn gọn "07/11/2026" (tháng: "11/2026") — không chữ "Ngày", không kiểu Mỹ/ISO
+//   · viền rõ + biểu tượng lịch + mũi tên ▾ ⇒ nhìn là biết bấm vào đổi được
+// Ô <input type="date|month"> trong suốt phủ kín nút ⇒ chạm vào đâu cũng chạm đúng ô thật.
 export default function DateButton({
   value,
   onChange,
   className = '',
   compact = false,
+  mode = 'date',
+  min,
+  max,
+  disabled = false,
+  ariaLabel,
 }: {
-  value: string; // YYYY-MM-DD
+  value: string; // date: YYYY-MM-DD · month: YYYY-MM
   onChange: (v: string) => void;
   className?: string;
   compact?: boolean;
+  mode?: 'date' | 'month';
+  min?: string;
+  max?: string;
+  disabled?: boolean;
+  ariaLabel?: string;
 }) {
-  const [y, m, d] = value.split('-');
-  const label = y && m && d ? `Ngày ${d}/${m}/${y}` : 'Chọn ngày';
+  const label = dateLabel(value, mode);
 
   // Máy có chuột (Chrome desktop): bấm vào ô date chỉ focus từng phần ngày/tháng,
   // không tự mở lịch ⇒ gọi showPicker(). Điện thoại (iPhone/Android): chạm thẳng vào
@@ -31,25 +46,32 @@ export default function DateButton({
 
   return (
     <label
-      className={`relative inline-flex items-center gap-1.5 cursor-pointer bg-white border border-brand-surface-alt rounded-lg font-semibold text-brand-navy hover:bg-[#f0f5ff] transition ${
-        compact ? 'px-3 py-1.5 text-sm' : 'px-4 py-2 text-sm'
-      } ${className}`}
+      className={`relative inline-flex items-center gap-1.5 whitespace-nowrap bg-white border-2 border-brand-teal/60 rounded-lg font-bold text-brand-navy tabular-nums transition ${
+        disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-brand-teal hover:bg-[#effaf8]'
+      } ${compact ? 'px-2 py-1 text-[13px]' : 'px-3 py-1.5 text-sm'} ${className}`}
     >
       <CalendarIcon />
       <span>{label}</span>
+      <svg viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 text-brand-teal-dark -mr-0.5 shrink-0" aria-hidden="true">
+        <path d="M5.5 7.5 10 12l4.5-4.5z" />
+      </svg>
       <input
-        type="date"
+        type={mode}
         value={value}
+        min={min}
+        max={max}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         onClick={(e) => openPickerIfMouse(e.currentTarget)}
-        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
         // 16px: iPhone không tự phóng to trang khi chạm vào ô
         style={{ colorScheme: 'light', fontSize: 16 }}
-        aria-label="Đổi ngày"
+        aria-label={ariaLabel ?? (mode === 'month' ? 'Đổi tháng' : 'Đổi ngày')}
       />
     </label>
   );
 }
+
 
 function CalendarIcon() {
   return (
@@ -61,7 +83,7 @@ function CalendarIcon() {
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="w-4 h-4 text-brand-navy-soft"
+      className="w-4 h-4 text-brand-teal-dark shrink-0"
       aria-hidden="true"
     >
       <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
