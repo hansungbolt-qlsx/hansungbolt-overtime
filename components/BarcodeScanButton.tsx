@@ -39,14 +39,70 @@ const BOX_H = 5;
 const MAX_SIDE = 1920;
 // Cứ N khung thì đọc cả khung hình (bắt QR nằm ngoài khung chữ nhật)
 const FULL_EVERY = 5;
+// Zoom mặc định trên Android (máy có zoom) — xem chỗ áp dụng
+const DEFAULT_ZOOM = 2;
+// Camera sau đã chọn (Android nhiều camera) — lưu trên máy để lần sau mở thẳng camera chính
+const CAM_KEY = 'hsb-scan-cam-v1';
+const VIDEO_RES = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+
+function loadCam(): string {
+  try {
+    return localStorage.getItem(CAM_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+function saveCam(id: string) {
+  try {
+    localStorage.setItem(CAM_KEY, id);
+  } catch {
+    /* chế độ ẩn danh — bỏ qua */
+  }
+}
+function openStream(deviceId?: string): Promise<MediaStream> {
+  return navigator.mediaDevices.getUserMedia({
+    audio: false,
+    video: deviceId
+      ? { deviceId: { exact: deviceId }, ...VIDEO_RES }
+      : { facingMode: { ideal: 'environment' }, ...VIDEO_RES },
+  });
+}
+function stopStream(s: MediaStream | null) {
+  s?.getTracks().forEach((t) => {
+    try {
+      t.stop();
+    } catch {
+      /* đã dừng */
+    }
+  });
+}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function capsOf(s: MediaStream): any {
+  const t = s.getVideoTracks()[0] as AnyTrack | undefined;
+  try {
+    return t?.getCapabilities?.() ?? {};
+  } catch {
+    return {};
+  }
+}
+// Camera sau (nhãn có sau khi đã cho phép camera). Bỏ camera trước/selfie.
+async function backCameras(): Promise<MediaDeviceInfo[]> {
+  try {
+    const ds = await navigator.mediaDevices.enumerateDevices();
+    return ds.filter((d) => d.kind === 'videoinput' && d.deviceId && !/front|user|selfie/i.test(d.label));
+  } catch {
+    return [];
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyTrack = MediaStreamTrack & { getCapabilities?: () => any };
 
 type Caps = {
   torch: boolean;
   zoom: { min: number; max: number; step: number } | null;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyTrack = MediaStreamTrack & { getCapabilities?: () => any };
 
 function isIOS(): boolean {
   if (typeof navigator === 'undefined') return false;
@@ -93,6 +149,10 @@ export default function BarcodeScanButton({
   const [torchOn, setTorchOn] = useState(false);
   const [torchMsg, setTorchMsg] = useState('');
   const [zoom, setZoom] = useState(1);
+  const [camPick, setCamPick] = useState(''); // camera chọn tay bằng nút 🔄
+  const [backCams, setBackCams] = useState<MediaDeviceInfo[]>([]);
+  const [probing, setProbing] = useState(false); // đang dò camera chính
+  const [info, setInfo] = useState('');
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const boxRef = useRef<HTMLDivElement | null>(null);
@@ -175,34 +235,62 @@ export default function BarcodeScanButton({
       try {
         const zx = loadZxing(); // tải wasm song song với lúc xin camera
         if (!navigator.mediaDevices?.getUserMedia) throw new Error('trình duyệt không hỗ trợ camera');
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: {
-            facingMode: { ideal: 'environment' },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-          },
-        });
+        const android = !isIOS();
+        const saved = loadCam();
+        let stream: MediaStream | null = null;
+        const want = camPick || saved;
+        if (want) stream = await openStream(want).catch(() => null);
+        if (!stream) stream = await openStream();
         if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
+          stopStream(stream);
+          return;
+        }
+        let c = capsOf(stream);
+        const cams = android ? await backCameras() : [];
+        if (!cancelled) setBackCams(cams);
+
+        // 🔴 Android nhiều camera sau (anh Hữu báo 07/11: máy anh Cường không quét được, không có
+        // nút đèn): Chrome hay mở NHẦM ống kính phụ (góc rộng/tele) — không đèn, không lấy nét gần
+        // ⇒ hình nhoè. Lần đầu (chưa lưu camera) mà camera đang mở KHÔNG có đèn → thử lần lượt các
+        // camera sau khác, lấy cái CÓ ĐÈN (= camera chính). Lưu lại để lần sau mở thẳng.
+        if (android && !camPick && !saved && !c.torch && cams.length > 1) {
+          setProbing(true);
+          const curId = stream.getVideoTracks()[0]?.getSettings().deviceId;
+          for (const d of cams) {
+            if (cancelled) break;
+            if (d.deviceId === curId) continue;
+            // nhiều máy Android không mở được 2 camera cùng lúc ⇒ tắt cái cũ trước
+            stopStream(stream);
+            stream = null;
+            const s2 = await openStream(d.deviceId).catch(() => null);
+            if (!s2) continue;
+            if (capsOf(s2).torch) {
+              stream = s2;
+              break;
+            }
+            stopStream(s2);
+          }
+          if (!stream) stream = (curId ? await openStream(curId).catch(() => null) : null) ?? (await openStream());
+          if (!cancelled) setProbing(false);
+          c = capsOf(stream);
+        }
+        if (cancelled) {
+          stopStream(stream);
           return;
         }
         streamRef.current = stream;
+        const track = stream.getVideoTracks()[0] as AnyTrack | undefined;
+        const st = track?.getSettings();
+        if (android && st?.deviceId) saveCam(st.deviceId);
+
         const video = videoRef.current;
         if (!video) return;
         video.srcObject = stream;
         await video.play().catch(() => {});
 
-        const track = stream.getVideoTracks()[0] as AnyTrack | undefined;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let c: any = {};
-        try {
-          c = track?.getCapabilities?.() ?? {};
-        } catch {
-          c = {};
-        }
         // Android: lấy nét liên tục (mặc định nhiều máy để "single shot" → nhoè khi đưa gần)
-        if (Array.isArray(c.focusMode) && c.focusMode.includes('continuous')) {
+        const focusOk = Array.isArray(c.focusMode) && c.focusMode.includes('continuous');
+        if (focusOk) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           await track?.applyConstraints({ advanced: [{ focusMode: 'continuous' } as any] }).catch(() => {});
         }
@@ -214,10 +302,29 @@ export default function BarcodeScanButton({
                 step: c.zoom.step > 0 ? c.zoom.step : 0.1,
               }
             : null;
+        // Mặc định zoom 2× (Android): đứng xa 20–30 cm camera mới lấy nét được, zoom bù lại cho
+        // mã vạch vẫn to + nhiều pixel (zoom phần cứng cắt từ cảm biến, không phải phóng ảnh).
+        const z0 = z ? Math.min(Math.max(DEFAULT_ZOOM, z.min), z.max) : 1;
+        if (z && z0 !== 1) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await track?.applyConstraints({ advanced: [{ zoom: z0 } as any] }).catch(() => {});
+        }
         if (!cancelled) {
           // iPhone: getCapabilities không phải lúc nào cũng báo torch dù bật được ⇒ vẫn hiện nút
           setCaps({ torch: !!c.torch || isIOS(), zoom: z });
-          if (z) setZoom(Math.max(z.min, 1));
+          setZoom(z0);
+          // Dòng chẩn đoán nhỏ — anh Hữu chụp màn hình gửi là biết máy đang mở camera nào
+          setInfo(
+            [
+              (track?.label || 'camera').replace(/\s+/g, ' ').slice(0, 40),
+              st?.width && st?.height ? `${st.width}×${st.height}` : '',
+              `đèn ${c.torch ? 'có' : isIOS() ? '?' : 'không'}`,
+              focusOk ? 'nét tự động' : '',
+              cams.length > 1 ? `${cams.length} camera sau` : '',
+            ]
+              .filter(Boolean)
+              .join(' · '),
+          );
         }
 
         await zx;
@@ -300,8 +407,20 @@ export default function BarcodeScanButton({
       setTorchOn(false);
       setTorchMsg('');
       setCaps({ torch: false, zoom: null });
+      setInfo('');
+      setProbing(false);
     };
-  }, [open, finish, stopCamera]);
+  }, [open, camPick, finish, stopCamera]);
+
+  // 🔄 Đổi sang camera sau kế tiếp (máy Android nhiều ống kính, tự dò vẫn chọn sai)
+  const nextCamera = useCallback(() => {
+    if (backCams.length < 2) return;
+    const cur = streamRef.current?.getVideoTracks()[0]?.getSettings().deviceId;
+    const i = backCams.findIndex((d) => d.deviceId === cur);
+    const next = backCams[(i + 1) % backCams.length].deviceId;
+    saveCam(next);
+    setCamPick(next);
+  }, [backCams]);
 
   const toggleTorch = useCallback(async () => {
     const track = streamRef.current?.getVideoTracks()[0];
@@ -468,13 +587,13 @@ export default function BarcodeScanButton({
               </div>
               {!ready && !err && (
                 <div className="absolute inset-0 flex items-center justify-center text-white text-sm">
-                  Đang mở camera…
+                  {probing ? 'Đang chọn camera chính…' : 'Đang mở camera…'}
                 </div>
               )}
             </div>
 
             {/* Đèn + zoom */}
-            {(caps.torch || caps.zoom) && (
+            {(caps.torch || caps.zoom || backCams.length > 1) && (
               <div className="mt-2 flex items-center gap-2 shrink-0">
                 {caps.torch && (
                   <button
@@ -486,6 +605,17 @@ export default function BarcodeScanButton({
                     }`}
                   >
                     🔦 {torchOn ? 'Tắt đèn' : 'Bật đèn'}
+                  </button>
+                )}
+                {backCams.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={nextCamera}
+                    title="Đổi camera"
+                    aria-label="Đổi camera"
+                    className="px-2.5 py-2 rounded-lg text-sm font-bold border-2 bg-white border-brand-navy/30 text-brand-navy whitespace-nowrap"
+                  >
+                    🔄
                   </button>
                 )}
                 {caps.zoom && (
@@ -507,12 +637,19 @@ export default function BarcodeScanButton({
             )}
 
             <div className="mt-2 overflow-auto min-h-0">
+              {info && <p className="text-[10px] text-slate-400 mb-1 break-words">{info}</p>}
               {err ? (
                 <p className="text-sm text-red-600 font-semibold break-words">{err}</p>
               ) : (
                 <p className="text-xs text-brand-navy-soft leading-relaxed">
-                  Cách tem khoảng <b>15–20 cm</b>, mã vạch nằm <b>ngang trong khung</b>, vạch đỏ cắt
-                  ngang mã. Chỗ tối thì bật 🔦; tem bị chói thì nghiêng máy một chút.
+                  Cách tem khoảng <b>{caps.zoom ? '20–30 cm' : '15–20 cm'}</b>, mã vạch nằm{' '}
+                  <b>ngang trong khung</b>, vạch đỏ cắt ngang mã. Chỗ tối thì bật 🔦; tem bị chói thì
+                  nghiêng máy một chút.
+                  {backCams.length > 1 && !caps.torch && (
+                    <span className="block mt-1 text-amber-700 font-semibold">
+                      Hình mờ / không có nút đèn → bấm 🔄 đổi sang camera khác.
+                    </span>
+                  )}
                   {torchMsg && <span className="block mt-1 text-amber-700 font-semibold">{torchMsg}</span>}
                   {secs >= 10 && (
                     <span className="block mt-1 text-amber-700 font-semibold">
