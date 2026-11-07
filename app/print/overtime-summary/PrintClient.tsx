@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { quayLai } from '@/lib/quay-lai';
 import { toTitleCase } from '@/lib/format';
 
 type DateEntry = { date: string; dayType: 'weekday' | 'sunday' };
@@ -127,7 +128,7 @@ export default function PrintClient({
       <div className="no-print">
         <span>{preview ? `XEM BÁO CÁO: ${title}` : title}</span>
         <button onClick={() => window.print()}>{preview ? 'In trang này' : 'In ngay'}</button>
-        <button className="btn-close" onClick={() => window.close()}>✕</button>
+        <button className="btn-close" onClick={() => quayLai()} title="Quay lại">← Quay lại</button>
       </div>
 
       <div className="page">

@@ -269,7 +269,7 @@ export default function MaterialLabelsAdminCard() {
                 </p>
                 <button
                   type="button"
-                  onClick={() => window.open(`/print/labels?date=${day}`, '_blank')}
+                  onClick={() => { window.location.href = `/print/labels?date=${day}`; }}
                   className="bg-[#e32531] hover:bg-[#c01f2a] active:scale-95 text-white font-bold py-3 px-8 rounded-xl shadow-md transition text-sm"
                 >
                   Mở trang in

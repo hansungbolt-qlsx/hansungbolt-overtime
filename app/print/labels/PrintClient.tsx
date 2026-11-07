@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { quayLai } from '@/lib/quay-lai';
 import { dateLabel } from '@/lib/date-label';
 
 type Photo = { id: string; url: string | null; employee_name: string | null };
@@ -101,7 +102,7 @@ export default function PrintClient({
           Tem NVL ngày {dateLabel(date)} — {photos.length} ảnh — {sheets.length} tờ
         </span>
         <button onClick={() => window.print()}>In ngay</button>
-        <button className="btn-close" onClick={() => window.close()} title="Đóng">✕</button>
+        <button className="btn-close" onClick={() => quayLai()} title="Quay lại">← Quay lại</button>
       </div>
 
       {sheets.map((sheet, si) => (

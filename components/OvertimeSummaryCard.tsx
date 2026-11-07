@@ -131,14 +131,14 @@ export default function OvertimeSummaryCard({ isAdmin = false }: { isAdmin?: boo
                 <>
                   <button
                     type="button"
-                    onClick={() => window.open(previewUrl, '_blank')}
+                    onClick={() => { window.location.href = previewUrl; }}
                     className="bg-[#063882] hover:bg-[#052a64] active:scale-95 text-white text-sm font-bold py-1.5 px-4 rounded-lg shadow-sm transition"
                   >
                     Xem
                   </button>
                   <button
                     type="button"
-                    onClick={() => window.open(printUrl, '_blank')}
+                    onClick={() => { window.location.href = printUrl; }}
                     className="bg-[#e32531] hover:bg-[#c01f2a] active:scale-95 text-white text-sm font-bold py-1.5 px-4 rounded-lg shadow-sm transition"
                   >
                     In / Xuất

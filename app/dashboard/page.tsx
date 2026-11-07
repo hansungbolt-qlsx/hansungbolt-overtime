@@ -169,8 +169,6 @@ export default async function DashboardPage({
             {regs.length > 0 && (
               <a
                 href={`/dashboard/print-day/${selectedDate}?autoprint=1`}
-                target="_blank"
-                rel="noopener"
                 className="inline-flex items-center gap-1 rounded-md font-semibold text-xs px-2.5 py-1.5 bg-[#f97316] hover:bg-[#ea580c] text-white transition active:scale-95"
               >
                 🖨 In {regs.length} phiếu (

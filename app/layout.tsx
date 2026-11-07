@@ -20,6 +20,9 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "default",
   },
+  // Next chỉ in "mobile-web-app-capable" — iPhone (iOS ≤ 16, vd iPhone X) cần đúng thẻ apple-… mới mở
+  // biểu tượng màn hình chính thành app riêng, không sinh tab Safari (anh Hữu 07/11/2026)
+  other: { "apple-mobile-web-app-capable": "yes" },
 };
 
 export default function RootLayout({
