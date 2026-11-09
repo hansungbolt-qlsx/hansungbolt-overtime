@@ -59,13 +59,53 @@ function saveCam(id: string) {
     /* chế độ ẩn danh — bỏ qua */
   }
 }
+// anh Hữu 09/11/2026: iPhone anh Hữu treo mãi "Đang mở camera…" (máy không trả camera, không báo lỗi)
+// ⇒ chờ tối đa OPEN_TIMEOUT_MS rồi báo lỗi rõ + thông tin máy; camera trả về muộn thì tắt ngay.
+const OPEN_TIMEOUT_MS = 8000;
 function openStream(deviceId?: string): Promise<MediaStream> {
-  return navigator.mediaDevices.getUserMedia({
+  const p = navigator.mediaDevices.getUserMedia({
     audio: false,
     video: deviceId
       ? { deviceId: { exact: deviceId }, ...VIDEO_RES }
       : { facingMode: { ideal: 'environment' }, ...VIDEO_RES },
   });
+  return new Promise<MediaStream>((resolve, reject) => {
+    let done = false;
+    const t = setTimeout(() => {
+      done = true;
+      const e = new Error('hết thời gian chờ camera');
+      e.name = 'TimeoutError';
+      reject(e);
+      p.then((s) => stopStream(s)).catch(() => {});
+    }, OPEN_TIMEOUT_MS);
+    p.then(
+      (s) => {
+        clearTimeout(t);
+        if (done) stopStream(s);
+        else resolve(s);
+      },
+      (e) => {
+        clearTimeout(t);
+        if (!done) reject(e);
+      },
+    );
+  });
+}
+/** Thông tin máy để chẩn đoán khi không mở được camera: iOS mấy · Safari hay chế độ ứng dụng · quyền camera. */
+async function camDiag(): Promise<string> {
+  const ua = navigator.userAgent;
+  const ios = /OS (\d+)[_.](\d+)/.exec(ua);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const standalone = (navigator as any).standalone === true || window.matchMedia?.('(display-mode: standalone)').matches;
+  let perm = '?';
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    perm = (await navigator.permissions.query({ name: 'camera' as any })).state;
+  } catch {
+    /* trình duyệt không hỗ trợ hỏi quyền */
+  }
+  const os = ios && isIOS() ? `iOS ${ios[1]}.${ios[2]}` : /Android [\d.]+/.exec(ua)?.[0] ?? 'máy khác';
+  return `[${os} · ${standalone ? 'mở như ứng dụng' : 'trình duyệt'} · quyền camera: ${perm}]`;
 }
 function stopStream(s: MediaStream | null) {
   s?.getTracks().forEach((t) => {
@@ -122,8 +162,14 @@ function visibleRect(vw: number, vh: number, boxW: number, boxH: number) {
 
 function errText(e: unknown): string {
   const name = e instanceof DOMException || e instanceof Error ? e.name : '';
+  if (name === 'TimeoutError')
+    return isIOS()
+      ? 'iPhone chưa mở được camera sau 8 giây. Bấm “📸 Chụp ảnh tem” bên dưới để quét tiếp; hoặc vuốt tắt hẳn app rồi mở lại; kiểm tra Cài đặt › Safari › Camera = Cho phép (hoặc Hỏi).'
+      : 'Máy chưa mở được camera sau 8 giây — bấm “📸 Chụp ảnh tem” bên dưới, hoặc đóng hẳn trình duyệt rồi mở lại.';
   if (name === 'NotAllowedError' || name === 'SecurityError')
-    return 'Chưa cho phép dùng camera — vào cài đặt trình duyệt cho phép Camera với trang này rồi thử lại.';
+    return isIOS()
+      ? 'iPhone đang chặn camera với trang này — vào Cài đặt › Safari › Camera chọn Cho phép (hoặc Hỏi), rồi mở lại app. Tạm thời bấm “📸 Chụp ảnh tem”.'
+      : 'Chưa cho phép dùng camera — vào cài đặt trình duyệt cho phép Camera với trang này rồi thử lại.';
   if (name === 'NotFoundError' || name === 'OverconstrainedError')
     return 'Không tìm thấy camera sau của máy.';
   if (name === 'NotReadableError')
@@ -150,6 +196,9 @@ export default function BarcodeScanButton({
   const [torchMsg, setTorchMsg] = useState('');
   const [zoom, setZoom] = useState(1);
   const [camPick, setCamPick] = useState(''); // camera chọn tay bằng nút 🔄
+  // iPhone "mở như ứng dụng" (màn hình chính) kẹt camera nếu xin SAU lần chạm (anh Hữu 09/11/2026: Safari
+  // quét được, biểu tượng màn hình chính treo) ⇒ trên iPhone xin camera NGAY trong lần bấm nút, khung quét dùng lại.
+  const preStream = useRef<Promise<MediaStream> | null>(null);
   const [backCams, setBackCams] = useState<MediaDeviceInfo[]>([]);
   const [probing, setProbing] = useState(false); // đang dò camera chính
   const [info, setInfo] = useState('');
@@ -179,6 +228,9 @@ export default function BarcodeScanButton({
   }, []);
 
   const close = useCallback(() => {
+    const pre = preStream.current; // đóng khi luồng xin trước chưa kịp dùng → tắt khi nó về
+    preStream.current = null;
+    pre?.then((st) => stopStream(st)).catch(() => {});
     stopCamera();
     setOpen(false);
     setSecs(0);
@@ -238,8 +290,11 @@ export default function BarcodeScanButton({
         const android = !isIOS();
         const saved = loadCam();
         let stream: MediaStream | null = null;
+        const pre = preStream.current;
+        preStream.current = null;
+        if (pre) stream = await pre; // iPhone: luồng đã xin trong lần bấm (lỗi → catch dưới, báo rõ)
         const want = camPick || saved;
-        if (want) stream = await openStream(want).catch(() => null);
+        if (!stream && want) stream = await openStream(want).catch(() => null);
         if (!stream) stream = await openStream();
         if (cancelled) {
           stopStream(stream);
@@ -395,7 +450,10 @@ export default function BarcodeScanButton({
         };
         void tick();
       } catch (e) {
-        if (!cancelled) setErr(errText(e));
+        if (!cancelled) {
+          const d = await camDiag().catch(() => '');
+          if (!cancelled) setErr(`${errText(e)} ${d}`);
+        }
       }
     })();
 
@@ -543,6 +601,11 @@ export default function BarcodeScanButton({
           }
           setErr('');
           setSecs(0);
+          if (isIOS() && typeof navigator.mediaDevices?.getUserMedia === 'function') {
+            const p = openStream();
+            p.catch(() => {}); // lỗi được xử lý khi khung quét đọc lại promise
+            preStream.current = p;
+          }
           setOpen(true);
         }}
         className="px-3 py-2 rounded-lg text-sm font-semibold bg-brand-navy text-white active:scale-95 transition"
