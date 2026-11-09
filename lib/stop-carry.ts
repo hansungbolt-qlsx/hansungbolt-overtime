@@ -10,7 +10,7 @@
 //   · Không chép vào Chủ nhật (giờ VN).
 //   · Tổ trưởng sửa/bỏ máy ở NGÀY NGUỒN sau khi đã chép (vd. sáng nay sửa danh sách hôm
 //     qua) → dòng tự chép hôm nay của máy đó (nếu tổ trưởng chưa đụng) đi theo.
-// Nhắc: từ 15:30 (giờ VN, trừ Chủ nhật) tổ trưởng RL chưa mở tab Máy dừng hôm nay →
+// Nhắc: từ 15:30, hạn 16:00 (giờ VN, trừ Chủ nhật) tổ trưởng RL chưa mở tab Máy dừng hôm nay →
 // chấm đỏ trên tab + băng đỏ đầu trang; mở tab là tắt (ghi nhớ trên máy, theo ngày).
 import { supabaseAdmin } from '@/lib/supabase';
 import {

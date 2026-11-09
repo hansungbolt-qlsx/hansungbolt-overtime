@@ -113,7 +113,7 @@ with sync_playwright() as pw:
     ctx, pg = mo(br, "leader", "RL", T7_1545)
     tab = pg.get_by_role("button", name=re.compile("Máy dừng hôm nay"))
     kiem(pg.get_by_text(BANG).is_visible(), "băng đỏ hiện")
-    kiem("hạn 16:30" in pg.get_by_text(BANG).inner_text(), "ghi hạn 16:30")
+    kiem("hạn 16:00" in pg.get_by_text(BANG).inner_text(), "ghi hạn 16:00")
     kiem(tab.locator('[aria-label="Chưa kiểm tra"]').count() == 1, "chấm đỏ trên tab")
     pg.screenshot(path=str(ANH / "rl_nhac.png"), full_page=True)
 

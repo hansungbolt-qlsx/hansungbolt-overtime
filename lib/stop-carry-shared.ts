@@ -5,7 +5,7 @@ export const CARRY_DEPTS = ['RL'] as const;
 export const CARRY_PREFIX = 'Tự động từ ';
 export const CARRY_WINDOW_DAYS = 10;
 export const REMIND_FROM_MIN = 15 * 60 + 30;   // 15:30
-export const REMIND_DEADLINE = '16:30';
+export const REMIND_DEADLINE = '16:00';   // anh Hữu 09/11/2026: họp dừng máy 16h (trước là 16:30)
 
 const DAY_MS = 86400 * 1000;
 
