@@ -51,7 +51,7 @@ export async function GET() {
   const session = await getSession();
   if (!session || !canUseKhoSon(session)) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   const [ton, phieu] = await Promise.all([docTon(), docPhieu()]);
-  return NextResponse.json({ ton, phieu, user_id: session.userId, duoc_xuat: canXuatKhoSon(session) });
+  return NextResponse.json({ ton, phieu, duoc_xuat: canXuatKhoSon(session) });
 }
 
 export async function POST(req: Request) {
@@ -96,8 +96,8 @@ export async function PATCH(req: Request) {
   const { data: p } = await supabaseAdmin.from('co_paint_slips').select(COT).eq('so_phieu', String(b.so_phieu || '')).maybeSingle();
   if (!p) return NextResponse.json({ error: 'Không có phiếu' }, { status: 404 });
   const ph = p as KsPhieu;
-  if (!duocSua(ph, session.userId)) {
-    return NextResponse.json({ error: `Chỉ người lập phiếu sửa / huỷ được, trong ${KS_SUA_NGAY} ngày. Quá hạn: báo admin app Coating điều chỉnh` }, { status: 403 });
+  if (!duocSua(ph, session)) {
+    return NextResponse.json({ error: `Chỉ tổ trưởng Coating sửa / xoá được, trong ${KS_SUA_NGAY} ngày. Quá hạn: báo admin app Coating điều chỉnh` }, { status: 403 });
   }
   if (Number(b.version) !== ph.version) return NextResponse.json({ error: 'Phiếu vừa được sửa ở máy khác — tải lại rồi làm lại' }, { status: 409 });
 

@@ -8,7 +8,7 @@ export const KS_BUCKET = 'plan-files';
 export const KS_PATH = 'kho-son.json';
 export const KS_SUA_NGAY = 7;                  // tổ trưởng sửa/huỷ phiếu của mình trong 7 ngày
 
-export type KsLo = { lot_id: string; lot_no: string; han: string | null; con_ngay: number | null; ton: number;
+export type KsLo = { lot_id: string; lot_no: string; han: string | null; ngay_nhap?: string | null; con_ngay: number | null; ton: number;
   ton_kg: number; muc: 'tot' | 'sap' | 'het' };
 export type KsSanPham = { product_id: string; code: string; ten: string; ten_day_du: string; don_vi: string;
   kg_moi_dv: number; la_thung: boolean; ton: number; ton_kg: number; lo: KsLo[]; co_line: boolean; line_kg: number | null };
@@ -30,10 +30,11 @@ export function canUseKhoSon(s: { department?: string | null; role?: string } | 
 export function canXuatKhoSon(s: { department?: string | null; role?: string } | null | undefined): boolean {
   return !!s && ((s.department === 'CO' && s.role === 'leader') || s.role === 'admin');
 }
-/** Sửa / huỷ: người lập phiếu, trong 7 ngày kể từ lúc Gửi. Quá hạn → admin app Coating điều chỉnh bên app Coating. */
-export function duocSua(p: Pick<KsPhieu, 'created_by' | 'sent_at' | 'status'>, userId: string, now = Date.now()): boolean {
-  return p.status !== 'cancelled' && !!p.created_by && p.created_by === userId
-    && now - new Date(p.sent_at).getTime() <= KS_SUA_NGAY * 86400_000;
+/** Sửa / xoá phiếu đã xuất: TỔ TRƯỞNG Coating (+ admin), trong 7 ngày kể từ lúc Gửi (anh Hữu 11/11/2026 — trước là
+ *  chỉ người lập). Tổ viên CO không thấy chức năng này. Quá hạn → admin app Coating điều chỉnh bên app Coating. */
+export function duocSua(p: Pick<KsPhieu, 'sent_at' | 'status'>, s: { department?: string | null; role?: string } | null | undefined,
+  now = Date.now()): boolean {
+  return p.status !== 'cancelled' && canXuatKhoSon(s) && now - new Date(p.sent_at).getTime() <= KS_SUA_NGAY * 86400_000;
 }
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000;

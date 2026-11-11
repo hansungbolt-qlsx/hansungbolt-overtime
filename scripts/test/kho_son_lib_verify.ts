@@ -52,11 +52,14 @@ ck(kiemDongKs([{ line_id: '1', product_id: 'blue', lot_id: 'L2', qty: 2 }, { lin
 ck(kiemDongKs([{ line_id: '1', product_id: 'blue', lot_id: 'LX', qty: 1 }], TON, tl)?.includes('lô không còn') === true, 'lô lạ → chặn');
 ck(kiemDongKs([{ line_id: '1', product_id: 'toluene', lot_id: 'LT', qty: 10.5 }], TON, tl) === null, 'hợp lệ → null');
 
-console.log('4. Quyền sửa');
-ck(duocSua(P({}), 'u1') === true, 'người lập, trong 7 ngày → được');
-ck(duocSua(P({}), 'u2') === false, 'người khác → không');
-ck(duocSua(P({ sent_at: new Date(Date.now() - 8 * 86400_000).toISOString() }), 'u1') === false, 'quá 7 ngày → không');
-ck(duocSua(P({ status: 'cancelled' }), 'u1') === false, 'phiếu đã huỷ → không');
+console.log('4. Quyền sửa / xoá (anh Hữu 11/11: tổ trưởng Coating, trong 7 ngày)');
+const TT = { department: 'CO', role: 'leader' }, TV = { department: 'CO', role: 'worker' };
+ck(duocSua(P({ created_by: 'nguoi-khac' }), TT) === true, 'tổ trưởng CO sửa / xoá được cả phiếu tổ trưởng khác lập');
+ck(duocSua(P({}), TV) === false, 'tổ viên CO → không');
+ck(duocSua(P({}), { department: 'HD', role: 'leader' }) === false, 'tổ trưởng bộ phận khác → không');
+ck(duocSua(P({}), { role: 'admin' }) === true, 'admin → được');
+ck(duocSua(P({ sent_at: new Date(Date.now() - 8 * 86400_000).toISOString() }), TT) === false, 'quá 7 ngày → không');
+ck(duocSua(P({ status: 'cancelled' }), TT) === false, 'phiếu đã xoá → không');
 
 console.log(`\nKẾT QUẢ: ${ok} ok · ${fail} FAIL`);
 process.exit(fail ? 1 : 0);

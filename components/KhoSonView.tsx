@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { vnToday } from '@/lib/co-day';
+import DateButton from './DateButton';
 import {
   KS_SUA_NGAY, chiaFifo, duocSua, hanVN, kiemDongKs, tonTam, type KsDong, type KsPhieu, type KsSanPham, type KsTon,
 } from '@/lib/kho-son';
@@ -22,7 +23,6 @@ const VONG = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'];
 export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string) => void }) {
   const [ton, setTon] = useState<KsTon | null>(null);
   const [phieu, setPhieu] = useState<KsPhieu[]>([]);
-  const [userId, setUserId] = useState('');
   const [duocXuat, setDuocXuat] = useState(false);
   const [taiLoi, setTaiLoi] = useState('');
   const [ngay, setNgay] = useState(vnToday());
@@ -34,6 +34,7 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [mo, setMo] = useState('');
+  const [vuaGui, setVuaGui] = useState('');      // phiếu vừa gửi / sửa → tô nổi + LOT in đậm để kiểm đúng lô
 
   const docVe = async () => {
     try {
@@ -44,7 +45,7 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
   const apDung = useCallback(({ ok, j }: { ok: boolean; j: Record<string, unknown> }) => {
     if (!ok) { setTaiLoi(String(j.error || 'Lỗi tải')); return; }
     setTon((j.ton as KsTon) ?? { ok: false, loi: 'agent chưa đẩy số tồn', san_pham: [] });
-    setPhieu((j.phieu as KsPhieu[]) || []); setUserId(String(j.user_id || '')); setDuocXuat(!!j.duoc_xuat); setTaiLoi('');
+    setPhieu((j.phieu as KsPhieu[]) || []); setDuocXuat(!!j.duoc_xuat); setTaiLoi('');
   }, []);
   const tai = useCallback(async () => apDung(await docVe()), [apDung]);
   useEffect(() => {
@@ -65,6 +66,9 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
     return m;
   }, [tonLo, gio]);
   const sp = spMap.get(chonSp);
+  const ngayMin = new Date(Date.parse(vnToday()) - KS_SUA_NGAY * 86400_000).toISOString().slice(0, 10);
+  // quyền sửa / xoá: tổ trưởng CO (server tính duoc_xuat) trong 7 ngày
+  const quyen = duocXuat ? { department: 'CO', role: 'leader' } : null;
 
   const themDong = () => {
     setMsg(null);
@@ -113,7 +117,8 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
       });
       const j = await r.json();
       if (!r.ok) { setMsg({ ok: false, text: j.error || 'Lỗi gửi' }); return; }
-      setMsg({ ok: true, text: sua ? `Đã sửa ${sua.so_phieu}` : `Đã gửi ${j.so_phieu} — chờ đồng bộ app Coating` });
+      setMsg({ ok: true, text: sua ? `Đã sửa ${sua.so_phieu} — kiểm lại LOT bên dưới` : `Đã gửi ${j.so_phieu} — kiểm lại LOT đã xuất bên dưới` });
+      setVuaGui(sua ? sua.so_phieu : j.so_phieu); setMo(sua ? sua.so_phieu : j.so_phieu);
       setGio([]); setSua(null); setLyDo('');
       await tai();
     } finally { setBusy(false); }
@@ -125,15 +130,15 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
     setNgay(p.ngay); setLyDo(''); setMsg(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-  const huy = async (p: KsPhieu) => {
-    const ly = window.prompt(`Huỷ phiếu ${p.so_phieu}? Ghi lý do:`);
+  const xoa = async (p: KsPhieu) => {
+    const ly = window.prompt(`Xoá phiếu ${p.so_phieu}? Ghi lý do:`);
     if (!ly || !ly.trim()) return;
     setBusy(true);
     try {
       const r = await fetch('/api/kho-son', { method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ so_phieu: p.so_phieu, version: p.version, action: 'huy', reason: ly }) });
       const j = await r.json();
-      setMsg(r.ok ? { ok: true, text: `Đã huỷ ${p.so_phieu}` } : { ok: false, text: j.error || 'Lỗi huỷ' });
+      setMsg(r.ok ? { ok: true, text: `Đã xoá ${p.so_phieu}` } : { ok: false, text: j.error || 'Lỗi xoá' });
       await tai();
     } finally { setBusy(false); }
   };
@@ -166,12 +171,13 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
                   <span>Main <b>{so(tong)}</b> {p.don_vi}{p.la_thung ? ` (${so(tong * p.kg_moi_dv, 2)} kg)` : ''}</span>
                   {p.co_line && <span>Line <b className={(p.line_kg ?? 0) < 0 ? 'text-red-600' : 'text-teal-700'}>{so(p.line_kg ?? 0, 2)} kg</b></span>}
                 </div>
-                <div className="flex flex-wrap gap-1 mt-1">
+                <div className="mt-1 space-y-1">
                   {p.lo.filter((l) => (tonLo[l.lot_id] ?? 0) > 0).map((l, i) => (
-                    <span key={l.lot_id} className={`text-xs border rounded px-1.5 py-0.5 ${MAU[l.muc]}`}>
-                      {VONG[i] ?? `${i + 1}.`} {l.lot_no || 'lô'}: {so(tonLo[l.lot_id])}
-                      {l.han && ` · ${hanVN(l.han).slice(0, 5)}/${l.han.slice(2, 4)}`}{l.muc === 'het' && ' hết hạn'}
-                    </span>
+                    <div key={l.lot_id} className={`text-[13px] border rounded px-2 py-1 flex flex-wrap gap-x-2 ${MAU[l.muc]}`}>
+                      <span>{VONG[i] ?? `${i + 1}.`} {l.lot_no ? <>Lô <b>{l.lot_no}</b></> : <>Nhập {hanVN(l.ngay_nhap ?? null) || '—'}</>}</span>
+                      <span>· <b>{so(tonLo[l.lot_id])}</b> {p.la_thung ? 'thùng' : p.don_vi}</span>
+                      {l.han && <span>· {l.muc === 'het' ? <b>ĐÃ HẾT HẠN {hanVN(l.han)}</b> : <>Hết hạn {hanVN(l.han)}</>}</span>}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -187,17 +193,16 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
       {duocXuat && (
         <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-3 space-y-2">
           <h2 className="font-bold text-brand-navy">{sua ? `Sửa phiếu ${sua.so_phieu}` : 'Xuất sơn'}</h2>
-          <label className="flex items-center justify-between text-sm gap-2">Ngày xuất
-            <input type="date" value={ngay} max={vnToday()} disabled={!!sua} onChange={(e) => setNgay(e.target.value)}
-              className="border rounded px-2 py-1" />
-          </label>
+          <div className="flex items-center justify-between text-sm gap-2">Ngày xuất
+            <DateButton value={ngay} onChange={(v) => v && setNgay(v)} min={ngayMin} max={vnToday()} disabled={!!sua} />
+          </div>
           <div className="flex gap-2">
-            <select value={chonSp} onChange={(e) => { setChonSp(e.target.value); setSl(''); }} className="flex-1 border rounded px-2 py-2 text-sm">
+            <select value={chonSp} onChange={(e) => { setChonSp(e.target.value); setSl(''); }} className="flex-1 min-w-0 border rounded px-2 py-2 text-base">
               <option value="">— Chọn vật tư —</option>
               {ton.san_pham.map((p) => <option key={p.product_id} value={p.product_id}>{p.code} · {p.ten}</option>)}
             </select>
             <input inputMode={sp?.la_thung ? 'numeric' : 'decimal'} value={sl} onChange={(e) => setSl(e.target.value)}
-              placeholder={sp ? (sp.la_thung ? 'số thùng' : sp.don_vi) : 'SL'} className="w-24 border rounded px-2 py-2 text-sm" />
+              placeholder={sp ? (sp.la_thung ? 'số thùng' : sp.don_vi) : 'SL'} className="w-24 border rounded px-2 py-2 text-base" />
             <button type="button" onClick={themDong} disabled={!sp || !sl} className="px-3 rounded bg-teal-600 text-white text-sm font-semibold disabled:opacity-40">Thêm</button>
           </div>
           {sp?.la_thung && Number(sl) > 0 && <p className="text-xs text-gray-600">= {so(Number(sl) * sp.kg_moi_dv, 2)} kg</p>}
@@ -210,9 +215,9 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
                   <span><b>{p?.code}</b> · <b>{so(d.qty)}</b> {p?.don_vi}{kg != null && ` (${so(kg, 2)} kg)`}</span>
                   <button type="button" onClick={() => setGio(gio.filter((_, j) => j !== i))} className="text-red-600 text-xs">Bỏ</button>
                 </div>
-                <div className="flex items-center gap-2 mt-1 text-xs">
-                  Lô
-                  <select value={d.lot_id} onChange={(e) => doiLo(i, e.target.value)} className="border rounded px-1 py-0.5">
+                <div className="flex flex-wrap items-center gap-2 mt-1 text-sm">
+                  <span>Lô xuất <span className="text-xs text-gray-500">(tự chọn lô cũ trước)</span></span>
+                  <select value={d.lot_id} onChange={(e) => doiLo(i, e.target.value)} className="border-2 border-brand-navy rounded px-1 py-0.5 text-base font-bold">
                     {p?.lo.filter((x) => x.lot_id === d.lot_id || (conLai[x.lot_id] || 0) >= d.qty).map((x) => (
                       <option key={x.lot_id} value={x.lot_id}>{x.lot_no || 'không số'}{x.han ? ` · HSD ${hanVN(x.han)}` : ''}</option>
                     ))}
@@ -223,7 +228,7 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
               </div>
             );
           })}
-          {sua && <input value={lyDo} onChange={(e) => setLyDo(e.target.value)} placeholder="Lý do sửa (bắt buộc)" className="w-full border rounded px-2 py-2 text-sm" />}
+          {sua && <input value={lyDo} onChange={(e) => setLyDo(e.target.value)} placeholder="Lý do sửa (bắt buộc)" className="w-full border rounded px-2 py-2 text-base" />}
           {msg && <p className={`text-sm ${msg.ok ? 'text-teal-700' : 'text-red-700'}`}>{msg.text}</p>}
           {loiGio && <p className="text-sm text-red-700">{loiGio}</p>}
           <div className="flex gap-2">
@@ -249,10 +254,10 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
         <div className="space-y-2">
           {phieu.map((p) => {
             const nSua = (p.history || []).filter((h) => h.action === 'sua').length;
-            const tt = p.status === 'cancelled' ? '✖ Đã huỷ' : p.last_error ? `⚠ ${p.last_error}`
+            const tt = p.status === 'cancelled' ? '✖ Đã xoá' : p.last_error ? `⚠ ${p.last_error}`
               : p.status === 'synced' ? '● Đã vào app Coating' : '⏳ Chờ đồng bộ';
             return (
-              <div key={p.so_phieu} className={`border rounded-lg p-2 text-sm ${p.status === 'cancelled' ? 'opacity-60' : ''}`}>
+              <div key={p.so_phieu} className={`border rounded-lg p-2 text-sm ${p.status === 'cancelled' ? 'opacity-60' : ''} ${vuaGui === p.so_phieu ? 'ring-2 ring-teal-500 bg-teal-50' : ''}`}>
                 <button type="button" onClick={() => setMo(mo === p.so_phieu ? '' : p.so_phieu)} className="w-full text-left">
                   <div className="flex justify-between gap-2">
                     <b>{p.so_phieu}{nSua ? ` ✎${nSua}` : ''}</b>
@@ -261,24 +266,24 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
                   <div className={`text-xs ${p.last_error ? 'text-red-700' : p.status === 'synced' ? 'text-teal-700' : 'text-gray-600'}`}>{tt}</div>
                   {p.lines.map((d) => {
                     const { p: s, l, kg } = tenDong(d);
-                    return <div key={d.line_id} className={`text-xs ${p.status === 'cancelled' ? 'line-through' : ''}`}>
-                      {s?.code ?? d.product_id} · {l?.lot_no || '—'} · <b>{so(d.qty)}</b> {s?.don_vi}{kg != null && ` (${so(kg, 2)} kg)`}{d.het_han && ' · hết hạn'}
+                    return <div key={d.line_id} className={`${vuaGui === p.so_phieu ? 'text-sm' : 'text-xs'} ${p.status === 'cancelled' ? 'line-through' : ''}`}>
+                      {s?.code ?? d.product_id} · Lô <b className={vuaGui === p.so_phieu ? 'text-brand-navy underline' : ''}>{l?.lot_no || '—'}</b> · <b>{so(d.qty)}</b> {s?.don_vi}{kg != null && ` (${so(kg, 2)} kg)`}{d.het_han && <b className="text-red-700"> · hết hạn {d.het_han}</b>}
                     </div>;
                   })}
                 </button>
                 {mo === p.so_phieu && (
                   <div className="mt-2 border-t pt-2 space-y-1 text-xs">
                     {(p.history || []).map((h) => (
-                      <div key={h.v}>v{h.v} · {new Date(h.at).toLocaleString('vi-VN', { hour12: false })} · {h.by} · {h.action === 'huy' ? 'Huỷ' : 'Sửa'}: {h.reason}</div>
+                      <div key={h.v}>v{h.v} · {new Date(h.at).toLocaleString('vi-VN', { hour12: false })} · {h.by} · {h.action === 'huy' ? 'Xoá' : 'Sửa'}: {h.reason}</div>
                     ))}
-                    {p.cancel_reason && <div>Lý do huỷ: {p.cancel_reason}</div>}
-                    {duocSua(p, userId) ? (
+                    {p.cancel_reason && <div>Lý do xoá: {p.cancel_reason}</div>}
+                    {duocSua(p, quyen) ? (
                       <div className="flex gap-2 pt-1">
                         <button type="button" disabled={busy} onClick={() => batDauSua(p)} className="px-3 py-1 rounded border border-teal-600 text-teal-700">Sửa</button>
-                        <button type="button" disabled={busy} onClick={() => huy(p)} className="px-3 py-1 rounded border border-red-500 text-red-600">Huỷ</button>
+                        <button type="button" disabled={busy} onClick={() => xoa(p)} className="px-3 py-1 rounded border border-red-500 text-red-600">Xoá</button>
                       </div>
-                    ) : p.status !== 'cancelled' && (
-                      <div className="text-gray-500">Chỉ người lập sửa / huỷ trong {KS_SUA_NGAY} ngày. Cần sửa: báo admin app Coating.</div>
+                    ) : duocXuat && p.status !== 'cancelled' && (
+                      <div className="text-gray-500">Quá {KS_SUA_NGAY} ngày — cần sửa: báo admin app Coating.</div>
                     )}
                   </div>
                 )}
