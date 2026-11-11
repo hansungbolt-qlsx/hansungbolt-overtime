@@ -13,6 +13,7 @@ import WarehouseSlipView from './WarehouseSlipView';
 import CoDailyView from './CoDailyView';
 import CoDccdCard from './CoDccdCard';
 import CoProdSummaryView from './CoProdSummaryView';
+import KhoSonView from './KhoSonView';
 import NvlCanhBaoCard from './NvlCanhBaoCard';
 import DateButton from './DateButton';
 import { chanNeuChuaLuu } from '@/lib/nvl-slips';
@@ -44,7 +45,7 @@ const todayISO = () => {
   return `${y}-${m}-${day}`;
 };
 
-type Tab = 'overtime' | 'labels' | 'summary' | 'today' | 'plan' | 'dccd' | 'co_day' | 'ab_day' | 'prod_sum' | 'stops' | 'wh_out' | 'wh_in';
+type Tab = 'overtime' | 'labels' | 'summary' | 'today' | 'plan' | 'dccd' | 'co_day' | 'ab_day' | 'prod_sum' | 'kho_son' | 'stops' | 'wh_out' | 'wh_in';
 
 function OvertimeView({ department, isLeader }: { department: string; isLeader: boolean }) {
   return (
@@ -158,6 +159,8 @@ export default function RegisterLayout({
     tabs.push({ key: 'co_day', label: 'Sản lượng CO', color: 'red' });
     tabs.push({ key: 'ab_day', label: 'Sản lượng AB', color: 'red' });
     tabs.push({ key: 'prod_sum', label: 'Tổng hợp sản lượng', color: 'green' });
+    // Kho sơn Coating (anh Hữu chốt 11/11/2026): cả bộ phận CO xem tồn; chỉ tổ trưởng xuất / sửa / huỷ
+    tabs.push({ key: 'kho_son', label: '🎨 Kho sơn', color: 'navy' });
   }
   if (showStopsTab) tabs.push({ key: 'stops', label: 'Máy dừng hôm nay', color: 'red' });
   const moTabMayDung = () => {
@@ -284,6 +287,7 @@ export default function RegisterLayout({
       {activeTab === 'co_day' && <CoDailyView key="86" stage="86" canSend={isLeader} currentUserFullName={currentUserFullName} />}
       {activeTab === 'ab_day' && <CoDailyView key="84" stage="84" canSend={isLeader} currentUserFullName={currentUserFullName} />}
       {activeTab === 'prod_sum' && <CoProdSummaryView />}
+      {activeTab === 'kho_son' && <KhoSonView onChuaLuu={setKhoChuaLuu} />}
 
       {activeTab === 'stops' && <StopReasonsView readOnly={isQlsx} department={department} />}
 

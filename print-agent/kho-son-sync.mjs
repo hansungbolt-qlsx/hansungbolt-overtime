@@ -15,7 +15,7 @@ export function taoKsSync({ sb, mainGet, mainPost, upload, gioLam = () => true, 
     if (!gioLam()) return false;
     const d = await mainGet('/api/ot/kho-son/ton');
     if (!d.ok) return false;                           // app chính chưa đọc được app Coating → giữ file cũ
-    const fp = createHash('sha1').update(JSON.stringify([d.san_pham, d.chua_dinh_muc])).digest('hex');
+    const fp = createHash('sha1').update(JSON.stringify([d.san_pham, d.chua_dinh_muc, d.phieu_v])).digest('hex');
     if (fp === fpTon) return false;
     await upload('plan-files', 'kho-son.json', JSON.stringify({ at: new Date().toISOString(), ...d }));
     fpTon = fp;
