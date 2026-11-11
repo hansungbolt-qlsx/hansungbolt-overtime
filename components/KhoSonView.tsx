@@ -16,6 +16,8 @@ import {
 
 type Dong = Omit<KsDong, 'line_id'>;
 const so = (n: number, max = 3) => n.toLocaleString('vi-VN', { maximumFractionDigits: max });
+// ô chọn vật tư + ô số lượng: viền đỏ, bóng đỏ mờ (anh Hữu 11/11) — chạm vào thì bóng đậm hơn
+const O_DO = 'border-2 border-red-500 rounded-lg shadow-[0_0_0_4px_rgba(239,68,68,0.15)] focus:outline-none focus:shadow-[0_0_0_4px_rgba(239,68,68,0.4)]';
 const MAU = { tot: 'bg-emerald-50 border-emerald-200 text-emerald-800', sap: 'bg-orange-50 border-orange-300 text-orange-800',
   het: 'bg-red-50 border-red-300 text-red-800' } as const;
 const VONG = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'];
@@ -85,7 +87,7 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
       if (cu) cu.qty = Math.round((cu.qty + c.qty) * 1000) / 1000;
       else moi.push({ product_id: sp.product_id, lot_id: c.lot_id, qty: c.qty, het_han: l.muc === 'het' ? hanVN(l.han) : null });
     }
-    setGio(moi); setSl('');
+    setGio(moi); setSl(''); setChonSp('');      // xuất xong 1 vật tư → ô chọn về ban đầu (anh Hữu 11/11)
   };
 
   // Đổi lô 1 dòng: còn lô xếp trước (cũ hơn) chưa hết → bắt lý do
@@ -197,12 +199,12 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
             <DateButton value={ngay} onChange={(v) => v && setNgay(v)} min={ngayMin} max={vnToday()} disabled={!!sua} />
           </div>
           <div className="flex gap-2">
-            <select value={chonSp} onChange={(e) => { setChonSp(e.target.value); setSl(''); }} className="flex-1 min-w-0 border rounded px-2 py-2 text-base">
+            <select value={chonSp} onChange={(e) => { setChonSp(e.target.value); setSl(''); }} className={`flex-1 min-w-0 px-2 py-2 text-base bg-white ${O_DO}`}>
               <option value="">— Chọn vật tư —</option>
               {ton.san_pham.map((p) => <option key={p.product_id} value={p.product_id}>{p.code} · {p.ten}</option>)}
             </select>
             <input inputMode={sp?.la_thung ? 'numeric' : 'decimal'} value={sl} onChange={(e) => setSl(e.target.value)}
-              placeholder={sp ? (sp.la_thung ? 'số thùng' : sp.don_vi) : 'SL'} className="w-24 border rounded px-2 py-2 text-base" />
+              placeholder={sp ? (sp.la_thung ? 'số thùng' : sp.don_vi) : 'SL'} className={`w-24 px-2 py-2 text-base ${O_DO}`} />
             <button type="button" onClick={themDong} disabled={!sp || !sl} className="px-3 rounded bg-teal-600 text-white text-sm font-semibold disabled:opacity-40">Thêm</button>
           </div>
           {sp?.la_thung && Number(sl) > 0 && <p className="text-xs text-gray-600">= {so(Number(sl) * sp.kg_moi_dv, 2)} kg</p>}

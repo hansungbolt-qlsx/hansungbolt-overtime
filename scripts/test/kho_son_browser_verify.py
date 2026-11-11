@@ -150,9 +150,17 @@ with sync_playwright() as pw:
     fw = pg.locator("select").nth(1).evaluate("e => [getComputedStyle(e).fontWeight, getComputedStyle(e).fontSize]")
     kiem(int(fw[0]) >= 700 and fw[1] == "16px", "ô LOT xuất in đậm 16 px", str(fw))
     kiem("tự chọn lô cũ trước" in pg.inner_text("body"), "ghi rõ 'tự chọn lô cũ trước'")
+    kiem(pg.locator("select").first.input_value() == "", "Thêm xong → ô chọn vật tư về '— Chọn vật tư —'")
+    # Tailwind 4 trả màu viền dạng lab(…) — đỏ = trục a lớn (> 50); bóng mờ giữ dạng rgba(239, 68, 68, …)
+    vien = [pg.locator(x).first.evaluate("e => [getComputedStyle(e).borderTopColor, getComputedStyle(e).boxShadow, getComputedStyle(e).borderTopWidth]")
+            for x in ("select", "input[inputmode]")]
+    do = lambda c: ("239, 68, 68" in c) or (c.startswith("lab(") and float(c[4:-1].split()[1]) > 50)
+    kiem(all(do(v[0]) and v[2] == "2px" and "rgba(239, 68, 68, 0.15) 0px 0px 0px 4px" in v[1] for v in vien),
+         "ô vật tư + ô số lượng viền đỏ 2 px, bóng đỏ mờ 4 px", str([v[0] for v in vien]))
     for _ in range(len(sel)):
         pg.get_by_role("button", name="Bỏ", exact=True).first.click()
-    o.fill("1")
+    pg.locator("select").first.select_option("blue")
+    pg.get_by_placeholder("số thùng").fill("1")
     pg.get_by_role("button", name="Thêm").click()
     pg.locator("select").nth(1).select_option(LO[2]["lot_id"])
     pg.wait_for_timeout(300)
