@@ -168,7 +168,7 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
             const tong = p.lo.reduce((a, l) => a + (tonLo[l.lot_id] ?? 0), 0);
             return (
               <div key={p.product_id} className="border rounded-lg p-2">
-                <div className="text-sm font-bold">{p.code} · {p.ten}</div>
+                <div className="text-sm font-bold" style={p.mau ? { color: p.mau } : undefined}>{p.code} · {p.ten}</div>
                 <div className="flex justify-between gap-2 text-sm">
                   <span>Main <b>{so(tong)}</b> {p.don_vi}{p.la_thung ? ` (${so(tong * p.kg_moi_dv, 2)} kg)` : ''}</span>
                   {p.co_line && <span>Line <b className={(p.line_kg ?? 0) < 0 ? 'text-red-600' : 'text-teal-700'}>{so(p.line_kg ?? 0, 2)} kg</b></span>}
@@ -199,9 +199,10 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
             <DateButton value={ngay} onChange={(v) => v && setNgay(v)} min={ngayMin} max={vnToday()} disabled={!!sua} />
           </div>
           <div className="flex gap-2">
-            <select value={chonSp} onChange={(e) => { setChonSp(e.target.value); setSl(''); }} className={`flex-1 min-w-0 px-2 py-2 text-base bg-white ${O_DO}`}>
-              <option value="">— Chọn vật tư —</option>
-              {ton.san_pham.map((p) => <option key={p.product_id} value={p.product_id}>{p.code} · {p.ten}</option>)}
+            <select value={chonSp} onChange={(e) => { setChonSp(e.target.value); setSl(''); }} className={`flex-1 min-w-0 px-2 py-2 text-base bg-white ${O_DO}`}
+              style={sp?.mau ? { color: sp.mau, fontWeight: 700 } : undefined}>
+              <option value="" style={{ color: '#111827' }}>— Chọn vật tư —</option>
+              {ton.san_pham.map((p) => <option key={p.product_id} value={p.product_id} style={{ color: p.mau || '#111827', fontWeight: p.mau ? 700 : 400 }}>{p.code} · {p.ten}</option>)}
             </select>
             <input inputMode={sp?.la_thung ? 'numeric' : 'decimal'} value={sl} onChange={(e) => setSl(e.target.value)}
               placeholder={sp ? (sp.la_thung ? 'số thùng' : sp.don_vi) : 'SL'} className={`w-24 px-2 py-2 text-base ${O_DO}`} />
@@ -214,7 +215,7 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
             return (
               <div key={i} className={`border rounded-lg p-2 text-sm ${d.het_han ? 'border-red-300 bg-red-50' : ''}`}>
                 <div className="flex justify-between gap-2">
-                  <span><b>{p?.code}</b> · <b>{so(d.qty)}</b> {p?.don_vi}{kg != null && ` (${so(kg, 2)} kg)`}</span>
+                  <span><b style={p?.mau ? { color: p.mau } : undefined}>{p?.code}</b> · <b>{so(d.qty)}</b> {p?.don_vi}{kg != null && ` (${so(kg, 2)} kg)`}</span>
                   <button type="button" onClick={() => setGio(gio.filter((_, j) => j !== i))} className="text-red-600 text-xs">Bỏ</button>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 mt-1 text-sm">
@@ -269,7 +270,7 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
                   {p.lines.map((d) => {
                     const { p: s, l, kg } = tenDong(d);
                     return <div key={d.line_id} className={`${vuaGui === p.so_phieu ? 'text-sm' : 'text-xs'} ${p.status === 'cancelled' ? 'line-through' : ''}`}>
-                      {s?.code ?? d.product_id} · Lô <b className={vuaGui === p.so_phieu ? 'text-brand-navy underline' : ''}>{l?.lot_no || '—'}</b> · <b>{so(d.qty)}</b> {s?.don_vi}{kg != null && ` (${so(kg, 2)} kg)`}{d.het_han && <b className="text-red-700"> · hết hạn {d.het_han}</b>}
+                      <b style={s?.mau ? { color: s.mau } : undefined}>{s?.code ?? d.product_id}</b> · Lô <b className={vuaGui === p.so_phieu ? 'text-brand-navy underline' : ''}>{l?.lot_no || '—'}</b> · <b>{so(d.qty)}</b> {s?.don_vi}{kg != null && ` (${so(kg, 2)} kg)`}{d.het_han && <b className="text-red-700"> · hết hạn {d.het_han}</b>}
                     </div>;
                   })}
                 </button>

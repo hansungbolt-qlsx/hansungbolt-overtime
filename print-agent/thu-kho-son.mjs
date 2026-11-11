@@ -40,7 +40,8 @@ const mainPost = async (p, body) => {
 const ks = taoKsSync({ sb, mainGet, mainPost, upload, log: () => {}, logLoi: () => {} });
 const coating = async () => (await fetch(COATING + '/test/state')).json();
 const coatingPost = (p, b) => fetch(COATING + p, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
-const xs = (st) => st.state.txns.filter((t) => t.id.startsWith('XS-'));
+// chỉ dòng của phiếu THỬ — app Coating thật đã có phiếu XS thật (11/11/2026)
+const xs = (st) => st.state.txns.filter((t) => t.id.startsWith('XS-991231-'));
 // app chính ghi app Coating ở việc nền SAU khi trả lời agent → chờ tới khi điều kiện đúng (tối đa 8 giây)
 async function cho(dk) { for (let i = 0; i < 40; i++) { const st = await coating(); if (dk(st)) return st; await new Promise((r) => setTimeout(r, 200)); } return coating(); }
 // app tăng ca: Gửi phiếu mới / Sửa / Huỷ (đúng các cột API app tăng ca sẽ ghi)
@@ -58,15 +59,15 @@ ck(blue.lo.every((l, i) => i === 0 || (blue.lo[i - 1].han || '9') <= (l.han || '
 const tonBlue0 = loB(blue).ton;
 ck(await ks.dayTon() === false && soUpload === 1, 'lần 2 không đổi → KHÔNG đẩy lại (tiết kiệm gói Free)');
 
-console.log('\n2. Tổ trưởng gửi phiếu XS-261111-01 (1 thùng sơn xanh + 10,5 lít toluene)');
-gui({ so_phieu: 'XS-261111-01', version: 1, lines: [
-  { line_id: 'XS-261111-01-1', product_id: 'blue', lot_id: LOT_BLUE, qty: 1 },
-  { line_id: 'XS-261111-01-2', product_id: 'toluene', lot_id: LOT_TOL, qty: 10.5 }] });
+console.log('\n2. Tổ trưởng gửi phiếu XS-991231-01 (1 thùng sơn xanh + 10,5 lít toluene)');
+gui({ so_phieu: 'XS-991231-01', version: 1, lines: [
+  { line_id: 'XS-991231-01-1', product_id: 'blue', lot_id: LOT_BLUE, qty: 1 },
+  { line_id: 'XS-991231-01-2', product_id: 'toluene', lot_id: LOT_TOL, qty: 10.5 }] });
 ck(await ks.dayPhieu() === 1, 'agent đẩy phiếu sang app chính');
 ck(bang[0].synced_at && !bang[0].last_error, 'Supabase: synced_at ghi, không lỗi');
 let st = await cho((s) => xs(s).length === 2);
 ck(xs(st).length === 2 && st.state.txns.length === N0 + 2, `app Coating có 2 dòng XS (${N0} → ${st.state.txns.length} dòng)`);
-const d1 = xs(st).find((t) => t.id === 'XS-261111-01-1');
+const d1 = xs(st).find((t) => t.id === 'XS-991231-01-1');
 ck(d1 && d1.type === 'export' && d1.qty === 1 && d1.note.includes('Nguyễn Văn Thử'), 'dòng xuất đúng dạng + tên tổ trưởng trong ghi chú', d1);
 await ks.keoTrangThai();
 ck(bang[0].status === 'synced' && bang[0].main_version === 1, 'điện thoại: ● đã vào app Coating (status synced, v1)', bang[0]);
@@ -78,7 +79,7 @@ ck(loB(blue1).ton === tonBlue0 - 1 && blue1.line_kg === 18.14, `tồn lô 482502
 
 console.log('\n3. Admin nhập kho trên app Coating đúng lúc tổ trưởng sửa phiếu (409)');
 await coatingPost('/test/chen', {});
-sua('XS-261111-01', { lines: [{ line_id: 'XS-261111-01-1', product_id: 'blue', lot_id: LOT_BLUE, qty: 2 }],
+sua('XS-991231-01', { lines: [{ line_id: 'XS-991231-01-1', product_id: 'blue', lot_id: LOT_BLUE, qty: 2 }],
   history: [{ v: 2, by: 'Nguyễn Văn Thử', at: '2026-11-11T10:05', action: 'sua', reason: 'đếm lại', before: [] }] });
 ck(await ks.dayPhieu() === 1, 'agent đẩy bản sửa v2');
 st = await cho((s) => xs(s).length === 1 && xs(s)[0].qty === 2);
@@ -88,7 +89,7 @@ await ks.keoTrangThai();
 ck(bang[0].status === 'synced' && bang[0].main_version === 2, 'điện thoại: v2 đã vào app Coating', bang[0]);
 
 console.log('\n4. Huỷ phiếu');
-sua('XS-261111-01', { status: 'cancelled', cancel_reason: 'nhập nhầm' });
+sua('XS-991231-01', { status: 'cancelled', cancel_reason: 'nhập nhầm' });
 bang[0].status = 'cancelled';
 await ks.dayPhieu();
 st = await cho((s) => xs(s).length === 0);
@@ -103,24 +104,24 @@ const sai = bang.find((x) => x.so_phieu === 'XS-SAI');
 ck(sai.synced_at && /không nhận/.test(sai.last_error || ''), 'phiếu sai: last_error hiện trên điện thoại, không thử lại', sai);
 
 console.log('\n6. Admin xoá dòng XS bên app Coating → không thêm lại + báo điện thoại');
-gui({ so_phieu: 'XS-261111-02', version: 1, lines: [{ line_id: 'XS-261111-02-1', product_id: 'blue', lot_id: LOT_BLUE, qty: 1 }] });
+gui({ so_phieu: 'XS-991231-02', version: 1, lines: [{ line_id: 'XS-991231-02-1', product_id: 'blue', lot_id: LOT_BLUE, qty: 1 }] });
 await ks.dayPhieu();
-st = await cho((s) => s.state.txns.some((t) => t.id === 'XS-261111-02-1'));
-await coatingPost('/test/xoa', { id: 'XS-261111-02-1' });
-gui({ so_phieu: 'XS-261111-03', version: 1, lines: [{ line_id: 'XS-261111-03-1', product_id: 'toluene', lot_id: LOT_TOL, qty: 5 }] });
+st = await cho((s) => s.state.txns.some((t) => t.id === 'XS-991231-02-1'));
+await coatingPost('/test/xoa', { id: 'XS-991231-02-1' });
+gui({ so_phieu: 'XS-991231-03', version: 1, lines: [{ line_id: 'XS-991231-03-1', product_id: 'toluene', lot_id: LOT_TOL, qty: 5 }] });
 await ks.dayPhieu();                                 // phiếu mới kích lượt app chính → phát hiện dòng bị xoá
-st = await cho((s) => s.state.txns.some((t) => t.id === 'XS-261111-03-1'));
+st = await cho((s) => s.state.txns.some((t) => t.id === 'XS-991231-03-1'));
 await new Promise((r) => setTimeout(r, 500));
 st = await coating();
-ck(!st.state.txns.some((t) => t.id === 'XS-261111-02-1'), 'dòng admin đã xoá KHÔNG bị thêm lại');
+ck(!st.state.txns.some((t) => t.id === 'XS-991231-02-1'), 'dòng admin đã xoá KHÔNG bị thêm lại');
 await ks.keoTrangThai();
-const p2 = bang.find((x) => x.so_phieu === 'XS-261111-02');
+const p2 = bang.find((x) => x.so_phieu === 'XS-991231-02');
 ck(/Admin app Coating đã xoá/.test(p2.last_error || ''), 'điện thoại thấy cảnh báo admin đã xoá dòng', p2);
 
 console.log('\n7. Toàn vẹn app Coating');
 st = await coating();
-const tc = st.state.txns.filter((t) => !t.id.startsWith('XS-') && t.id !== 'Tadmin1');
-ck(tc.length === N0, `${N0} dòng gốc của app Coating còn đủ, không bị đổi`);
+const tc = st.state.txns.filter((t) => !t.id.startsWith('XS-991231-') && t.id !== 'Tadmin1');
+ck(tc.length === N0, `${N0} dòng gốc của app Coating (gồm phiếu thật) còn đủ`);
 console.log(`   (app Coating giả: ${st.n_save} lần lưu, ${st.n_409} lần 409)`);
 ck(st.n_409 >= 1, 'đã đi qua nhánh 409 thật');
 

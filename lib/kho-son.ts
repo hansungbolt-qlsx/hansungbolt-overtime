@@ -11,7 +11,7 @@ export const KS_SUA_NGAY = 7;                  // tổ trưởng sửa/huỷ phi
 export type KsLo = { lot_id: string; lot_no: string; han: string | null; ngay_nhap?: string | null; con_ngay: number | null; ton: number;
   ton_kg: number; muc: 'tot' | 'sap' | 'het' };
 export type KsSanPham = { product_id: string; code: string; ten: string; ten_day_du: string; don_vi: string;
-  kg_moi_dv: number; la_thung: boolean; ton: number; ton_kg: number; lo: KsLo[]; co_line: boolean; line_kg: number | null };
+  kg_moi_dv: number; la_thung: boolean; mau?: string | null; ton: number; ton_kg: number; lo: KsLo[]; co_line: boolean; line_kg: number | null };
 export type KsTon = { ok: boolean; loi?: string; at?: string; rev?: number; doc_luc?: string;
   phieu_v?: Record<string, number>; san_pham: KsSanPham[]; chua_dinh_muc?: { ma: string; ea: number }[] };
 

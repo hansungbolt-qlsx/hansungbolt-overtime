@@ -119,6 +119,11 @@ with sync_playwright() as pw:
     kiem(all(f"Lô {l['lot_no']}" in t for l in LO), f"đủ {len(LO)} lô sơn xanh")
     tol = next(p for p in TON["san_pham"] if p["product_id"] == "toluene")["lo"][0]
     kiem(f"Nhập {hn(tol['ngay_nhap'])}" in t, f"hoá chất không số lô → ghi ngày nhập {hn(tol['ngay_nhap'])}")
+    mau = pg.evaluate("""() => [...document.querySelectorAll('div.font-bold')].filter(e => /^(593SB|1193SBO|TOL) ·/.test(e.textContent))
+                               .map(e => [e.textContent.split(' ')[0], getComputedStyle(e).color])""")
+    md = dict(mau)
+    kiem(md.get("593SB") == "rgb(47, 109, 246)" and md.get("1193SBO") == "rgb(224, 147, 47)" and md.get("TOL") not in
+         ("rgb(47, 109, 246)", "rgb(224, 147, 47)"), "chữ Blue màu xanh, Orange màu cam, hoá chất màu thường", str(mau))
     w = pg.evaluate("[document.documentElement.scrollWidth, window.innerWidth]")
     kiem(w[0] <= w[1], "không tràn ngang 390 px", str(w))
     pg.screenshot(path=str(ANH / "ks_m_1_ton.png"), full_page=True)
@@ -131,7 +136,10 @@ with sync_playwright() as pw:
     o = pg.locator("input[inputmode]").first
     fs = [pg.locator("select").first.evaluate("e => getComputedStyle(e).fontSize"), o.evaluate("e => getComputedStyle(e).fontSize")]
     kiem(all(x == "16px" for x in fs), "chữ ô chọn vật tư + ô số lượng = 16 px", str(fs))
+    pg.locator("select").first.select_option("orange")
+    kiem(pg.locator("select").first.evaluate("e => getComputedStyle(e).color") == "rgb(224, 147, 47)", "chọn sơn cam → ô vật tư chữ màu cam")
     pg.locator("select").first.select_option("blue")
+    kiem(pg.locator("select").first.evaluate("e => getComputedStyle(e).color") == "rgb(47, 109, 246)", "chọn sơn xanh → ô vật tư chữ màu xanh")
     o = pg.get_by_placeholder("số thùng")
     o.fill("1.5")
     pg.get_by_role("button", name="Thêm").click()
