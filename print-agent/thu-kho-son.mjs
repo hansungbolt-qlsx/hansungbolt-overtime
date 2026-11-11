@@ -52,8 +52,10 @@ console.log('\n1. Tồn → file kho-son.json cho điện thoại');
 ck(await ks.dayTon() === true, 'lần đầu: đẩy file');
 const f1 = JSON.parse(kho['plan-files/kho-son.json']);
 const blue = f1.san_pham.find((p) => p.product_id === 'blue');
-ck(blue && blue.lo[0].lot_no === '4825022' && blue.la_thung && blue.kg_moi_dv === 18.14, 'sơn xanh: lô 4825022 xuất trước, thùng 18,14 kg', blue && blue.lo[0]);
-const tonBlue0 = blue.lo[0].ton;
+const loB = (sp) => sp.lo.find((l) => l.lot_id === LOT_BLUE);   // tìm theo mã lô — thứ tự xuất đổi khi HSD đổi
+ck(blue && loB(blue) && blue.la_thung && blue.kg_moi_dv === 18.14, 'sơn xanh: có lô 4825022, thùng 18,14 kg', blue && blue.lo);
+ck(blue.lo.every((l, i) => i === 0 || (blue.lo[i - 1].han || '9') <= (l.han || '9')), 'lô xếp HSD sớm trước', blue.lo.map((l) => l.han));
+const tonBlue0 = loB(blue).ton;
 ck(await ks.dayTon() === false && soUpload === 1, 'lần 2 không đổi → KHÔNG đẩy lại (tiết kiệm gói Free)');
 
 console.log('\n2. Tổ trưởng gửi phiếu XS-261111-01 (1 thùng sơn xanh + 10,5 lít toluene)');
@@ -72,7 +74,7 @@ await new Promise((r) => setTimeout(r, 300));
 // app chính cần 1 lượt đọc để file tồn phản ánh — việc nền đã đọc lại state sau khi ghi
 ck(await ks.dayTon() === true, 'tồn đổi → đẩy lại file');
 const blue1 = JSON.parse(kho['plan-files/kho-son.json']).san_pham.find((p) => p.product_id === 'blue');
-ck(blue1.lo[0].ton === tonBlue0 - 1 && blue1.line_kg === 18.14, `tồn lô 4825022 ${tonBlue0} → ${tonBlue0 - 1}, Tồn Line 18,14 kg`, blue1.lo[0]);
+ck(loB(blue1).ton === tonBlue0 - 1 && blue1.line_kg === 18.14, `tồn lô 4825022 ${tonBlue0} → ${tonBlue0 - 1}, Tồn Line 18,14 kg`, loB(blue1));
 
 console.log('\n3. Admin nhập kho trên app Coating đúng lúc tổ trưởng sửa phiếu (409)');
 await coatingPost('/test/chen', {});
