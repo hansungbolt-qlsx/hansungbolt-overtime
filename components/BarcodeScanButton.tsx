@@ -91,6 +91,47 @@ function openStream(deviceId?: string): Promise<MediaStream> {
     );
   });
 }
+/** Xin camera yêu cầu TỐI GIẢN (chỉ camera sau, không độ phân giải) — lượt cứu khi luồng 1920×1080 không ra hình. */
+function openStreamToiGian(): Promise<MediaStream> {
+  const p = navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: 'environment' } });
+  return Promise.race([
+    p,
+    new Promise<MediaStream>((_, rej) =>
+      setTimeout(() => {
+        p.then((s) => stopStream(s)).catch(() => {});
+        const e = new Error('hết thời gian chờ camera (lần xin lại)');
+        e.name = 'TimeoutError';
+        rej(e);
+      }, OPEN_TIMEOUT_MS),
+    ),
+  ]);
+}
+/** Gắn luồng vào video, gọi play (KHÔNG chờ mãi), đợi tới khi có khung hình thật hoặc hết `ms`. */
+async function ganVaChoHinh(video: HTMLVideoElement, stream: MediaStream, ms: number): Promise<boolean> {
+  try {
+    video.pause();
+  } catch {
+    /* chưa phát */
+  }
+  video.muted = true;
+  video.setAttribute('playsinline', '');
+  video.setAttribute('webkit-playsinline', '');
+  video.srcObject = null;
+  video.srcObject = stream;
+  void video.play().catch(() => {});
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) {
+    if (video.videoWidth > 0 && video.readyState >= 2) return true;
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return video.videoWidth > 0 && video.readyState >= 2;
+}
+/** Trạng thái luồng camera + video — chụp màn hình gửi lại là biết iPhone kẹt ở đâu. */
+function chanDoanLuong(stream: MediaStream, video: HTMLVideoElement): string {
+  const t = stream.getVideoTracks()[0];
+  if (!t) return 'không có luồng video';
+  return `luồng ${t.readyState}${t.muted ? ' · bị tắt tiếng hình' : ''}${t.enabled ? '' : ' · tắt'} · video rs${video.readyState} ${video.videoWidth}×${video.videoHeight}${video.paused ? ' · dừng' : ''}`;
+}
 /** Thông tin máy để chẩn đoán khi không mở được camera: iOS mấy · Safari hay chế độ ứng dụng · quyền camera. */
 async function camDiag(): Promise<string> {
   const ua = navigator.userAgent;
@@ -172,6 +213,8 @@ function errText(e: unknown): string {
       : 'Chưa cho phép dùng camera — vào cài đặt trình duyệt cho phép Camera với trang này rồi thử lại.';
   if (name === 'NotFoundError' || name === 'OverconstrainedError')
     return 'Không tìm thấy camera sau của máy.';
+  if (name === 'NoFramesError')
+    return `${isIOS() ? 'iPhone' : 'Máy'} đã cho camera nhưng không ra hình. Bấm “📸 Chụp ảnh tem” bên dưới để quét tiếp, và chụp màn hình này gửi anh Hữu. Chi tiết: ${e instanceof Error ? e.message : ''}`;
   if (name === 'NotReadableError')
     return 'Camera đang bị ứng dụng khác dùng — tắt ứng dụng camera khác rồi thử lại.';
   const msg = e instanceof Error ? e.message : typeof e === 'string' ? e : '';
@@ -202,6 +245,7 @@ export default function BarcodeScanButton({
   const [backCams, setBackCams] = useState<MediaDeviceInfo[]>([]);
   const [probing, setProbing] = useState(false); // đang dò camera chính
   const [info, setInfo] = useState('');
+  const [phase, setPhase] = useState(''); // bước đang làm khi chưa có hình (hiện thay "Đang mở camera…")
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const boxRef = useRef<HTMLDivElement | null>(null);
@@ -334,14 +378,38 @@ export default function BarcodeScanButton({
           return;
         }
         streamRef.current = stream;
+        const video = videoRef.current;
+        if (!video) return;
+
+        // 🔴 anh Hữu 12/11/2026: iPhone mở từ MÀN HÌNH CHÍNH treo "Đang mở camera…" KHÔNG báo lỗi — camera đã cấp
+        // (không chạm mốc 8 s xin camera) nhưng luồng không ra hình ⇒ video.play() chờ mãi. Không chờ mù nữa:
+        // chờ hình tối đa vài giây → (1) gắn lại luồng → (2) xin lại camera yêu cầu tối giản → (3) báo lỗi kèm
+        // chẩn đoán trạng thái luồng (để chụp màn hình gửi).
+        setPhase('Đã có camera — đang chờ hình…');
+        const coHinh = await ganVaChoHinh(video, stream, 3500);
+        if (!coHinh && !cancelled) {
+          setPhase('Chưa có hình — thử gắn lại camera…');
+          if (!(await ganVaChoHinh(video, stream, 3000)) && !cancelled) {
+            setPhase('Chưa có hình — xin lại camera…');
+            const cu = chanDoanLuong(stream, video);
+            stopStream(stream);
+            stream = await openStreamToiGian();
+            streamRef.current = stream;
+            c = capsOf(stream);
+            if (!(await ganVaChoHinh(video, stream, 4000))) {
+              const e = new Error(`camera không ra hình (lần 1: ${cu} · lần 2: ${chanDoanLuong(stream, video)})`);
+              e.name = 'NoFramesError';
+              throw e;
+            }
+          }
+        }
+        if (cancelled) {
+          stopStream(stream);
+          return;
+        }
         const track = stream.getVideoTracks()[0] as AnyTrack | undefined;
         const st = track?.getSettings();
         if (android && st?.deviceId) saveCam(st.deviceId);
-
-        const video = videoRef.current;
-        if (!video) return;
-        video.srcObject = stream;
-        await video.play().catch(() => {});
 
         // Android: lấy nét liên tục (mặc định nhiều máy để "single shot" → nhoè khi đưa gần)
         const focusOk = Array.isArray(c.focusMode) && c.focusMode.includes('continuous');
@@ -466,6 +534,7 @@ export default function BarcodeScanButton({
       setTorchMsg('');
       setCaps({ torch: false, zoom: null });
       setInfo('');
+      setPhase('');
       setProbing(false);
     };
   }, [open, camPick, finish, stopCamera]);
@@ -650,7 +719,7 @@ export default function BarcodeScanButton({
               </div>
               {!ready && !err && (
                 <div className="absolute inset-0 flex items-center justify-center text-white text-sm">
-                  {probing ? 'Đang chọn camera chính…' : 'Đang mở camera…'}
+                  {probing ? 'Đang chọn camera chính…' : phase || 'Đang mở camera…'}
                 </div>
               )}
             </div>
