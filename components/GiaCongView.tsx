@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import BarcodeScanButton from './BarcodeScanButton';
 import {
-  GC_CD_DAT, GC_CD_NHAP, GC_CONG_DOAN, GC_LOAI, GC_STATUS_UI, hienSaeji, kiemDong, normalizeSaeji,
+  GC_CD_DAT, GC_CD_EA, GC_CD_NHAP, GC_CONG_DOAN, GC_LOAI, GC_STATUS_UI, hienSaeji, kiemDong, normalizeSaeji,
   type GcCongDoan, type GcGuong, type GcLine, type GcLoai, type GcSlip,
 } from '@/lib/gia-cong';
 
@@ -60,7 +60,7 @@ export default function GiaCongView({ onChuaLuu }: { onChuaLuu?: (canhBao: strin
   const doiLoai = (l: GcLoai) => {
     if (lines.length && !window.confirm('Bỏ các dòng chưa lưu để chuyển loại phiếu?')) return;
     lamMoi(); setLoai(l);
-    if (l === 'nhap' && !GC_CD_NHAP.includes(cd)) setCd('80');   // phiếu nhập chỉ 70 / 80
+    if (l === 'nhap' && !GC_CD_NHAP.includes(cd)) setCd('80');
   };
 
   const quet = (text: string) => {
@@ -86,21 +86,29 @@ export default function GiaCongView({ onChuaLuu }: { onChuaLuu?: (canhBao: strin
   const tichThung = (t: GcGuong['cho_ve'][number]) => {
     const k = `${t.dat_no}-${t.dat_seq}`;
     if (daChon(k)) { setLines((ls) => ls.filter((l) => `${l.dat_no}-${l.dat_seq}` !== k)); return; }
-    setLines((ls) => [...ls, { saeji_no: t.saeji_no, ma_hang: t.ma_hang, ten_hang: t.ten_hang, kg: t.kg_dat - t.kg_da_ve,
-      dat_no: t.dat_no, dat_seq: t.dat_seq, kg_dat: t.kg_dat, kg_da_ve: t.kg_da_ve, hoan_thanh: 1 }]);
+    const eaCon = (t.ea_dat ?? 0) - (t.ea_da_ve ?? 0);
+    setLines((ls) => [...ls, { saeji_no: t.saeji_no, ma_hang: t.ma_hang, ten_hang: t.ten_hang, kg: Math.max(0, t.kg_dat - t.kg_da_ve),
+      dat_no: t.dat_no, dat_seq: t.dat_seq, kg_dat: t.kg_dat, kg_da_ve: t.kg_da_ve, hoan_thanh: 1,
+      ...(theoEa ? { ea: eaCon, ea_dat: t.ea_dat, ea_da_ve: t.ea_da_ve, don_trong: t.don_trong } : {}) }]);
   };
 
-  const suaDong = (i: number, p: Partial<GcLine>) => setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...p } : l)));
+  // Công đoạn tính EA (15/20 — ERP gjcode.Gjgubun = 1): gõ EA thực về, kg tự tính theo đơn trọng (sửa được)
+  const theoEa = loai === 'nhap' && GC_CD_EA.includes(cd);
+  const kgTuEa = (ea: number, dt?: number) => (dt ? Math.round((ea * dt) / 1000) : 0);
+  const suaDong =(i: number, p: Partial<GcLine>) => setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...p } : l)));
   const xoaDong = (i: number) => setLines((ls) => ls.filter((_, j) => j !== i));
 
   const luu = async (send: boolean) => {
-    const loi = kiemDong(loai, lines) || (nccChon ? '' : 'Chưa có nhà gia công cho công đoạn này');
+    const loi = kiemDong(loai, lines, cd) || (nccChon ? '' : 'Chưa có nhà gia công cho công đoạn này');
     if (loi) { setMsg({ ok: false, text: loi }); return; }
     if (send && loai === 'nhap') {
-      const thieu = lines.filter((l) => l.hoan_thanh === 1 && l.kg < (l.kg_dat ?? 0) - (l.kg_da_ve ?? 0));
+      const ve = (l: GcLine) => (theoEa ? l.ea ?? 0 : l.kg);
+      const con = (l: GcLine) => (theoEa ? (l.ea_dat ?? 0) - (l.ea_da_ve ?? 0) : (l.kg_dat ?? 0) - (l.kg_da_ve ?? 0));
+      const dv = theoEa ? 'EA' : 'kg';
+      const thieu = lines.filter((l) => l.hoan_thanh === 1 && ve(l) < con(l));
       if (thieu.length && !window.confirm(
-        thieu.map((l) => `Chỉ thị ${hienSaeji(l.saeji_no)}: về ${l.kg} kg < còn chờ ${(l.kg_dat ?? 0) - (l.kg_da_ve ?? 0)} kg`).join('\n')
-        + '\n\nĐang để Hoàn thành = 1 → phần thiếu sẽ bị ĐÓNG, không chờ về nữa.\nVẫn gửi? (Bấm Hủy để sửa Hoàn thành = 0)')) return;
+        thieu.map((l) => `Chỉ thị ${hienSaeji(l.saeji_no)}: về ${fmt(ve(l))} ${dv} < còn chờ ${fmt(con(l))} ${dv}`).join('\n')
+        + '\n\nĐang để Hoàn thành = 1 → CHỐT, phần thiếu tính hao hụt, không chờ về nữa.\nVẫn gửi? (Bấm Hủy để chọn 0 = còn Pending)')) return;
     }
     setBusy(true);
     try {
@@ -176,7 +184,9 @@ export default function GiaCongView({ onChuaLuu }: { onChuaLuu?: (canhBao: strin
                 <label key={k} className={`flex items-center gap-2 py-1 text-sm ${giu ? 'opacity-50' : ''}`}>
                   <input type="checkbox" className="h-5 w-5" disabled={!!giu} checked={daChon(k)} onChange={() => tichThung(t)} />
                   <span className="font-mono">{t.dat_no.slice(0, 6)}-{t.dat_no.slice(6)}-{t.dat_seq}</span>
-                  <span>đặt {fmt(t.kg_dat)} kg{t.kg_da_ve ? ` · đã về ${fmt(t.kg_da_ve)}` : ''}</span>
+                  {theoEa
+                    ? <span>đặt {fmt(t.ea_dat ?? 0)} EA{t.ea_da_ve ? ` · đã về ${fmt(t.ea_da_ve)}` : ''}</span>
+                    : <span>đặt {fmt(t.kg_dat)} kg{t.kg_da_ve ? ` · đã về ${fmt(t.kg_da_ve)}` : ''}</span>}
                   {giu && <span className="text-red-700">(đang ở phiếu khác)</span>}
                 </label>
               );
@@ -187,28 +197,41 @@ export default function GiaCongView({ onChuaLuu }: { onChuaLuu?: (canhBao: strin
         {lines.length > 0 && (
           <div className="space-y-2">
             {lines.map((l, i) => {
-              const con = (l.kg_dat ?? 0) - (l.kg_da_ve ?? 0);
-              const thieu = loai === 'nhap' && l.hoan_thanh === 1 && Number.isInteger(l.kg) && l.kg < con;
+              const dv = theoEa ? 'EA' : 'kg';
+              const con = theoEa ? (l.ea_dat ?? 0) - (l.ea_da_ve ?? 0) : (l.kg_dat ?? 0) - (l.kg_da_ve ?? 0);
+              const ve = theoEa ? l.ea ?? 0 : l.kg;
+              const chenh = loai === 'nhap' && Number.isInteger(ve) && ve > 0 && ve !== con;
               return (
                 <div key={i} className="rounded-lg border border-slate-200 p-2">
                   <div className="flex justify-between text-sm">
                     <b className="text-brand-navy">{i + 1}. {hienSaeji(l.saeji_no)} · {l.ma_hang}</b>
                     <button type="button" className="text-red-600 text-sm" onClick={() => xoaDong(i)}>Xoá</button>
                   </div>
-                  <div className="text-xs text-slate-500">{l.ten_hang}{l.dat_no ? ` · thùng ${l.dat_no}-${l.dat_seq} · còn chờ ${fmt(con)} kg` : ''}</div>
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="text-xs text-slate-500">{l.ten_hang}{l.dat_no ? ` · thùng ${l.dat_no}-${l.dat_seq} · còn chờ ${fmt(con)} ${dv}` : ''}</div>
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                    {theoEa && (
+                      <label className="text-sm font-semibold">EA
+                        <input className="ml-1 w-32 rounded-lg border-2 border-amber-400 px-2 py-1.5 text-lg font-bold" inputMode="numeric"
+                          value={l.ea || ''} onChange={(e) => {
+                            const ea = Number(e.target.value.replace(/[^0-9]/g, ''));
+                            suaDong(i, { ea, kg: kgTuEa(ea, l.don_trong) });
+                          }} /></label>
+                    )}
                     <label className="text-sm font-semibold">Kg
-                      <input className="ml-1 w-28 rounded-lg border-2 border-amber-400 px-2 py-1.5 text-lg font-bold" inputMode="numeric"
+                      <input className={`ml-1 w-28 rounded-lg px-2 py-1.5 text-lg font-bold ${theoEa ? 'border border-slate-300' : 'border-2 border-amber-400'}`} inputMode="numeric"
                         value={l.kg || ''} onChange={(e) => suaDong(i, { kg: Number(e.target.value.replace(/[^0-9]/g, '')) })} /></label>
                     {loai === 'nhap' && (
                       <label className="text-sm font-semibold">Hoàn thành
                         <select className="ml-1 rounded-lg border px-2 py-1.5" value={l.hoan_thanh ?? 1}
                           onChange={(e) => suaDong(i, { hoan_thanh: Number(e.target.value) as 0 | 1 })}>
-                          <option value={1}>1 — đủ</option><option value={0}>0 — còn nợ</option>
+                          <option value={1}>1 — chốt</option><option value={0}>0 — còn Pending</option>
                         </select></label>
                     )}
                   </div>
-                  {thieu && <div className="mt-1 text-xs font-semibold text-red-700">⚠ Về thiếu {fmt(con - l.kg)} kg mà Hoàn thành = 1 → phần thiếu sẽ bị đóng. Còn nợ thì chọn 0.</div>}
+                  {chenh && ve < con && <div className="mt-1 text-xs font-semibold text-red-700">
+                    {l.hoan_thanh === 1 ? `⚠ Về thiếu ${fmt(con - ve)} ${dv}, Hoàn thành 1 → CHỐT, phần thiếu tính hao hụt. Còn chờ về thì chọn 0.`
+                      : `Về thiếu ${fmt(con - ve)} ${dv}, Hoàn thành 0 → thùng còn PENDING ${fmt(con - ve)} ${dv} chờ về.`}</div>}
+                  {chenh && ve > con && <div className="mt-1 text-xs font-semibold text-amber-700">Về dư {fmt(ve - con)} {dv} so với còn chờ.</div>}
                 </div>
               );
             })}

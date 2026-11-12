@@ -14,8 +14,12 @@ export const GC_CONG_DOAN: Record<GcCongDoan, string> = {
   // Đẩy ERP các công đoạn này còn KHOÁ trên app chính cho tới khi anh Hữu mở. Cần chạy docs/sql/27-gia-cong-cd-moi.sql TRƯỚC.
   '89': '89 · Phủ đầu (Head coating)', '67': '67 · Đánh bóng (Buffing)', '15': '15 · Gia công (Processing)', '20': '20 · Cắt viền (Trimming)',
 };
-/** Phiếu NHẬP vẫn chỉ 70/80 (công đoạn tính EA về nhiều lần — chưa đủ căn cứ). */
-export const GC_CD_NHAP: GcCongDoan[] = ['70', '80'];
+/** Phiếu NHẬP: mọi công đoạn gia công trừ 98 + LV (anh Hữu 12/11/2026). App chính nhận + xem trước; ĐẨY ERP từng
+ *  công đoạn mở dần khi anh duyệt (erp_push_gc_nhap.CONG_DOAN). Đổi danh sách = sửa CÙNG LÚC gc_nhap_lieu.CONG_DOAN. */
+export const GC_CD_NHAP: GcCongDoan[] = ['70', '80', '89', '67', '15', '20'];
+/** Công đoạn tính theo SỐ LƯỢNG (EA) — ERP "Đăng ký mã quy trình" ô Đơn vị quy trình = 1 (bảng gjcode.Gjgubun).
+ *  Phiếu nhập gõ EA thực về; kg tự tính theo đơn trọng (sửa được). Còn lại tính theo kg. */
+export const GC_CD_EA: GcCongDoan[] = ['15', '20'];
 /** Phiếu ĐẶT được chọn trên điện thoại = CD_MO_DAY app chính (anh Hữu 15/10/2026: mở hết 6 công đoạn).
  *  Đổi danh sách này CÙNG LÚC với CD_MO_DAY app chính (kẻo phiếu gửi lên mà không đẩy ERP được). */
 export const GC_CD_DAT: GcCongDoan[] = ['70', '80', '89', '67', '15', '20'];
@@ -33,6 +37,10 @@ export type GcLine = {
   kg_dat?: number;       // phiếu nhập: kg đặt / đã về (để hiện + cảnh báo)
   kg_da_ve?: number;
   hoan_thanh?: 0 | 1;
+  ea?: number;           // phiếu nhập công đoạn tính EA (15/20): EA thực về
+  ea_dat?: number;
+  ea_da_ve?: number;
+  don_trong?: number;
 };
 
 export type GcSlip = {
@@ -61,7 +69,7 @@ export type GcGuong = {
   ncc: Array<{ ma: string; ten: string; cong_doan: GcCongDoan; dat_cuoi: string }>;
   cho_dat: Array<{ saeji_no: string; cong_doan: GcCongDoan; ma_hang: string; ten_hang: string; vao: number; da_dat: number }>;
   cho_ve: Array<{ dat_no: string; dat_seq: string; ncc: string; cong_doan: GcCongDoan; saeji_no: string; ma_hang: string;
-    ten_hang: string; kg_dat: number; kg_da_ve: number; ngay_dat: string }>;
+    ten_hang: string; kg_dat: number; kg_da_ve: number; ngay_dat: string; ea_dat?: number; ea_da_ve?: number; don_trong?: number }>;
 };
 
 export const GC_STATUS_UI: Record<GcStatus, { label: string; cls: string }> = {
@@ -98,11 +106,15 @@ export function gcUid(loai: GcLoai): string {
 }
 
 /** Kiểm dòng trước khi lưu — giống luật app chính (gc_nhap_lieu.nhan_phieu). Trả lỗi đầu tiên hoặc ''. */
-export function kiemDong(loai: GcLoai, lines: GcLine[]): string {
+export function kiemDong(loai: GcLoai, lines: GcLine[], cd?: GcCongDoan): string {
   if (!lines.length) return 'Phiếu chưa có dòng nào';
+  const theoEa = loai === 'nhap' && !!cd && GC_CD_EA.includes(cd);
   for (const [i, l] of lines.entries()) {
     if (!/^\d{9}/.test(l.saeji_no || '')) return `Dòng ${i + 1}: số chỉ thị không đúng`;
-    if (!Number.isInteger(l.kg) || l.kg <= 0) return `Dòng ${i + 1}: kg phải là số NGUYÊN lớn hơn 0`;
+    if (theoEa) {
+      if (!Number.isInteger(l.ea) || (l.ea ?? 0) <= 0) return `Dòng ${i + 1}: EA phải là số NGUYÊN lớn hơn 0`;
+      if (!Number.isInteger(l.kg) || l.kg < 0) return `Dòng ${i + 1}: kg phải là số NGUYÊN`;
+    } else if (!Number.isInteger(l.kg) || l.kg <= 0) return `Dòng ${i + 1}: kg phải là số NGUYÊN lớn hơn 0`;
     if (loai === 'nhap' && (!l.dat_no || !l.dat_seq)) return `Dòng ${i + 1}: chưa chọn thùng chờ về`;
   }
   return '';
