@@ -61,6 +61,10 @@ console.log('\n1. Đẩy gương (danh sách cho điện thoại)');
 ck(await gc.dayGuong() === true, 'lần đầu: đẩy file gc-guong.json');
 const g = JSON.parse(kho['plan-files/gc-guong.json'] || '{}');
 ck(g.cho_dat?.length > 100 && g.cho_ve?.length > 50, `có ${g.cho_dat?.length} chỉ thị chờ đặt · ${g.cho_ve?.length} thùng chờ về`);
+// 12/11/2026: thùng 70 đã về chưa xuất 80 (màn Đặt CĐ 80 chọn nhanh) — mỗi thùng có số phiếu nhập 70, kg, NCC gợi ý
+ck(Array.isArray(g.thung_cho) && g.thung_cho.every((t) => /^\d{8}-\d{4}$/.test(t.thung) && t.cd_sau === '80' && t.kg > 0
+  && /^\d{9}/.test(t.saeji_no) && 'ncc_goi_y' in t),
+   `có ${g.thung_cho?.length} thùng 70 chờ xuất 80 (đủ trường)`, (g.thung_cho || []).slice(0, 2));
 const nccs = (g.ncc || []).map((n) => `${n.cong_doan}:${n.ma}`).sort();
 ck(JSON.stringify(nccs) === JSON.stringify(['15:VVN', '20:HTP', '67:NPT', '70:VIK', '80:NPT', '80:TC', '89:VVN']), 'NCC: 70 VIK · 80 NPT, TC + CĐ mới 15 VVN · 20 HTP · 67 NPT · 89 VVN (14/10 đêm)', nccs);
 const n0 = soGoiSb;

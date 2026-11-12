@@ -14,12 +14,14 @@ export function taoGcSync({ sb, mainGet, mainPost, upload, gioLam = () => true, 
   async function dayGuong() {
     if (!gioLam()) return false;
     const d = await mainGet('/api/ot/gc-guong');
-    const fp = createHash('sha1').update(JSON.stringify([d.ncc, d.cho_dat, d.cho_ve])).digest('hex');
+    // thung_cho (12/11/2026): thùng 70 đã về chưa xuất 80 — màn Đặt CĐ 80 chọn nhanh (app chính cũ chưa có → [])
+    const thung = d.thung_cho || [];
+    const fp = createHash('sha1').update(JSON.stringify([d.ncc, d.cho_dat, d.cho_ve, thung])).digest('hex');
     if (fp === fpGuong) return false;
     await upload('plan-files', 'gc-guong.json',
-      JSON.stringify({ at: new Date().toISOString(), ncc: d.ncc, cho_dat: d.cho_dat, cho_ve: d.cho_ve }));
+      JSON.stringify({ at: new Date().toISOString(), ncc: d.ncc, cho_dat: d.cho_dat, cho_ve: d.cho_ve, thung_cho: thung }));
     fpGuong = fp;
-    log(`Gia công: gương ${d.cho_dat.length} chỉ thị chờ đặt · ${d.cho_ve.length} thùng chờ về · ${d.ncc.length} NCC`);
+    log(`Gia công: gương ${d.cho_dat.length} chỉ thị chờ đặt · ${d.cho_ve.length} thùng chờ về · ${thung.length} thùng 70 chờ xuất 80 · ${d.ncc.length} NCC`);
     return true;
   }
 

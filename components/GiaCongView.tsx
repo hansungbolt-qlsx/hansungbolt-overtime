@@ -92,6 +92,26 @@ export default function GiaCongView({ onChuaLuu }: { onChuaLuu?: (canhBao: strin
       ...(theoEa ? { ea: eaCon, ea_dat: t.ea_dat, ea_da_ve: t.ea_da_ve, don_trong: t.don_trong } : {}) }]);
   };
 
+  // ĐẶT: thùng công đoạn trước (70) đã nhập về mà CHƯA xuất công đoạn này (anh Hữu 12/11/2026) — treo tới khi đặt;
+  // gợi ý NCC = NCC đặt gần nhất của mã, thùng nào cũng chuyển được sang NCC khác cùng công đoạn. Chọn tất cả / theo mã / từng thùng.
+  type ThungCho = NonNullable<GcGuong['thung_cho']>[number];
+  const thungXuat = useMemo(() => (loai === 'dat' ? (guong?.thung_cho || []).filter((t) => t.cd_sau === cd) : []),
+    [guong, cd, loai]);
+  const coThung = (k: string) => lines.some((l) => l.thung === k);
+  const giuThung = (k: string) => !!giuCho[`T:${k}`] && giuCho[`T:${k}`] !== uid;
+  const nhomThung = useMemo(() => {
+    const m = new Map<string, ThungCho[]>();
+    for (const t of thungXuat) m.set(t.ma_hang, [...(m.get(t.ma_hang) || []), t]);
+    return [...m.entries()]
+      .map(([ma, ts]) => ({ ma, ten: ts[0].ten_hang, ncc: ts[0].ncc_goi_y, ts }))
+      .sort((a, b) => Number(b.ncc === nccChon) - Number(a.ncc === nccChon) || a.ma.localeCompare(b.ma));
+  }, [thungXuat, nccChon]);
+  const chonDs = (ts: ThungCho[], on: boolean) => setLines((ls) => (on
+    ? [...ls, ...ts.filter((t) => !ls.some((l) => l.thung === t.thung) && !giuThung(t.thung))
+      .map((t) => ({ saeji_no: t.saeji_no, ma_hang: t.ma_hang, ten_hang: t.ten_hang, kg: t.kg, thung: t.thung }))]
+    : ls.filter((l) => !ts.some((t) => t.thung === l.thung))));
+  const goiYChon = thungXuat.filter((t) => t.ncc_goi_y === nccChon);
+
   // Công đoạn tính EA (15/20 — ERP gjcode.Gjgubun = 1): gõ EA thực về, kg tự tính theo đơn trọng (sửa được)
   const theoEa = loai === 'nhap' && GC_CD_EA.includes(cd);
   const kgTuEa = (ea: number, dt?: number) => (dt ? Math.round((ea * dt) / 1000) : 0);
@@ -173,6 +193,63 @@ export default function GiaCongView({ onChuaLuu }: { onChuaLuu?: (canhBao: strin
         </div>
         {msg && <div className={`rounded-lg px-3 py-2 text-sm ${msg.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-700'}`}>{msg.text}</div>}
 
+        {loai === 'dat' && thungXuat.length > 0 && (
+          <div className="rounded-lg border border-sky-200 bg-sky-50 p-2 space-y-2">
+            <div className="text-sm font-semibold text-sky-900">
+              📦 Thùng 70 đã về — chờ xuất {cd} · {thungXuat.length} thùng · {fmt(thungXuat.reduce((a, t) => a + t.kg, 0))} kg
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {goiYChon.length > 0 && (
+                <button type="button" onClick={() => chonDs(goiYChon, true)}
+                  className="rounded-lg bg-brand-navy text-white px-3 py-1.5 text-sm font-semibold">
+                  ✓ Chọn tất cả gợi ý {nccChon} ({goiYChon.length})
+                </button>
+              )}
+              <button type="button" onClick={() => chonDs(thungXuat, true)}
+                className="rounded-lg border border-brand-navy text-brand-navy px-3 py-1.5 text-sm font-semibold">
+                Chọn tất cả ({thungXuat.length})
+              </button>
+              {lines.some((l) => l.thung) && (
+                <button type="button" onClick={() => chonDs(thungXuat, false)}
+                  className="rounded-lg border border-red-400 text-red-600 px-3 py-1.5 text-sm font-semibold">Bỏ chọn</button>
+              )}
+            </div>
+            {nhomThung.map((g) => {
+              const chonDuoc = g.ts.filter((t) => !giuThung(t.thung));
+              const du = chonDuoc.length > 0 && chonDuoc.every((t) => coThung(t.thung));
+              return (
+                <div key={g.ma} className="rounded-lg border border-slate-200 bg-white p-1.5">
+                  <label className="flex items-center gap-2 text-sm font-semibold text-brand-navy">
+                    <input type="checkbox" className="h-5 w-5" checked={du} disabled={!chonDuoc.length}
+                      onChange={() => chonDs(g.ts, !du)} />
+                    <span className="break-all">{g.ma}</span>
+                    <span className="text-xs font-normal text-slate-500 whitespace-nowrap">
+                      {g.ts.length} thùng · {fmt(g.ts.reduce((a, t) => a + t.kg, 0))} kg</span>
+                    {g.ncc !== nccChon && (
+                      <span className="ml-auto text-xs font-semibold rounded bg-amber-100 text-amber-800 px-1.5 whitespace-nowrap">
+                        {g.ncc ? `gợi ý ${g.ncc}` : 'chưa rõ NCC'}</span>
+                    )}
+                  </label>
+                  {g.ts.map((t) => {
+                    const giu = giuThung(t.thung);
+                    return (
+                      <label key={t.thung} className={`flex items-center gap-2 pl-7 py-0.5 text-xs ${giu ? 'opacity-50' : ''}`}>
+                        <input type="checkbox" className="h-4 w-4" disabled={giu} checked={coThung(t.thung)}
+                          onChange={() => chonDs([t], !coThung(t.thung))} />
+                        <span className="font-mono">{hienSaeji(t.saeji_no)}</span>
+                        <span>về {t.ngay_ve.slice(6, 8)}/{t.ngay_ve.slice(4, 6)}</span>
+                        <b>{fmt(t.kg)} kg</b>
+                        {giu && <span className="text-red-700">(đang ở phiếu khác)</span>}
+                      </label>
+                    );
+                  })}
+                </div>
+              );
+            })}
+            <div className="text-xs text-slate-500">Thùng hàng khác (R/L, S/R…) → quét phiếu di chuyển như bình thường, vào chung phiếu này.</div>
+          </div>
+        )}
+
         {loai === 'nhap' && chonThung && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-2">
             <div className="text-sm font-semibold text-amber-900 mb-1">Thùng chờ về của chỉ thị {hienSaeji(chonThung)} · {nccChon} · CĐ {cd}</div>
@@ -207,7 +284,7 @@ export default function GiaCongView({ onChuaLuu }: { onChuaLuu?: (canhBao: strin
                     <b className="text-brand-navy">{i + 1}. {hienSaeji(l.saeji_no)} · {l.ma_hang}</b>
                     <button type="button" className="text-red-600 text-sm" onClick={() => xoaDong(i)}>Xoá</button>
                   </div>
-                  <div className="text-xs text-slate-500">{l.ten_hang}{l.dat_no ? ` · thùng ${l.dat_no}-${l.dat_seq} · còn chờ ${fmt(con)} ${dv}` : ''}</div>
+                  <div className="text-xs text-slate-500">{l.ten_hang}{l.dat_no ? ` · thùng ${l.dat_no}-${l.dat_seq} · còn chờ ${fmt(con)} ${dv}` : ''}{l.thung ? ` · thùng 70 về ${l.thung}` : ''}</div>
                   <div className="flex flex-wrap items-center gap-2 mt-1">
                     {theoEa && (
                       <label className="text-sm font-semibold">EA

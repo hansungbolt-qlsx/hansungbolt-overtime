@@ -35,7 +35,10 @@ export async function GET(req: Request) {
   const giuCho: Record<string, string> = {};      // 'dat_no-dat_seq' → uid phiếu đang giữ
   for (const s of rows) {
     if (s.loai !== 'nhap' || !MO.includes(s.status)) continue;
-    for (const l of (s.lines as GcLine[]) || []) if (l.dat_no) giuCho[`${l.dat_no}-${l.dat_seq}`] = s.uid;
+    for (const l of (s.lines as GcLine[]) || []) {
+      if (l.dat_no) giuCho[`${l.dat_no}-${l.dat_seq}`] = s.uid;
+      if (l.thung) giuCho[`T:${l.thung}`] = s.uid;      // thùng 70 đã nằm trong phiếu đặt 80 khác
+    }
   }
   return NextResponse.json({ slips: rows.filter((s) => s.loai === loai), giu_cho: giuCho, partial: rows.length >= 200 });
 }
@@ -54,6 +57,7 @@ export async function POST(req: Request) {
   const lines: GcLine[] = (b.lines || []).map((l) => ({
     saeji_no: String(l.saeji_no || '').trim(), ma_hang: String(l.ma_hang || '').trim(), ten_hang: l.ten_hang || '',
     kg: Number(l.kg),
+    ...(loai === 'dat' && l.thung ? { thung: String(l.thung) } : {}),
     ...(loai === 'nhap' ? { dat_no: l.dat_no, dat_seq: l.dat_seq, kg_dat: l.kg_dat, kg_da_ve: l.kg_da_ve,
       hoan_thanh: (l.hoan_thanh === 0 ? 0 : 1) as 0 | 1,
       ...(l.ea != null ? { ea: Number(l.ea), ea_dat: l.ea_dat, ea_da_ve: l.ea_da_ve, don_trong: l.don_trong } : {}) } : {}),

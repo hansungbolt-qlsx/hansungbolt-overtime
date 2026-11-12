@@ -37,6 +37,7 @@ export type GcLine = {
   kg_dat?: number;       // phiếu nhập: kg đặt / đã về (để hiện + cảnh báo)
   kg_da_ve?: number;
   hoan_thanh?: 0 | 1;
+  thung?: string;        // phiếu ĐẶT: thùng công đoạn trước (số phiếu nhập 70 YYYYMMDD-NNNN) chọn từ "chờ xuất" (12/11/2026)
   ea?: number;           // phiếu nhập công đoạn tính EA (15/20): EA thực về
   ea_dat?: number;
   ea_da_ve?: number;
@@ -70,6 +71,9 @@ export type GcGuong = {
   cho_dat: Array<{ saeji_no: string; cong_doan: GcCongDoan; ma_hang: string; ten_hang: string; vao: number; da_dat: number }>;
   cho_ve: Array<{ dat_no: string; dat_seq: string; ncc: string; cong_doan: GcCongDoan; saeji_no: string; ma_hang: string;
     ten_hang: string; kg_dat: number; kg_da_ve: number; ngay_dat: string; ea_dat?: number; ea_da_ve?: number; don_trong?: number }>;
+  /** Thùng 70 đã nhập về, CHƯA xuất 80 (treo tới khi đặt 80) — anh Hữu 12/11/2026. ncc_goi_y = NCC đặt 80 gần nhất của mã. */
+  thung_cho?: Array<{ thung: string; cd_sau: GcCongDoan; ngay_ve: string; saeji_no: string; ma_hang: string; ten_hang: string;
+    kg: number; ncc_goi_y: string }>;
 };
 
 export const GC_STATUS_UI: Record<GcStatus, { label: string; cls: string }> = {
