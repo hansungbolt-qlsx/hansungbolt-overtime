@@ -198,10 +198,11 @@ export async function GET(
     }
   }
 
-  sheet.getCell('H5').value = `Bộ phận:  ${department}\r\nDepartment:`;
-
-  // Phiếu tăng ca sáng: cột Ghi chú (M) mỗi dòng ghi "Tăng ca sáng"
+  // Phiếu tăng ca sáng: ghi "Tăng ca sáng" cạnh Bộ phận. Cột M đổi "Ghi chú" →
+  // "Ký tên" (anh Hữu 16/11/2026) — công nhân ký, 1 ô gộp mỗi người.
   const rowNote = normShift(reg.day_type, reg.shift) === 'AM' ? MORNING_NOTE : null;
+  sheet.getCell('H5').value = `Bộ phận:  ${department}${rowNote ? ` — ${rowNote}` : ''}\r\nDepartment:`;
+  sheet.getCell('M7').value = 'Ký tên\r\nSignature';
 
   let rowPtr = 9;
   let stt = 1;
@@ -219,7 +220,6 @@ export async function GET(
         row.getCell(4).value = group.timeLabel;
         row.getCell(5).value = group.hours;
       }
-      if (rowNote) row.getCell(13).value = rowNote;
       row.getCell(8).value = item.code;
       row.getCell(9).value = item.item_code;
       // Giữ là số (calculable), format dấu , là phân cách hàng nghìn
@@ -237,6 +237,7 @@ export async function GET(
       sheet.mergeCells(startRow, 5, endRow, 5);
       sheet.mergeCells(startRow, 6, endRow, 6);
       sheet.mergeCells(startRow, 7, endRow, 7);
+      sheet.mergeCells(startRow, 13, endRow, 13);
     }
     stt++;
   }

@@ -248,8 +248,10 @@ export default async function OvertimeSheetArticle({
     });
 
   const { d: dd, m: mm, y: yyyy } = formatDateVN(reg.overtime_date);
-  // Tờ tăng ca sáng = phiếu riêng; cột Ghi chú mỗi dòng ghi "Tăng ca sáng" (anh Hữu 21/10/2026)
-  const rowNote = normShift(reg.day_type, reg.shift) === 'AM' ? MORNING_NOTE : '';
+  // Tờ tăng ca sáng = phiếu riêng (anh Hữu 21/10/2026). Từ 16/11/2026 cột cuối
+  // đổi "Ghi chú" → "Ký tên" (công nhân tự ký xác nhận đồng ý tăng ca), nên chữ
+  // "Tăng ca sáng" chuyển lên dòng Bộ phận, không ghi vào ô ký nữa.
+  const shiftNote = normShift(reg.day_type, reg.shift) === 'AM' ? MORNING_NOTE : '';
 
   // Chiều cao dòng tự cân để fit 1 trang A4 dọc — RÀNG BUỘC CỨNG.
   // A4 portrait: 297mm. Margin 8mm × 2 = 16mm. Vùng in 281mm.
@@ -317,6 +319,7 @@ export default async function OvertimeSheetArticle({
         <div className="p-2">
           <div>
             Bộ phận: <strong>{reg.department}</strong>
+            {shiftNote && <strong> — {shiftNote}</strong>}
           </div>
           <div className="text-xs italic text-gray-600">Department</div>
         </div>
@@ -380,7 +383,8 @@ export default async function OvertimeSheetArticle({
               Tỉ lệ
             </th>
             <th className="ot-cell px-1 py-1" rowSpan={2}>
-              Ghi chú
+              Ký tên
+              <div className="text-[10px] italic font-normal">Signature</div>
             </th>
           </tr>
           <tr>
@@ -440,7 +444,6 @@ export default async function OvertimeSheetArticle({
                     <td className="ot-cell px-1 py-1"></td>
                     <td className="ot-cell px-1 py-1"></td>
                     <td className="ot-cell px-1 py-1"></td>
-                    <td className="ot-cell px-1 py-1 leading-tight">{rowNote}</td>
                   </>
                 ) : (
                   <>
@@ -451,9 +454,10 @@ export default async function OvertimeSheetArticle({
                     </td>
                     <td className="ot-cell px-1 py-1"></td>
                     <td className="ot-cell px-1 py-1"></td>
-                    <td className="ot-cell px-1 py-1 leading-tight">{rowNote}</td>
                   </>
                 )}
+                {/* Ký tên: 1 ô gộp cho mỗi người (anh Hữu 16/11/2026) */}
+                {rIdx === 0 && <td className="ot-cell px-1 py-1" rowSpan={span}></td>}
               </tr>
             ));
           })}
