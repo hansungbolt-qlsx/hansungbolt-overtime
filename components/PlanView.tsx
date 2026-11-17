@@ -164,6 +164,8 @@ type Lot = {
   name: string;
   date: string;
   qty: number;
+  // Công đoạn in được theo quy trình của chỉ thị trên ERP (anh Hữu 17/11/2026) — danh sách cũ chưa có thì undefined
+  gj?: string[];
 };
 
 // Hiển thị số chỉ thị dạng 3-3 như trên KHSX ('202607023' → '607-023')
@@ -240,7 +242,18 @@ export function DccdCard({ options, onlyCodes }: { options: [string, string][]; 
     ? pool.find((l) => l.saeji.replace(/\D/g, '') === fullSaeji(directSaeji)) ?? null
     : null;
   const pickedLot = sel ?? directLot;
-  const effGj = byGj ? (pickedLot ? gjMap.get(pickedLot.code.toUpperCase()) ?? null : null) : gj;
+  // Bộ phận khác CO (anh Hữu 17/11/2026): ô Công đoạn CHỈ hiện công đoạn có trong quy trình của chỉ thị
+  // (vụ 609-031 chỉ có S/R mà vẫn chọn được R/L, C/T → phiếu in ra không có tiêu chuẩn).
+  // Danh sách chưa có thông tin công đoạn / số chỉ thị gõ thẳng không có trong danh sách → hiện đủ, app chính chặn khi in.
+  const typedLot = !byGj && directSaeji && catalog
+    ? catalog.find((l) => l.saeji.replace(/\D/g, '') === fullSaeji(directSaeji)) ?? null
+    : null;
+  const routeGj = !byGj ? (sel ?? typedLot)?.gj : undefined;
+  const shownOptions = Array.isArray(routeGj) ? options.filter(([v]) => routeGj.includes(v)) : options;
+  const noStage = !byGj && Array.isArray(routeGj) && shownOptions.length === 0;
+  const effGj = byGj
+    ? (pickedLot ? gjMap.get(pickedLot.code.toUpperCase()) ?? null : null)
+    : shownOptions.some(([v]) => v === gj) ? gj : shownOptions[0]?.[0] ?? null;
 
   const target = byGj
     ? pickedLot && effGj
@@ -279,15 +292,19 @@ export function DccdCard({ options, onlyCodes }: { options: [string, string][]; 
         ) : (
           <div>
             <label className="block text-[11px] text-brand-navy-soft mb-0.5">Công đoạn</label>
-            <select
-              value={gj}
-              onChange={(e) => setGj(e.target.value)}
-              className="px-2 py-1.5 border border-gray-300 rounded-md text-sm text-brand-navy"
-            >
-              {options.map(([v, label]) => (
-                <option key={v} value={v}>{label}</option>
-              ))}
-            </select>
+            {noStage ? (
+              <div className="px-2 py-1.5 border border-red-200 bg-red-50 rounded-md text-sm text-red-600">không có</div>
+            ) : (
+              <select
+                value={effGj ?? ''}
+                onChange={(e) => setGj(e.target.value)}
+                className="px-2 py-1.5 border border-gray-300 rounded-md text-sm text-brand-navy"
+              >
+                {shownOptions.map(([v, label]) => (
+                  <option key={v} value={v}>{label}</option>
+                ))}
+              </select>
+            )}
           </div>
         )}
         <div>
@@ -302,7 +319,11 @@ export function DccdCard({ options, onlyCodes }: { options: [string, string][]; 
             ))}
           </select>
         </div>
-        {target ? (
+        {noStage ? (
+          <span className="basis-full text-[11px] text-red-600">
+            Chỉ thị này không có công đoạn của bộ phận mình — không in được ở đây
+          </span>
+        ) : target && effGj ? (
           <PrintJobButton
             type="dccd"
             refId={`${target.saeji}|${effGj}|${copies}`}
