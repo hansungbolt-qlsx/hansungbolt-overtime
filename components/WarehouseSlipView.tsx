@@ -1590,22 +1590,27 @@ export default function WarehouseSlipView(
                             dòng, nên NCC dùng nhãn ngắn (DH/VT/NT/KOS/Korea) và
                             lot dài >16 ký tự thì hạ 1 cỡ chữ. Lot dài nhất trong
                             DB thật là 20 ký tự (20260716-02-N-MAN-19). */}
+                        {/* LOT 1 dòng RIÊNG (anh Hữu 19/11/2026): để chung dòng với NCC +
+                            ngày nhập thì break-all ngắt GIỮA LOT, ký tự cuối rơi xuống
+                            cạnh "· NT" trông như LOT thiếu chữ. Dòng 2 = NCC · ngày nhập. */}
                         <span className="flex-1 min-w-0">
                           <span
-                            className={`font-mono break-all ${
+                            className={`${isReturn ? 'block ' : ''}font-mono break-all ${
                               (c.lot_no || c.coil_no || '').length > 16 ? 'text-xs' : ''
                             }`}
                           >
                             {c.lot_no || c.coil_no}
                           </span>
+                          {(sup || (isReturn && c.ngay_goc)) && (
+                          <span className={isReturn ? 'block' : 'ml-1'}>
                           {sup && (
                             <span
-                              className={`ml-1 text-xs font-bold whitespace-nowrap ${
+                              className={`text-xs font-bold whitespace-nowrap ${
                                 multiSup && ss ? ss.text : 'text-brand-navy-soft'
                               }`}
                               title={sup}
                             >
-                              · {supShort(sup)}
+                              {isReturn ? '' : '· '}{supShort(sup)}
                             </span>
                           )}
                           {/* Trả kho: kèm NGÀY NHẬP NCC ĐẦU TIÊN của cuộn (anh Hữu 02/11/2026) —
@@ -1613,9 +1618,11 @@ export default function WarehouseSlipView(
                               bằng đúng hàm duyệt trả kho), KHÔNG dùng received_at: cuộn đã
                               trả kho 1 lần còn mang ngày trả. Thiếu → không hiện. */}
                           {isReturn && c.ngay_goc && (
-                            <span className="ml-1 text-xs text-brand-navy-soft whitespace-nowrap">
-                              · nhập {ddmmyyyy(c.ngay_goc)}
+                            <span className="text-xs text-brand-navy-soft whitespace-nowrap">
+                              {sup ? ' · ' : ''}nhập {ddmmyyyy(c.ngay_goc)}
                             </span>
+                          )}
+                          </span>
                           )}
                         </span>
                         <span className={`${EMPH} whitespace-nowrap tabular-nums`}>
