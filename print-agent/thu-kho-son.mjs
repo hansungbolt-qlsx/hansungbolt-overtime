@@ -57,6 +57,7 @@ const loB = (sp) => sp.lo.find((l) => l.lot_id === LOT_BLUE);   // tìm theo mã
 ck(blue && loB(blue) && blue.la_thung && blue.kg_moi_dv === 18.14, 'sơn xanh: có lô 4825022, thùng 18,14 kg', blue && blue.lo);
 ck(blue.lo.every((l, i) => i === 0 || (blue.lo[i - 1].han || '9') <= (l.han || '9')), 'lô xếp HSD sớm trước', blue.lo.map((l) => l.han));
 const tonBlue0 = loB(blue).ton;
+const lineBlue0 = blue.line_kg;    // 20/11/2026: Line gốc theo ảnh chụp DB (anh đã điều chỉnh tay) — không giả định 0
 ck(await ks.dayTon() === false && soUpload === 1, 'lần 2 không đổi → KHÔNG đẩy lại (tiết kiệm gói Free)');
 
 console.log('\n2. Tổ trưởng gửi phiếu XS-991231-01 (1 thùng sơn xanh + 10,5 lít toluene)');
@@ -75,7 +76,9 @@ await new Promise((r) => setTimeout(r, 300));
 // app chính cần 1 lượt đọc để file tồn phản ánh — việc nền đã đọc lại state sau khi ghi
 ck(await ks.dayTon() === true, 'tồn đổi → đẩy lại file');
 const blue1 = JSON.parse(kho['plan-files/kho-son.json']).san_pham.find((p) => p.product_id === 'blue');
-ck(loB(blue1).ton === tonBlue0 - 1 && blue1.line_kg === 18.14, `tồn lô 4825022 ${tonBlue0} → ${tonBlue0 - 1}, Tồn Line 18,14 kg`, loB(blue1));
+ck(loB(blue1).ton === tonBlue0 - 1 && Math.abs(blue1.line_kg - (lineBlue0 + 18.14)) < 0.001
+   && Math.abs(blue1.line_erp_kg - (blue.line_erp_kg + 18.14)) < 0.001,
+   `tồn lô 4825022 ${tonBlue0} → ${tonBlue0 - 1}, Tồn Line ${lineBlue0} + 18,14 kg (cả line_erp_kg)`, { lo: loB(blue1), line: blue1.line_kg });
 
 console.log('\n3. Admin nhập kho trên app Coating đúng lúc tổ trưởng sửa phiếu (409)');
 await coatingPost('/test/chen', {});

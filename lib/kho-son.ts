@@ -11,7 +11,14 @@ export const KS_SUA_NGAY = 7;                  // tổ trưởng sửa/huỷ phi
 export type KsLo = { lot_id: string; lot_no: string; han: string | null; ngay_nhap?: string | null; con_ngay: number | null; ton: number;
   ton_kg: number; muc: 'tot' | 'sap' | 'het' };
 export type KsSanPham = { product_id: string; code: string; ten: string; ten_day_du: string; don_vi: string;
-  kg_moi_dv: number; la_thung: boolean; mau?: string | null; ton: number; ton_kg: number; lo: KsLo[]; co_line: boolean; line_kg: number | null };
+  kg_moi_dv: number; la_thung: boolean; mau?: string | null; ton: number; ton_kg: number; lo: KsLo[]; co_line: boolean; line_kg: number | null;
+  // Tồn Line TẠM → CHỐT (anh Hữu 20/11/2026): app chính gửi phần đã CHỐT theo phiếu nhập CO trên ERP; điện thoại trừ tiếp
+  // phần TẠM theo dòng Sản lượng CO (kể cả chưa Gửi) — khoá 'YYYY-MM-DD|MÃ' ngày ≥ line_moc_ngay, không nằm trong line_chot.
+  line_erp_kg?: number; line_moc_ngay?: string; line_moc_luc?: string;
+  line_dm?: Record<string, [number, number]>;   // mã → [g keo / EA, g thành phẩm / EA]
+  line_chot?: string[] };
+/** 1 dòng Sản lượng CO (công đoạn 86) trên app tăng ca — để trừ tạm Tồn Line. */
+export type KsCoDong = { ngay: string; ma: string; kg: number };
 export type KsTon = { ok: boolean; loi?: string; at?: string; rev?: number; doc_luc?: string;
   phieu_v?: Record<string, number>; san_pham: KsSanPham[]; chua_dinh_muc?: { ma: string; ea: number }[] };
 
@@ -65,6 +72,42 @@ export function tonTam(ton: KsTon | null, phieus: KsPhieu[], boQua?: string): Re
     for (const d of p.status === 'cancelled' ? [] : p.lines) m[d.lot_id] = r3((m[d.lot_id] || 0) - d.qty);
   }
   return m;
+}
+
+/** Tồn Line thời gian thực (anh Hữu 20/11/2026) — CÙNG LUẬT app chính coating_kho.ton_line:
+ *  = line_erp_kg (mốc + xuất app chính đã nhận − tiêu hao CHỐT theo ERP)
+ *    − TẠM: Σ theo khoá ngày × mã (ngày ≥ mốc, chưa có ERP) của EA × g keo ÷ 1000, EA = Σ round(kg × 1000 ÷ g/EA) TỪNG LOT
+ *    + phiếu xuất gửi sau mốc mà app chính CHƯA tính (phieu_v), trừ lại bản cũ app chính đã tính.
+ *  File cũ (chưa có line_erp_kg) → giữ line_kg của app chính. */
+export function lineTam(sp: KsSanPham, coDong: KsCoDong[], phieus: KsPhieu[], pv: Record<string, number>):
+  { kg: number; tam_kg: number; tam_ea: number; xuat_cho_kg: number } {
+  if (sp.line_erp_kg == null || !sp.line_moc_ngay || !sp.line_dm) {
+    return { kg: sp.line_kg ?? 0, tam_kg: 0, tam_ea: 0, xuat_cho_kg: 0 };
+  }
+  const chot = new Set(sp.line_chot || []);
+  const eaKhoa: Record<string, number> = {};
+  for (const d of coDong) {
+    const ma = d.ma.trim().toUpperCase();
+    const dm = sp.line_dm[ma];
+    if (!dm || d.ngay < sp.line_moc_ngay) continue;
+    const k = `${d.ngay}|${ma}`;
+    if (chot.has(k) || !(dm[1] > 0)) continue;
+    eaKhoa[k] = (eaKhoa[k] || 0) + Math.round((d.kg * 1000) / dm[1]);
+  }
+  let tam = 0, tamEa = 0;
+  for (const [k, ea] of Object.entries(eaKhoa)) {
+    tam += (ea * sp.line_dm[k.slice(11)][0]) / 1000;
+    tamEa += ea;
+  }
+  let xuat = 0;
+  const moc = sp.line_moc_luc ? Date.parse(`${sp.line_moc_luc}+07:00`) : 0;
+  for (const p of phieus) {
+    const daTinh = pv[p.so_phieu] || 0;
+    if (p.version <= daTinh || Date.parse(p.sent_at) <= moc) continue;
+    const cong = (ds: KsDong[]) => ds.filter((d) => d.product_id === sp.product_id).reduce((a, d) => a + d.qty, 0);
+    xuat += (cong(p.status === 'cancelled' ? [] : p.lines) - cong(dongTaiVersion(p, daTinh))) * sp.kg_moi_dv;
+  }
+  return { kg: r3(sp.line_erp_kg - tam + xuat), tam_kg: r3(tam), tam_ea: tamEa, xuat_cho_kg: r3(xuat) };
 }
 
 /** Thứ tự xuất: theo file app chính (HSD sớm trước, cùng HSD nhập trước). Lô tồn ≤ 0 bỏ qua. */

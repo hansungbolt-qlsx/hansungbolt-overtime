@@ -4,7 +4,7 @@ import { getSession } from '@/lib/auth-server';
 import { vnToday } from '@/lib/co-day';
 import {
   KS_BUCKET, KS_PATH, KS_SUA_NGAY, canUseKhoSon, canXuatKhoSon, duocSua, kiemDongKs, soPhieuNgay, tonTam,
-  type KsDong, type KsLichSu, type KsPhieu, type KsTon,
+  type KsCoDong, type KsDong, type KsLichSu, type KsPhieu, type KsTon,
 } from '@/lib/kho-son';
 
 export const runtime = 'nodejs';
@@ -47,11 +47,29 @@ function kiemNgay(ngay: string): string | null {
   return null;
 }
 
+/** Dòng Sản lượng CO (công đoạn 86) từ ngày mốc Tồn Line sớm nhất — KỂ CẢ dòng chưa bấm Gửi — để điện thoại trừ TẠM
+ *  Tồn Line ngay khi tổ CO nhập (anh Hữu 20/11/2026). Giới hạn 40 ngày (ERP thường chốt trong 1–2 ngày). */
+async function docCoDong(ton: KsTon | null): Promise<KsCoDong[]> {
+  const mocs = (ton?.san_pham || []).map((p) => p.line_moc_ngay).filter((x): x is string => !!x).sort();
+  if (!mocs.length) return [];
+  const san = new Date(Date.now() - 40 * 86400_000).toISOString().slice(0, 10);
+  const tu = mocs[0] > san ? mocs[0] : san;
+  const { data: slips } = await supabaseAdmin.from('co_day_slips').select('id, work_date')
+    .eq('stage', '86').gte('work_date', tu).limit(100);
+  if (!slips?.length) return [];
+  const ngay = new Map(slips.map((s) => [s.id, String(s.work_date)]));
+  const { data: lines } = await supabaseAdmin.from('co_day_lines').select('slip_id, item_code, weight_kg')
+    .in('slip_id', slips.map((s) => s.id)).limit(5000);
+  return (lines ?? []).filter((l) => l.item_code && ngay.has(l.slip_id))
+    .map((l) => ({ ngay: ngay.get(l.slip_id)!, ma: String(l.item_code), kg: Number(l.weight_kg) || 0 }));
+}
+
 export async function GET() {
   const session = await getSession();
   if (!session || !canUseKhoSon(session)) return NextResponse.json({ error: 'Không có quyền' }, { status: 403 });
   const [ton, phieu] = await Promise.all([docTon(), docPhieu()]);
-  return NextResponse.json({ ton, phieu, duoc_xuat: canXuatKhoSon(session) });
+  const coDong = await docCoDong(ton);
+  return NextResponse.json({ ton, phieu, co_dong: coDong, duoc_xuat: canXuatKhoSon(session) });
 }
 
 export async function POST(req: Request) {

@@ -11,7 +11,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { vnToday } from '@/lib/co-day';
 import DateButton from './DateButton';
 import {
-  KS_SUA_NGAY, chiaFifo, duocSua, hanVN, kiemDongKs, tonTam, type KsDong, type KsPhieu, type KsSanPham, type KsTon,
+  KS_SUA_NGAY, chiaFifo, duocSua, hanVN, kiemDongKs, lineTam, tonTam, type KsCoDong, type KsDong, type KsPhieu, type KsSanPham,
+  type KsTon,
 } from '@/lib/kho-son';
 
 type Dong = Omit<KsDong, 'line_id'>;
@@ -25,6 +26,7 @@ const VONG = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'];
 export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string) => void }) {
   const [ton, setTon] = useState<KsTon | null>(null);
   const [phieu, setPhieu] = useState<KsPhieu[]>([]);
+  const [coDong, setCoDong] = useState<KsCoDong[]>([]);   // dòng Sản lượng CO — trừ TẠM Tồn Line (20/11/2026)
   const [duocXuat, setDuocXuat] = useState(false);
   const [taiLoi, setTaiLoi] = useState('');
   const [ngay, setNgay] = useState(vnToday());
@@ -47,7 +49,7 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
   const apDung = useCallback(({ ok, j }: { ok: boolean; j: Record<string, unknown> }) => {
     if (!ok) { setTaiLoi(String(j.error || 'Lỗi tải')); return; }
     setTon((j.ton as KsTon) ?? { ok: false, loi: 'agent chưa đẩy số tồn', san_pham: [] });
-    setPhieu((j.phieu as KsPhieu[]) || []); setDuocXuat(!!j.duoc_xuat); setTaiLoi('');
+    setPhieu((j.phieu as KsPhieu[]) || []); setCoDong((j.co_dong as KsCoDong[]) || []); setDuocXuat(!!j.duoc_xuat); setTaiLoi('');
   }, []);
   const tai = useCallback(async () => apDung(await docVe()), [apDung]);
   useEffect(() => {
@@ -171,7 +173,11 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
                 <div className="text-sm font-bold" style={p.mau ? { color: p.mau } : undefined}>{p.code} · {p.ten}</div>
                 <div className="flex justify-between gap-2 text-sm">
                   <span>Main <b>{so(tong)}</b> {p.don_vi}{p.la_thung ? ` (${so(tong * p.kg_moi_dv, 2)} kg)` : ''}</span>
-                  {p.co_line && <span>Line <b className={(p.line_kg ?? 0) < 0 ? 'text-red-600' : 'text-teal-700'}>{so(p.line_kg ?? 0, 2)} kg</b></span>}
+                  {p.co_line && (() => {
+                    const ln = lineTam(p, coDong, phieu, ton.phieu_v || {});
+                    return <span className="text-right">Line <b className={ln.kg < 0 ? 'text-red-600' : 'text-teal-700'}>{so(ln.kg, 2)} kg</b>
+                      {ln.tam_kg > 0 && <span className="block text-[11px] text-amber-700">gồm tạm −{so(ln.tam_kg, 2)} kg ({so(ln.tam_ea, 0)} EA) chờ ERP</span>}</span>;
+                  })()}
                 </div>
                 <div className="mt-1 space-y-1">
                   {p.lo.filter((l) => (tonLo[l.lot_id] ?? 0) > 0).map((l, i) => (
