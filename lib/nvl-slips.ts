@@ -216,6 +216,10 @@ export type StockCoil = {
   // NCC của cuộn (app chính suy từ cuộn → phiếu nhập). Rỗng = phiếu nhập tay chưa
   // ghi NCC. Có từ STOCK_PAYLOAD_V=3; snapshot cũ chưa có field này → undefined.
   supplier?: string;
+  // Cuộn NG (STOCK_PAYLOAD_V=6, 21/11/2026): app chính chỉ gửi ở cuộn Main bị NG (cùng luật trang
+  // Tồn NVL lỗi). ng_note = Nội dung lỗi ghi tay, trống thì ghi chú NG. Cuộn thường: undefined.
+  ng?: boolean;
+  ng_note?: string;
 };
 
 // Viết tắt NCC — user quy ước 28/7 để mỗi cuộn LUÔN nằm gọn 1 dòng trên điện

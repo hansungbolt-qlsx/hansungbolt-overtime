@@ -1574,7 +1574,9 @@ export default function WarehouseSlipView(
                   return (
                     <li
                       key={c.id}
-                      className={`px-3 py-2 text-sm ${multiSup && ss ? ss.bg : ''}`}
+                      className={`px-3 py-2 text-sm ${
+                        c.ng ? 'bg-red-100 text-red-800' : multiSup && ss ? ss.bg : ''
+                      }`}
                     >
                       {/* Ô tích nằm CUỐI, sau số Kg — ngón tay thao tác từ phải
                           sang cho dễ (user 28/7). Cả dòng vẫn là <label> nên
@@ -1601,6 +1603,13 @@ export default function WarehouseSlipView(
                           >
                             {c.lot_no || c.coil_no}
                           </span>
+                          {/* Cuộn NG (anh Hữu 21/11/2026): vẫn chọn được nhưng tô đỏ cả dòng + nhãn NG
+                              để anh Cường biết trước khi tick. Nội dung lỗi ở dòng riêng bên dưới. */}
+                          {c.ng && (
+                            <span className="ml-1 inline-block rounded bg-red-600 px-1.5 text-xs font-bold text-white align-middle">
+                              NG
+                            </span>
+                          )}
                           {(sup || (isReturn && c.ngay_goc)) && (
                           <span className={isReturn ? 'block' : 'ml-1'}>
                           {sup && (
@@ -1648,6 +1657,11 @@ export default function WarehouseSlipView(
                           className="w-6 h-6 shrink-0"
                         />
                       </label>
+                      {c.ng && (
+                        <div className="mt-0.5 text-xs font-semibold text-red-700 break-words">
+                          ⚠ NG{c.ng_note ? `: ${c.ng_note}` : ''}
+                        </div>
+                      )}
                       {/* Trả kho: sửa được Kg cân thực khi trả cuộn dở */}
                       {on && isReturn && (
                         <div className="mt-1 pl-7 flex items-center gap-2">
