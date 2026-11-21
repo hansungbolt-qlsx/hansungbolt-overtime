@@ -194,8 +194,8 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
                 </div>
                 <div className="mt-1 space-y-1">
                   {p.lo.filter((l) => (tonLo[l.lot_id] ?? 0) > 0).map((l, i) => (
-                    // 21/11/2026 (anh Hữu): lô + số lượng + hạn LUÔN 1 dòng — hạn dồn sang phải, không xuống dòng
-                    <div key={l.lot_id} className={`text-[clamp(11px,3.45vw,13px)] border rounded px-2 py-1 flex items-center gap-x-[5px] whitespace-nowrap ${MAU[l.muc]}`}>
+                    // 21/11/2026 (anh Hữu): lô + số lượng + hạn LUÔN 1 dòng — hạn dồn sang phải; máy < 340px chữ 10px (đo thật 320px)
+                    <div key={l.lot_id} className={`text-[clamp(11px,3.45vw,13px)] max-[340px]:text-[10px] border rounded px-2 py-1 flex items-center gap-x-[5px] whitespace-nowrap ${MAU[l.muc]}`}>
                       <span className="shrink-0">{VONG[i] ?? `${i + 1}.`} {l.lot_no ? <>Lô <b>{l.lot_no}</b></> : <>Nhập {hanVN(l.ngay_nhap ?? null) || '—'}</>}</span>
                       <span className="shrink-0">· <b>{so(tonLo[l.lot_id])}</b> {p.la_thung ? 'thùng' : p.don_vi}</span>
                       {l.han && <span className="ml-auto min-w-0 truncate text-right">{l.muc === 'het' ? <b>Hết hạn {hanNgan(l.han)}</b> : <>HSD {hanNgan(l.han)}</>}</span>}
