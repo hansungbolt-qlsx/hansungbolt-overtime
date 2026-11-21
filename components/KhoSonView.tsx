@@ -31,6 +31,7 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
   const [coDong, setCoDong] = useState<KsCoDong[]>([]);   // dòng Sản lượng CO — trừ TẠM Tồn Line (20/11/2026)
   const [duocXuat, setDuocXuat] = useState(false);
   const [taiLoi, setTaiLoi] = useState('');
+  const [taiLuc, setTaiLuc] = useState<Date | null>(null);   // lúc điện thoại tải xong số tồn (21/11/2026)
   const [ngay, setNgay] = useState(vnToday());
   const [gio, setGio] = useState<Dong[]>([]);
   const [chonSp, setChonSp] = useState('');
@@ -52,11 +53,17 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
     if (!ok) { setTaiLoi(String(j.error || 'Lỗi tải')); return; }
     setTon((j.ton as KsTon) ?? { ok: false, loi: 'agent chưa đẩy số tồn', san_pham: [] });
     setPhieu((j.phieu as KsPhieu[]) || []); setCoDong((j.co_dong as KsCoDong[]) || []); setDuocXuat(!!j.duoc_xuat); setTaiLoi('');
+    setTaiLuc(new Date());
   }, []);
   const tai = useCallback(async () => apDung(await docVe()), [apDung]);
-  // nút ↻ cạnh "cập nhật" (anh Hữu 21/11/2026): tổ trưởng bấm → tải lại tồn + Sản lượng CO mới nhất
+  // nút ↻ cạnh "cập nhật" (anh Hữu 21/11/2026): tổ trưởng bấm → tải lại tồn + Sản lượng CO mới nhất.
+  // "cập nhật HH:MM" = lúc ĐIỆN THOẠI tải xong (đổi ngay khi bấm) — giờ app chính gửi file (ton.at) chỉ đổi khi số đổi.
   const [dangTai, setDangTai] = useState(false);
-  const lamMoi = async () => { if (dangTai) return; setDangTai(true); try { await tai(); } finally { setDangTai(false); } };
+  const lamMoi = async () => {
+    if (dangTai) return;
+    setDangTai(true);
+    try { await Promise.all([tai(), new Promise((r) => setTimeout(r, 500))]); } finally { setDangTai(false); }   // quay ≥ 0,5 s cho thấy đã bấm
+  };
   useEffect(() => {
     let song = true;
     docVe().then((kq) => { if (song) apDung(kq); });
@@ -168,11 +175,11 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
       <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-3">
         <div className="flex items-baseline justify-between mb-2">
           <h2 className="font-bold text-brand-navy">Tồn kho</h2>
-          <span className="flex items-center gap-1.5 text-xs text-gray-500">
-            cập nhật {ton.at ? new Date(ton.at).toLocaleTimeString('vi-VN', { hour12: false, hour: '2-digit', minute: '2-digit' }) : ''}
+          <span className="flex items-center gap-1 text-xs text-gray-500">
+            cập nhật {(taiLuc ?? (ton.at ? new Date(ton.at) : null))?.toLocaleTimeString('vi-VN', { hour12: false, hour: '2-digit', minute: '2-digit' }) ?? ''}
             <button type="button" onClick={lamMoi} disabled={dangTai} aria-label="Cập nhật tồn mới nhất" title="Cập nhật tồn mới nhất"
-              className="w-9 h-9 -my-2 flex items-center justify-center rounded-full border-2 border-teal-600 text-teal-700 bg-white active:bg-teal-50 disabled:opacity-60">
-              <svg viewBox="0 0 24 24" className={`w-4 h-4 ${dangTai ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              className="p-1 -m-1 rounded-full text-teal-700 active:bg-teal-50 disabled:opacity-60">
+              <svg viewBox="0 0 24 24" className={`w-3.5 h-3.5 ${dangTai ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" />
               </svg>
             </button>
