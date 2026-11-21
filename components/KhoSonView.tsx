@@ -21,6 +21,8 @@ const so = (n: number, max = 3) => n.toLocaleString('vi-VN', { maximumFractionDi
 const O_DO = 'border-2 border-red-500 rounded-lg shadow-[0_0_0_4px_rgba(239,68,68,0.15)] focus:outline-none focus:shadow-[0_0_0_4px_rgba(239,68,68,0.4)]';
 const MAU = { tot: 'bg-emerald-50 border-emerald-200 text-emerald-800', sap: 'bg-orange-50 border-orange-300 text-orange-800',
   het: 'bg-red-50 border-red-300 text-red-800' } as const;
+// hạn dd/mm/yy cho dòng lô 1 dòng (21/11/2026) — 23/01/2027 → 23/01/27
+const hanNgan = (h: string | null | undefined) => (hanVN(h ?? null) || '').replace(/\/(\d{2})(\d{2})$/, '/$2');
 const VONG = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'];
 
 export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string) => void }) {
@@ -52,6 +54,9 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
     setPhieu((j.phieu as KsPhieu[]) || []); setCoDong((j.co_dong as KsCoDong[]) || []); setDuocXuat(!!j.duoc_xuat); setTaiLoi('');
   }, []);
   const tai = useCallback(async () => apDung(await docVe()), [apDung]);
+  // nút ↻ cạnh "cập nhật" (anh Hữu 21/11/2026): tổ trưởng bấm → tải lại tồn + Sản lượng CO mới nhất
+  const [dangTai, setDangTai] = useState(false);
+  const lamMoi = async () => { if (dangTai) return; setDangTai(true); try { await tai(); } finally { setDangTai(false); } };
   useEffect(() => {
     let song = true;
     docVe().then((kq) => { if (song) apDung(kq); });
@@ -163,7 +168,15 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
       <section className="bg-white rounded-xl shadow-sm border border-brand-surface-alt p-3">
         <div className="flex items-baseline justify-between mb-2">
           <h2 className="font-bold text-brand-navy">Tồn kho</h2>
-          <span className="text-xs text-gray-500">cập nhật {ton.at ? new Date(ton.at).toLocaleTimeString('vi-VN', { hour12: false, hour: '2-digit', minute: '2-digit' }) : ''}</span>
+          <span className="flex items-center gap-1.5 text-xs text-gray-500">
+            cập nhật {ton.at ? new Date(ton.at).toLocaleTimeString('vi-VN', { hour12: false, hour: '2-digit', minute: '2-digit' }) : ''}
+            <button type="button" onClick={lamMoi} disabled={dangTai} aria-label="Cập nhật tồn mới nhất" title="Cập nhật tồn mới nhất"
+              className="w-9 h-9 -my-2 flex items-center justify-center rounded-full border-2 border-teal-600 text-teal-700 bg-white active:bg-teal-50 disabled:opacity-60">
+              <svg viewBox="0 0 24 24" className={`w-4 h-4 ${dangTai ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" />
+              </svg>
+            </button>
+          </span>
         </div>
         <div className="space-y-2">
           {ton.san_pham.map((p: KsSanPham) => {
@@ -181,10 +194,11 @@ export default function KhoSonView({ onChuaLuu }: { onChuaLuu?: (canhBao: string
                 </div>
                 <div className="mt-1 space-y-1">
                   {p.lo.filter((l) => (tonLo[l.lot_id] ?? 0) > 0).map((l, i) => (
-                    <div key={l.lot_id} className={`text-[13px] border rounded px-2 py-1 flex flex-wrap gap-x-2 ${MAU[l.muc]}`}>
-                      <span>{VONG[i] ?? `${i + 1}.`} {l.lot_no ? <>Lô <b>{l.lot_no}</b></> : <>Nhập {hanVN(l.ngay_nhap ?? null) || '—'}</>}</span>
-                      <span>· <b>{so(tonLo[l.lot_id])}</b> {p.la_thung ? 'thùng' : p.don_vi}</span>
-                      {l.han && <span>· {l.muc === 'het' ? <b>ĐÃ HẾT HẠN {hanVN(l.han)}</b> : <>Hết hạn {hanVN(l.han)}</>}</span>}
+                    // 21/11/2026 (anh Hữu): lô + số lượng + hạn LUÔN 1 dòng — hạn dồn sang phải, không xuống dòng
+                    <div key={l.lot_id} className={`text-[clamp(11px,3.45vw,13px)] border rounded px-2 py-1 flex items-center gap-x-[5px] whitespace-nowrap ${MAU[l.muc]}`}>
+                      <span className="shrink-0">{VONG[i] ?? `${i + 1}.`} {l.lot_no ? <>Lô <b>{l.lot_no}</b></> : <>Nhập {hanVN(l.ngay_nhap ?? null) || '—'}</>}</span>
+                      <span className="shrink-0">· <b>{so(tonLo[l.lot_id])}</b> {p.la_thung ? 'thùng' : p.don_vi}</span>
+                      {l.han && <span className="ml-auto min-w-0 truncate text-right">{l.muc === 'het' ? <b>Hết hạn {hanNgan(l.han)}</b> : <>HSD {hanNgan(l.han)}</>}</span>}
                     </div>
                   ))}
                 </div>
